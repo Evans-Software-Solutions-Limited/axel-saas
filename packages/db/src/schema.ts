@@ -83,9 +83,9 @@ export const subscriptions = pgTable(
   },
   (table) => ({
     userIdIdx: uniqueIndex("subscriptions_user_id_idx").on(table.userId),
-    stripeCustomerIdIdx: uniqueIndex(
-      "subscriptions_stripe_customer_id_idx",
-    ).on(table.stripeCustomerId),
+    stripeCustomerIdIdx: uniqueIndex("subscriptions_stripe_customer_id_idx").on(
+      table.stripeCustomerId,
+    ),
   }),
 );
 
@@ -132,7 +132,10 @@ export const onboardingAnswers = pgTable(
       .notNull()
       .unique()
       .references(() => users.id, { onDelete: "cascade" }),
-    answers: jsonb("answers").$type<Record<string, unknown>>().notNull().default({}),
+    answers: jsonb("answers")
+      .$type<Record<string, unknown>>()
+      .notNull()
+      .default({}),
     completedAt: timestamp("completed_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
