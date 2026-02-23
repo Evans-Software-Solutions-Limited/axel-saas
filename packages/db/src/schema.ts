@@ -1,0 +1,150 @@
+import {
+  pgEnum,
+  pgTable,
+  text,
+  timestamp,
+  uuid,
+  jsonb,
+  uniqueIndex,
+} from "drizzle-orm/pg-core";
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+export const subscriptionTierEnum = pgEnum("subscription_tier", [
+  "starter",
+  "pro",
+  "business",
+  "developer",
+]);
+
+export const subscriptionStatusEnum = pgEnum("subscription_status", [
+  "active",
+  "trialing",
+  "past_due",
+  "cancelled",
+  "incomplete",
+]);
+
+export const provisioningStatusEnum = pgEnum("provisioning_status", [
+  "pending",
+  "provisioning",
+  "active",
+  "failed",
+  "deprovisioned",
+]);
+
+// ─── Users ────────────────────────────────────────────────────────────────────
+
+export const users = pgTable(
+  "users",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    supabaseUserId: text("supabase_user_id").notNull().unique(),
+    email: text("email").notNull().unique(),
+    fullName: text("full_name"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => ({
+    supabaseUserIdIdx: uniqueIndex("users_supabase_user_id_idx").on(
+      table.supabaseUserId,
+    ),
+    emailIdx: uniqueIndex("users_email_idx").on(table.email),
+  }),
+);
+
+export type User = typeof users.$inferSelect;
+export type NewUser = typeof users.$inferInsert;
+
+// ─── Subscriptions ────────────────────────────────────────────────────────────
+
+export const subscriptions = pgTable(
+  "subscriptions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    stripeCustomerId: text("stripe_customer_id").unique(),
+    stripeSubscriptionId: text("stripe_subscription_id").unique(),
+    tier: subscriptionTierEnum("tier").notNull(),
+    status: subscriptionStatusEnum("status").notNull().default("incomplete"),
+    currentPeriodEnd: timestamp("current_period_end", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => ({
+    userIdIdx: uniqueIndex("subscriptions_user_id_idx").on(table.userId),
+    stripeCustomerIdIdx: uniqueIndex(
+      "subscriptions_stripe_customer_id_idx",
+    ).on(table.stripeCustomerId),
+  }),
+);
+
+export type Subscription = typeof subscriptions.$inferSelect;
+export type NewSubscription = typeof subscriptions.$inferInsert;
+
+// ─── Provisioning State ────────────────────────────────────────────────────────
+
+export const provisioningState = pgTable(
+  "provisioning_state",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .unique()
+      .references(() => users.id, { onDelete: "cascade" }),
+    status: provisioningStatusEnum("status").notNull().default("pending"),
+    ecsTaskArn: text("ecs_task_arn"),
+    workspacePath: text("workspace_path"),
+    errorMessage: text("error_message"),
+    provisionedAt: timestamp("provisioned_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => ({
+    userIdIdx: uniqueIndex("provisioning_state_user_id_idx").on(table.userId),
+  }),
+);
+
+export type ProvisioningState = typeof provisioningState.$inferSelect;
+export type NewProvisioningState = typeof provisioningState.$inferInsert;
+
+// ─── Onboarding Answers ───────────────────────────────────────────────────────
+
+export const onboardingAnswers = pgTable(
+  "onboarding_answers",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .unique()
+      .references(() => users.id, { onDelete: "cascade" }),
+    answers: jsonb("answers").$type<Record<string, unknown>>().notNull().default({}),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => ({
+    userIdIdx: uniqueIndex("onboarding_answers_user_id_idx").on(table.userId),
+  }),
+);
+
+export type OnboardingAnswers = typeof onboardingAnswers.$inferSelect;
+export type NewOnboardingAnswers = typeof onboardingAnswers.$inferInsert;

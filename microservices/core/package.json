@@ -13,10 +13,15 @@
     "build": "tsc --noEmit"
   },
   "dependencies": {
+    "@axel-saas/api-utils": "workspace:*",
+    "@axel-saas/db": "workspace:*",
     "@elysiajs/openapi": "^1.4.14",
+    "drizzle-orm": "^0.31.2",
     "elysia": "^1.4.23",
     "hono": "^4.11.9",
+    "jose": "^5.9.6",
     "jwt-decode": "^4.0.0",
+    "stripe": "^16.9.1",
     "sst": "*"
   },
   "devDependencies": {
