@@ -2,11 +2,22 @@
 
 export default $config({
   app(input) {
+    const stage = input?.stage ?? "dev";
     return {
-      name: "sst-monorepo-template",
-      removal: input?.stage === "production" ? "retain" : "remove",
-      protect: ["production"].includes(input?.stage),
+      name: "axel-saas",
+      removal: stage === "production" ? "retain" : "remove",
+      protect: stage === "production",
       home: "aws",
+      providers: {
+        aws: {
+          defaultTags: {
+            tags: {
+              App: "axel-saas",
+              Stage: stage,
+            },
+          },
+        },
+      },
     };
   },
   async run() {
