@@ -1,5 +1,3 @@
-import * as sst from "sst";
-
 export const supabaseDatabaseUrl = new sst.Secret(
   "AxelSaasSupabaseDatabaseUrl",
 );
