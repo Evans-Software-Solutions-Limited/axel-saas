@@ -5,8 +5,8 @@ export default $config({
     const stage = input?.stage ?? "dev";
     return {
       name: "axel-saas",
-      removal: stage === "production" ? "retain" : "remove",
-      protect: stage === "production",
+      removal: input?.stage === "production" ? "retain" : "remove",
+      protect: ["production"].includes(input?.stage),
       home: "aws",
       providers: {
         aws: {
