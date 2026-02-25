@@ -6,6 +6,38 @@
 
 declare module "sst" {
   export interface Resource {
+    "AxelSaasJwtSecret": {
+      "type": "sst.sst.Secret"
+      "value": string
+    }
+    "AxelSaasStripeSecretKey": {
+      "type": "sst.sst.Secret"
+      "value": string
+    }
+    "AxelSaasStripeWebhookSecret": {
+      "type": "sst.sst.Secret"
+      "value": string
+    }
+    "AxelSaasSupabaseAnonKey": {
+      "type": "sst.sst.Secret"
+      "value": string
+    }
+    "AxelSaasSupabaseDatabaseUrl": {
+      "type": "sst.sst.Secret"
+      "value": string
+    }
+    "api-core": {
+      "type": "sst.aws.ApiGatewayV2"
+      "url": string
+    }
+    "api-other-service": {
+      "type": "sst.aws.ApiGatewayV2"
+      "url": string
+    }
+    "web": {
+      "type": "sst.aws.StaticSite"
+      "url": string
+    }
   }
 }
 /// <reference path="sst-env.d.ts" />
