@@ -1,6 +1,17 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { UserRepository } from "../userRepository";
 import type { Db } from "@axel-saas/db";
+
+// Mock the db module BEFORE importing UserRepository to prevent module-level instantiation
+vi.mock("@axel-saas/db", async () => {
+  const actual =
+    await vi.importActual<typeof import("@axel-saas/db")>("@axel-saas/db");
+  return {
+    ...actual,
+    getDb: vi.fn(() => ({})),
+  };
+});
+
+import { UserRepository } from "../userRepository";
 
 /**
  * Creates a fluent chain that:
