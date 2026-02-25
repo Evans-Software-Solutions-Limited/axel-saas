@@ -7,22 +7,58 @@ export interface AuthUser {
   email?: string;
 }
 
+export interface AuthState {
+  user: AuthUser | null;
+  session: Session | null;
+  isLoading: boolean;
+  error: string | null;
+  onboardingCompleted: boolean;
+  isAuthenticated: boolean;
+}
+
 export function useAuth() {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [onboardingCompleted, setOnboardingCompleted] = useState(false);
   const navigate = useNavigate();
+
+  // Fetch onboarding status from user metadata
+  const fetchOnboardingStatus = (userId: string) => {
+    void (async () => {
+      try {
+        const { data, error } = await supabase
+          .from("users")
+          .select("onboarding_completed")
+          .eq("id", userId)
+          .single();
+
+        if (error) {
+          console.error("Error fetching onboarding status:", error);
+          setOnboardingCompleted(false);
+        } else if (data) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          setOnboardingCompleted((data as any).onboarding_completed ?? false);
+        }
+      } catch (err) {
+        console.error("Error fetching onboarding status:", err);
+        setOnboardingCompleted(false);
+      }
+    })();
+  };
 
   useEffect(() => {
     // Check current session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       if (session?.user) {
-        setUser({
+        const user: AuthUser = {
           id: session.user.id,
           email: session.user.email,
-        });
+        };
+        setUser(user);
+        fetchOnboardingStatus(session.user.id);
       }
       setIsLoading(false);
     });
@@ -33,12 +69,15 @@ export function useAuth() {
     } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
       if (session?.user) {
-        setUser({
+        const user: AuthUser = {
           id: session.user.id,
           email: session.user.email,
-        });
+        };
+        setUser(user);
+        fetchOnboardingStatus(session.user.id);
       } else {
         setUser(null);
+        setOnboardingCompleted(false);
       }
     });
 
@@ -100,5 +139,6 @@ export function useAuth() {
     signIn,
     signOut,
     isAuthenticated: !!user,
+    onboardingCompleted,
   };
 }

@@ -15,6 +15,8 @@ coreAPI.route("$default", {
     JWT_SECRET: supabaseJwtSecret.value,
     STRIPE_SECRET_KEY: stripeSecretKey.value,
     STRIPE_WEBHOOK_SECRET: stripeWebhookSecret.value,
+    NODE_ENV: process.env.NODE_ENV || "development",
+    VITE_WEB_URL: process.env.VITE_WEB_URL || "http://localhost:5173",
   },
 });
 

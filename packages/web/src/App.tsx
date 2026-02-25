@@ -39,7 +39,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 }
 
 function App() {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, onboardingCompleted } = useAuth();
 
   if (isLoading) {
     return (
@@ -58,7 +58,11 @@ function App() {
             path="/"
             element={
               isAuthenticated ? (
-                <Navigate to="/dashboard" />
+                onboardingCompleted ? (
+                  <Navigate to="/dashboard" />
+                ) : (
+                  <Navigate to="/onboarding" />
+                )
               ) : (
                 <Navigate to="/login" />
               )
