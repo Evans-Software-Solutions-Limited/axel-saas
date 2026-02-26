@@ -3,28 +3,26 @@ import { Hono } from "hono";
 import { handle } from "hono/aws-lambda";
 import { cors } from "hono/cors";
 
-import { supabaseAuth } from "@axel-saas/api-utils/auth/supabaseAuth";
 import { stripeHandler } from "./application/stripe/stripeHandler";
-import { subscriptionHandler } from "./application/subscriptions/subscriptionHandler";
+import {
+  subscriptionPublicHandler,
+  subscriptionHandler,
+} from "./application/subscriptions/subscriptionHandler";
 import { userHandler } from "./application/users/userHandler";
 
-// Get allowed origins from environment variables
 const getAllowedOrigins = (): string[] => {
   const origins: string[] = [];
 
-  // In development, allow localhost
   if (process.env.NODE_ENV !== "production") {
     origins.push("http://localhost:5173");
     origins.push("http://localhost:5174");
     origins.push("http://localhost:3000");
   }
 
-  // Add frontend URL from env (for deployed environments)
   if (process.env.FRONTEND_URL) {
     origins.push(process.env.FRONTEND_URL);
   }
 
-  // Always include production frontend URL if set via SST
   if (process.env.VITE_WEB_URL) {
     origins.push(process.env.VITE_WEB_URL);
   }
@@ -34,7 +32,6 @@ const getAllowedOrigins = (): string[] => {
 
 const hono = new Hono();
 
-// Apply CORS middleware globally
 hono.use(
   "*",
   cors({
@@ -47,8 +44,11 @@ hono.use(
 
 const app = new Elysia()
   .get("/health", () => ({ status: "ok" }))
+  // Stripe webhook — unauthenticated (Stripe signs payloads itself)
   .use(stripeHandler)
-  .use(supabaseAuth)
+  // Public subscription routes — no auth
+  .use(subscriptionPublicHandler)
+  // Protected routes — each handler applies supabaseAuth internally
   .use(userHandler)
   .use(subscriptionHandler);
 
