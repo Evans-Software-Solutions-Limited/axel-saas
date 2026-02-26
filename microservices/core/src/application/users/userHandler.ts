@@ -44,21 +44,34 @@ export const userHandler = new Elysia({ name: "UserHandler" })
   .get(
     "/users/me",
     async ({ headers, set }) => {
-      // This route requires the supabaseAuth middleware to be applied first
-      const authHeader = headers.authorization;
-      if (!authHeader?.startsWith("Bearer ")) {
+      const authUser = await getAuthUser(headers.authorization);
+      if (!authUser?.sub) {
         set.status = 401;
-        return { received: false };
+        return { success: false, error: "Unauthorized" };
       }
 
       try {
-        // Parse token to get sub (would be done by middleware in real app)
-        // For now, return empty response as it requires jwt parsing
-        set.status = 501;
-        return { received: false };
-      } catch {
+        const user = await userRepository.getUserBySupabaseId(authUser.sub);
+        if (!user) {
+          set.status = 404;
+          return { success: false, error: "User not found" };
+        }
+
+        return { 
+          success: true, 
+          user: {
+            id: user.id,
+            email: user.email,
+            fullName: user.fullName,
+            onboardingCompleted: user.onboardingCompleted,
+            createdAt: user.createdAt,
+            updatedAt: user.updatedAt
+          }
+        };
+      } catch (error) {
+        console.error("Get user error:", error);
         set.status = 500;
-        return { received: false };
+        return { success: false, error: "Failed to fetch user profile" };
       }
     },
     {

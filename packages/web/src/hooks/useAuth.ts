@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import { supabase, type Session } from "@/lib/supabase";
+import { api } from "@/lib/eden";
 
 export interface AuthUser {
   id: string;
@@ -24,28 +25,19 @@ export function useAuth() {
   const [onboardingCompleted, setOnboardingCompleted] = useState(false);
   const navigate = useNavigate();
 
-  // Fetch onboarding status from user metadata
-  const fetchOnboardingStatus = (userId: string) => {
-    void (async () => {
-      try {
-        const { data, error } = await supabase
-          .from("users")
-          .select("onboarding_completed")
-          .eq("id", userId)
-          .single();
-
-        if (error) {
-          console.error("Error fetching onboarding status:", error);
-          setOnboardingCompleted(false);
-        } else if (data) {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          setOnboardingCompleted((data as any).onboarding_completed ?? false);
-        }
-      } catch (err) {
-        console.error("Error fetching onboarding status:", err);
+  // Fetch onboarding status from backend API
+  const fetchOnboardingStatus = async () => {
+    try {
+      const response = await api.core.users.me.get();
+      if (response.data?.success && response.data.user) {
+        setOnboardingCompleted(response.data.user.onboardingCompleted);
+      } else {
         setOnboardingCompleted(false);
       }
-    })();
+    } catch (err) {
+      console.error("Error fetching onboarding status:", err);
+      setOnboardingCompleted(false);
+    }
   };
 
   useEffect(() => {
@@ -58,7 +50,7 @@ export function useAuth() {
           email: session.user.email,
         };
         setUser(user);
-        fetchOnboardingStatus(session.user.id);
+        void fetchOnboardingStatus();
       }
       setIsLoading(false);
     });
@@ -74,7 +66,7 @@ export function useAuth() {
           email: session.user.email,
         };
         setUser(user);
-        fetchOnboardingStatus(session.user.id);
+        void fetchOnboardingStatus();
       } else {
         setUser(null);
         setOnboardingCompleted(false);

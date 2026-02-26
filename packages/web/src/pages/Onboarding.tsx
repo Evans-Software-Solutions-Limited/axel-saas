@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { useNavigate } from "react-router";
 import { api } from "@/lib/eden";
+import { IconLogout } from "@tabler/icons-react";
+import { useAuth } from "@/hooks/useAuth";
 
 interface OnboardingData {
   name: string;
@@ -48,8 +50,14 @@ export function Onboarding() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
+  const { signOut } = useAuth();
 
   const progress = ((currentStep + 1) / STEP_LABELS.length) * 100;
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate("/login");
+  };
 
   const handleNext = () => {
     if (currentStep < STEP_LABELS.length - 1) {
@@ -119,8 +127,27 @@ export function Onboarding() {
                 : false;
 
   return (
-    <div className="min-h-screen bg-[#0f0f0f] dark text-white p-8">
-      <div className="max-w-2xl mx-auto">
+    <div className="min-h-screen bg-[#0f0f0f] dark text-white">
+      {/* Header */}
+      <div className="border-b border-[#1a1a1a] bg-[#111] px-8 py-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-blue-600 bg-clip-text text-transparent">
+              Axel
+            </h1>
+          </div>
+          <button
+            onClick={handleSignOut}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-gray-400 hover:text-white hover:bg-[#1a1a1a] transition-colors"
+          >
+            <IconLogout size={20} />
+            <span>Sign out</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Main content */}
+      <div className="max-w-2xl mx-auto p-8">
         {/* Progress bar */}
         <div className="mb-12">
           <div className="flex items-center justify-between mb-4">

@@ -58,18 +58,20 @@ export default defineConfig({
     environment: "jsdom",
     coverage: {
       provider: "v8",
-      // Target 90% - increase as tests are added. Set to 0 for template to pass CI.
+      // Target 90% for lines/functions/statements, 80% for branches
       thresholds: {
-        lines: 0,
-        functions: 0,
-        branches: 0,
-        statements: 0,
+        lines: 90,
+        functions: 90,
+        branches: 80,
+        statements: 90,
       },
       exclude: [
         "node_modules",
         "**/*.test.{ts,tsx}",
         "**/*.config.{ts,js}",
         "**/components/ui/**",
+        "**/components/*-example.tsx",
+        "**/pages/**/__tests__/**",
       ],
     },
   },
