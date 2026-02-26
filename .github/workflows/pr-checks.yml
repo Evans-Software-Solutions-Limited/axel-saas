@@ -28,7 +28,6 @@ jobs:
       has-changes: ${{ steps.set-any.outputs.has-changes }}
       web: ${{ steps.filter.outputs.web }}
       core: ${{ steps.filter.outputs.core }}
-      other-service: ${{ steps.filter.outputs.other-service }}
       api-utils: ${{ steps.filter.outputs.api-utils }}
       infra: ${{ steps.filter.outputs.infra }}
     steps:
@@ -41,9 +40,6 @@ jobs:
               - packages/api-utils/**
             core:
               - microservices/core/**
-              - packages/api-utils/**
-            other-service:
-              - microservices/other-service/**
               - packages/api-utils/**
             api-utils:
               - packages/api-utils/**
@@ -60,7 +56,6 @@ jobs:
         run: |
           if [ "${{ steps.filter.outputs.web }}" == "true" ] || \
              [ "${{ steps.filter.outputs.core }}" == "true" ] || \
-             [ "${{ steps.filter.outputs.other-service }}" == "true" ] || \
              [ "${{ steps.filter.outputs.api-utils }}" == "true" ] || \
              [ "${{ steps.filter.outputs.infra }}" == "true" ]; then
             echo "has-changes=true" >> $GITHUB_OUTPUT

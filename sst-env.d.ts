@@ -6,10 +6,6 @@
 
 declare module "sst" {
   export interface Resource {
-    "AxelSaasJwtSecret": {
-      "type": "sst.sst.Secret"
-      "value": string
-    }
     "AxelSaasStripeSecretKey": {
       "type": "sst.sst.Secret"
       "value": string
@@ -23,10 +19,6 @@ declare module "sst" {
       "value": string
     }
     "api-core": {
-      "type": "sst.aws.ApiGatewayV2"
-      "url": string
-    }
-    "api-other-service": {
       "type": "sst.aws.ApiGatewayV2"
       "url": string
     }

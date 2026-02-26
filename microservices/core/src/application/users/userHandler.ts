@@ -1,54 +1,25 @@
 import Elysia, { t } from "elysia";
-import { createRemoteJWKSet, jwtVerify } from "jose";
+import {
+  getAuthUser,
+  requireAuth,
+  getUser,
+} from "@axel-saas/api-utils/auth/supabaseAuth";
 import { userRepository } from "../repositories/userRepository";
 
-// Cached per Lambda warm instance — avoids re-fetching on every request
-let _jwks: ReturnType<typeof createRemoteJWKSet> | null = null;
-
-function getJwks() {
-  if (!_jwks) {
-    const supabaseUrl = process.env.SUPABASE_URL;
-    if (!supabaseUrl) {
-      throw new Error("SUPABASE_URL environment variable is not set");
-    }
-    _jwks = createRemoteJWKSet(
-      new URL(
-        `${supabaseUrl.replace(/\/$/, "")}/auth/v1/.well-known/jwks.json`,
-      ),
-    );
-  }
-  return _jwks;
-}
-
-async function getAuthUser(authHeader: string | undefined) {
-  if (!authHeader?.startsWith("Bearer ")) {
-    console.warn("[getAuthUser] Missing or malformed Authorization header");
-    return null;
-  }
-
-  const token = authHeader.slice(7);
-  try {
-    const { payload } = await jwtVerify(token, getJwks());
-    return payload as { sub: string; email: string };
-  } catch (err) {
-    console.error("[getAuthUser] JWT verification failed:", err);
-    return null;
-  }
-}
-
 export const userHandler = new Elysia({ name: "UserHandler" })
+  .derive(async ({ headers }) => ({
+    user: await getAuthUser(headers.authorization),
+  }))
+  .onBeforeHandle(requireAuth)
   .get(
     "/users/me",
-    async ({ headers, set }) => {
-      const authUser = await getAuthUser(headers.authorization);
-      if (!authUser?.sub) {
-        set.status = 401;
-        return { success: false, error: "Unauthorized" };
-      }
-
+    async (ctx) => {
+      const { set } = ctx;
       try {
-        const user = await userRepository.getUserBySupabaseId(authUser.sub);
-        if (!user) {
+        const dbUser = await userRepository.getUserBySupabaseId(
+          getUser(ctx).sub,
+        );
+        if (!dbUser) {
           set.status = 404;
           return { success: false, error: "User not found" };
         }
@@ -56,12 +27,12 @@ export const userHandler = new Elysia({ name: "UserHandler" })
         return {
           success: true,
           user: {
-            id: user.id,
-            email: user.email,
-            fullName: user.fullName,
-            onboardingCompleted: user.onboardingCompleted,
-            createdAt: user.createdAt,
-            updatedAt: user.updatedAt,
+            id: dbUser.id,
+            email: dbUser.email,
+            fullName: dbUser.fullName,
+            onboardingCompleted: dbUser.onboardingCompleted,
+            createdAt: dbUser.createdAt,
+            updatedAt: dbUser.updatedAt,
           },
         };
       } catch (error) {
@@ -79,25 +50,18 @@ export const userHandler = new Elysia({ name: "UserHandler" })
   )
   .post(
     "/users/onboarding",
-    async ({ body, headers, set }) => {
-      const authUser = await getAuthUser(headers.authorization);
-      if (!authUser?.sub) {
-        set.status = 401;
-        return { success: false, error: "Unauthorized" };
-      }
-
+    async (ctx) => {
+      const { body, set } = ctx;
       try {
-        // Get user from database
-        const dbUser = await userRepository.getUserBySupabaseId(authUser.sub);
+        const dbUser = await userRepository.getUserBySupabaseId(
+          getUser(ctx).sub,
+        );
         if (!dbUser) {
           set.status = 404;
           return { success: false, error: "User not found" };
         }
 
-        // Update onboarding answers
         await userRepository.updateOnboardingAnswers(dbUser.id, body);
-
-        // Mark onboarding as completed
         await userRepository.updateUser(dbUser.id, {
           onboardingCompleted: true,
         });
