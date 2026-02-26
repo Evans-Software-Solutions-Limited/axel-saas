@@ -13,8 +13,11 @@ coreAPI.route("$default", {
   environment: {
     DATABASE_URL: supabaseDatabaseUrl.value,
     JWT_SECRET: supabaseJwtSecret.value,
+    SUPABASE_URL: process.env.SUPABASE_URL || "",
     STRIPE_SECRET_KEY: stripeSecretKey.value,
     STRIPE_WEBHOOK_SECRET: stripeWebhookSecret.value,
+    NODE_ENV: process.env.NODE_ENV || "development",
+    VITE_WEB_URL: process.env.VITE_WEB_URL || "http://localhost:5173",
   },
 });
 

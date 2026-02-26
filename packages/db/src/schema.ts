@@ -1,4 +1,5 @@
 import {
+  boolean,
   pgEnum,
   pgTable,
   text,
@@ -42,6 +43,9 @@ export const users = pgTable(
     supabaseUserId: text("supabase_user_id").notNull().unique(),
     email: text("email").notNull().unique(),
     fullName: text("full_name"),
+    onboardingCompleted: boolean("onboarding_completed")
+      .notNull()
+      .default(false),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

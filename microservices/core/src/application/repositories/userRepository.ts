@@ -9,6 +9,7 @@ import {
   users,
   subscriptions,
   provisioningState,
+  onboardingAnswers,
 } from "@axel-saas/db";
 
 export type UserWithRelations = User & {
@@ -26,6 +27,7 @@ function rowToUser(
     supabaseUserId: userRow.supabaseUserId,
     email: userRow.email,
     fullName: userRow.fullName,
+    onboardingCompleted: userRow.onboardingCompleted,
     createdAt: userRow.createdAt,
     updatedAt: userRow.updatedAt,
     ...(subRow && { subscription: subRow }),
@@ -107,4 +109,47 @@ export class UserRepository {
       .set({ ...updates, updatedAt: new Date() })
       .where(eq(users.id, id));
   }
+
+  async getUserBySupabaseId(supabaseUserId: string): Promise<User | null> {
+    const [userRow] = await this.db
+      .select()
+      .from(users)
+      .where(eq(users.supabaseUserId, supabaseUserId))
+      .limit(1);
+
+    return userRow ?? null;
+  }
+
+  async updateUser(
+    id: string,
+    updates: Partial<Omit<User, "id" | "createdAt">>,
+  ): Promise<void> {
+    await this.updateById(id, updates);
+  }
+
+  async updateOnboardingAnswers(
+    userId: string,
+    answers: Record<string, unknown>,
+  ): Promise<void> {
+    const existing = await this.db
+      .select()
+      .from(onboardingAnswers)
+      .where(eq(onboardingAnswers.userId, userId))
+      .limit(1);
+
+    if (existing.length > 0) {
+      await this.db
+        .update(onboardingAnswers)
+        .set({ answers, updatedAt: new Date() })
+        .where(eq(onboardingAnswers.userId, userId));
+    } else {
+      await this.db.insert(onboardingAnswers).values({
+        userId,
+        answers,
+        completedAt: new Date(),
+      });
+    }
+  }
 }
+
+export const userRepository = new UserRepository();

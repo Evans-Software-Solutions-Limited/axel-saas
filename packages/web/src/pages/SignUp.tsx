@@ -2,34 +2,49 @@ import { useState } from "react";
 import { useNavigate, Link } from "react-router";
 import { useAuth } from "@/hooks/useAuth";
 
-export function Login() {
+export function SignUp() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const { signIn, error } = useAuth();
+  const [localError, setLocalError] = useState<string | null>(null);
+  const { signUp, error } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setLocalError(null);
+
+    if (password !== confirmPassword) {
+      setLocalError("Passwords do not match");
+      return;
+    }
+
+    if (password.length < 6) {
+      setLocalError("Password must be at least 6 characters");
+      return;
+    }
+
     setIsLoading(true);
 
-    const result = await signIn(email, password);
+    const result = await signUp(email, password);
     if (result.success) {
-      // Redirect based on onboarding status
-      // For now, redirect to onboarding
-      navigate("/onboarding");
+      // Redirect to subscribe page
+      navigate("/subscribe");
     }
 
     setIsLoading(false);
   };
 
+  const displayError = localError || error;
+
   return (
     <div className="min-h-screen bg-[#0f0f0f] dark flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="rounded-lg border border-[#1a1a1a] bg-[#111] p-8">
-          <h1 className="mb-2 text-3xl font-bold text-white">Welcome back</h1>
+          <h1 className="mb-2 text-3xl font-bold text-white">Create account</h1>
           <p className="mb-8 text-sm text-gray-400">
-            Sign in to your Axel account
+            Get started with Axel, your AI personal assistant
           </p>
 
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -69,9 +84,27 @@ export function Login() {
               />
             </div>
 
-            {error && (
+            <div>
+              <label
+                htmlFor="confirmPassword"
+                className="block text-sm font-medium text-gray-300"
+              >
+                Confirm Password
+              </label>
+              <input
+                id="confirmPassword"
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                required
+                className="mt-1 w-full rounded-lg bg-[#1a1a1a] px-4 py-2 text-white placeholder-gray-500 border border-[#2a2a2a] focus:border-blue-500 focus:outline-none"
+                placeholder="••••••••"
+              />
+            </div>
+
+            {displayError && (
               <div className="rounded-lg bg-red-500/10 p-3 text-sm text-red-400 border border-red-500/20">
-                {error}
+                {displayError}
               </div>
             )}
 
@@ -80,14 +113,14 @@ export function Login() {
               disabled={isLoading}
               className="w-full rounded-lg bg-blue-500 py-2 font-medium text-white hover:bg-blue-600 disabled:opacity-50 transition-colors"
             >
-              {isLoading ? "Signing in..." : "Sign in"}
+              {isLoading ? "Creating account..." : "Create account"}
             </button>
           </form>
 
           <p className="mt-6 text-center text-sm text-gray-400">
-            Don't have an account?{" "}
-            <Link to="/signup" className="text-blue-400 hover:text-blue-300">
-              Sign up
+            Already have an account?{" "}
+            <Link to="/login" className="text-blue-400 hover:text-blue-300">
+              Sign in
             </Link>
           </p>
         </div>
@@ -96,4 +129,4 @@ export function Login() {
   );
 }
 
-export default Login;
+export default SignUp;
