@@ -14,9 +14,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const fetchOnboardingStatus = async () => {
     try {
-      const response = await api.core.users.me.get();
-      if (response.data?.success && response.data.user) {
-        setOnboardingCompleted(response.data.user.onboardingCompleted);
+      const { data } = await api.core.users.me.get();
+      if (data && "user" in data && data.user) {
+        setOnboardingCompleted(data.user.onboardingCompleted);
       } else {
         setOnboardingCompleted(false);
       }
