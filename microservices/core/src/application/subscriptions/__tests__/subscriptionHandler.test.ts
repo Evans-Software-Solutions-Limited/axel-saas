@@ -233,7 +233,11 @@ describe("SubscriptionHandler", () => {
       );
 
       expect(result.status).toBe(200);
-      const json = (await result.json()) as { success: boolean; tierId: string; userId: string };
+      const json = (await result.json()) as {
+        success: boolean;
+        tierId: string;
+        userId: string;
+      };
       expect(json.success).toBe(true);
       expect(json.tierId).toBe("starter");
       expect(json.userId).toBe("test-user-id");

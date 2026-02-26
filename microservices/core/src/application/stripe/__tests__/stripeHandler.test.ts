@@ -177,9 +177,7 @@ describe("StripeHandler", () => {
         customer: "cus_123",
         current_period_end: 1234567890,
         items: {
-          data: [
-            { price: { metadata: { tier: "pro" } } },
-          ],
+          data: [{ price: { metadata: { tier: "pro" } } }],
         },
         status: "active",
       };

@@ -88,7 +88,7 @@ describe("UserHandler Endpoints", () => {
         new Error("Database connection failed"),
       );
 
-      expect(
+      await expect(
         mockUserRepository.getUserBySupabaseId("supabase_user_123"),
       ).rejects.toThrow("Database connection failed");
     });
@@ -114,9 +114,8 @@ describe("UserHandler Endpoints", () => {
 
       mockUserRepository.getUserBySupabaseId.mockResolvedValue(mockUser);
 
-      const result = await mockUserRepository.getUserBySupabaseId(
-        "supabase_user_123",
-      );
+      const result =
+        await mockUserRepository.getUserBySupabaseId("supabase_user_123");
       expect(result).toEqual(mockUser);
       expect(result?.email).toBe("user@example.com");
       expect(result?.fullName).toBe("Jane Doe");
@@ -155,13 +154,15 @@ describe("UserHandler Endpoints", () => {
       });
 
       // Test the flow
-      const user = await mockUserRepository.getUserBySupabaseId(
-        "supabase_user_123",
-      );
+      const user =
+        await mockUserRepository.getUserBySupabaseId("supabase_user_123");
       expect(user).toBeDefined();
 
       if (user) {
-        await mockUserRepository.updateOnboardingAnswers(user.id, onboardingData);
+        await mockUserRepository.updateOnboardingAnswers(
+          user.id,
+          onboardingData,
+        );
         expect(mockUserRepository.updateOnboardingAnswers).toHaveBeenCalledWith(
           "db_user_123",
           onboardingData,
@@ -170,9 +171,12 @@ describe("UserHandler Endpoints", () => {
         await mockUserRepository.updateUser(user.id, {
           onboardingCompleted: true,
         });
-        expect(mockUserRepository.updateUser).toHaveBeenCalledWith("db_user_123", {
-          onboardingCompleted: true,
-        });
+        expect(mockUserRepository.updateUser).toHaveBeenCalledWith(
+          "db_user_123",
+          {
+            onboardingCompleted: true,
+          },
+        );
       }
     });
 
@@ -180,9 +184,8 @@ describe("UserHandler Endpoints", () => {
       mockGetUser.mockReturnValue({ sub: "unknown_user" });
       mockUserRepository.getUserBySupabaseId.mockResolvedValue(null);
 
-      const result = await mockUserRepository.getUserBySupabaseId(
-        "unknown_user",
-      );
+      const result =
+        await mockUserRepository.getUserBySupabaseId("unknown_user");
       expect(result).toBeNull();
     });
 
@@ -202,7 +205,7 @@ describe("UserHandler Endpoints", () => {
         new Error("Update failed"),
       );
 
-      expect(
+      await expect(
         mockUserRepository.updateOnboardingAnswers("db_user_123", {}),
       ).rejects.toThrow("Update failed");
     });
@@ -223,7 +226,7 @@ describe("UserHandler Endpoints", () => {
         new Error("User update failed"),
       );
 
-      expect(
+      await expect(
         mockUserRepository.updateUser("db_user_123", {
           onboardingCompleted: true,
         }),
@@ -242,7 +245,7 @@ describe("UserHandler Endpoints", () => {
       expect(validOnboardingData.name).toBeDefined();
       expect(validOnboardingData.helpWith).toBeInstanceOf(Array);
       expect(validOnboardingData.channels).toBeInstanceOf(Array);
-      expect(validOnboardingData.morningBrief).toBeInstanceOf(Boolean);
+      expect(typeof validOnboardingData.morningBrief).toBe("boolean");
     });
 
     it("should handle missing optional onboarding fields", async () => {

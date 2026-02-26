@@ -124,8 +124,6 @@ describe("UserHandler", () => {
       // Handler has onBeforeHandle requireAuth middleware
       expect(userHandler.routes.length).toBeGreaterThan(0);
     });
-
-
   });
 
   describe("POST /users/onboarding route", () => {
@@ -232,7 +230,8 @@ describe("UserHandler", () => {
 
   describe("error handling paths", () => {
     it("should handle database errors in GET /users/me", async () => {
-      const { userRepository } = await import("../../repositories/userRepository");
+      const { userRepository } =
+        await import("../../repositories/userRepository");
       vi.mocked(userRepository.getUserBySupabaseId).mockRejectedValueOnce(
         new Error("Database error"),
       );
@@ -245,7 +244,8 @@ describe("UserHandler", () => {
     });
 
     it("should handle database errors in POST /users/onboarding", async () => {
-      const { userRepository } = await import("../../repositories/userRepository");
+      const { userRepository } =
+        await import("../../repositories/userRepository");
       vi.mocked(userRepository.updateUser).mockRejectedValueOnce(
         new Error("Database error"),
       );
@@ -260,7 +260,8 @@ describe("UserHandler", () => {
     });
 
     it("should handle errors when updating onboarding answers", async () => {
-      const { userRepository } = await import("../../repositories/userRepository");
+      const { userRepository } =
+        await import("../../repositories/userRepository");
       vi.mocked(userRepository.updateOnboardingAnswers).mockRejectedValueOnce(
         new Error("Update failed"),
       );

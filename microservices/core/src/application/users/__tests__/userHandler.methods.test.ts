@@ -5,7 +5,7 @@ vi.mock("@axel-saas/db", () => ({
   getDb: vi.fn(() => ({})),
 }));
 
-// Mock auth  
+// Mock auth
 vi.mock("@axel-saas/api-utils/auth/supabaseAuth", () => {
   return {
     getAuthUser: vi.fn(),

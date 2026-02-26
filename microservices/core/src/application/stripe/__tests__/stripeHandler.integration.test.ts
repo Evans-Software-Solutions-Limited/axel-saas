@@ -185,9 +185,7 @@ describe("StripeHandler Integration Tests", () => {
       };
 
       const isValid =
-        session.customer &&
-        session.metadata?.userId &&
-        session.metadata?.tier;
+        session.customer && session.metadata?.userId && session.metadata?.tier;
       expect(isValid).toBeFalsy();
     });
 

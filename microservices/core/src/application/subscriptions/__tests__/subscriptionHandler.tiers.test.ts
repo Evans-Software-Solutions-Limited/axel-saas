@@ -173,7 +173,13 @@ describe("SubscriptionHandler Tiers and Checkout", () => {
   describe("POST /subscriptions/checkout (Protected Endpoint)", () => {
     it("should require authentication for checkout", async () => {
       const response = await subscriptionHandler.handle(
-        new Request("http://localhost/subscriptions/checkout", { method: "POST" })
+        new Request("http://localhost/subscriptions/checkout", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ tierId: "pro" }),
+        }),
       );
       expect(response.status).toBe(401);
     });

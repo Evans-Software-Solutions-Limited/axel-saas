@@ -139,4 +139,81 @@ describe("UserRepository", () => {
       expect(mockDb.update).toHaveBeenCalledOnce();
     });
   });
+
+  describe("getUserBySupabaseId", () => {
+    it("returns user when found", async () => {
+      const user = await repo.getUserBySupabaseId("supabase-123");
+      expect(user).not.toBeNull();
+      expect(user?.id).toBe("user-uuid-1");
+      expect(user?.email).toBe("user@example.com");
+    });
+
+    it("returns null when not found", async () => {
+      (mockDb.select as ReturnType<typeof vi.fn>).mockReturnValue(
+        mockChain([]),
+      );
+      const user = await repo.getUserBySupabaseId("nonexistent");
+      expect(user).toBeNull();
+    });
+  });
+
+  describe("updateUser", () => {
+    it("updates user with new values", async () => {
+      await repo.updateUser("user-uuid-1", {
+        fullName: "New Name",
+        onboardingCompleted: true,
+      });
+      expect(mockDb.update).toHaveBeenCalledOnce();
+    });
+
+    it("does not update id or createdAt", async () => {
+      await repo.updateUser("user-uuid-1", {
+        email: "newemail@example.com",
+      });
+      expect(mockDb.update).toHaveBeenCalled();
+    });
+  });
+
+  describe("updateOnboardingAnswers", () => {
+    it("inserts new onboarding answers if not exists", async () => {
+      (mockDb.select as ReturnType<typeof vi.fn>).mockReturnValue(
+        mockChain([]),
+      );
+      (mockDb.insert as ReturnType<typeof vi.fn>).mockReturnValue(
+        mockChain([{ userId: "user-uuid-1", answers: {} }]),
+      );
+
+      await repo.updateOnboardingAnswers("user-uuid-1", {
+        name: "John",
+        channels: ["slack"],
+      });
+
+      expect(mockDb.insert).toHaveBeenCalled();
+    });
+
+    it("updates existing onboarding answers", async () => {
+      (mockDb.select as ReturnType<typeof vi.fn>).mockReturnValue(
+        mockChain([{ userId: "user-uuid-1" }]),
+      );
+
+      await repo.updateOnboardingAnswers("user-uuid-1", {
+        name: "John",
+        channels: ["email"],
+      });
+
+      expect(mockDb.update).toHaveBeenCalled();
+    });
+
+    it("sets completedAt date for new answers", async () => {
+      (mockDb.select as ReturnType<typeof vi.fn>).mockReturnValue(
+        mockChain([]),
+      );
+      (mockDb.insert as ReturnType<typeof vi.fn>).mockReturnValue(
+        mockChain([]),
+      );
+
+      await repo.updateOnboardingAnswers("user-uuid-1", { test: true });
+      expect(mockDb.insert).toHaveBeenCalled();
+    });
+  });
 });

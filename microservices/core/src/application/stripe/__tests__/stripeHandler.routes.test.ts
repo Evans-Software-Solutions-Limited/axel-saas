@@ -45,7 +45,8 @@ describe("StripeHandler - Route Execution", () => {
   it("should have POST /stripe/create-checkout-session route", async () => {
     const { stripeHandler } = await import("../stripeHandler");
     const route = stripeHandler.routes.find(
-      (r) => r.method === "POST" && r.path === "/stripe/create-checkout-session",
+      (r) =>
+        r.method === "POST" && r.path === "/stripe/create-checkout-session",
     );
     expect(route).toBeDefined();
     expect(route?.method).toBe("POST");
