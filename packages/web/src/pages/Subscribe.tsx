@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
 import { api } from "@/lib/eden";
+import SubscriptionCard from "@/components/SubscriptionCard";
 
 interface Plan {
   id: string;
@@ -79,10 +80,12 @@ export function Subscribe() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0f0f0f] dark text-white p-8">
+    <div className="min-h-screen bg-[#0a0a0a] dark text-white p-8">
       <div className="max-w-6xl mx-auto">
         <div className="mb-12">
-          <h1 className="mb-4 text-4xl font-bold">Choose your plan</h1>
+          <h1 className="text-4xl font-bold text-white mb-4">
+            Choose your plan
+          </h1>
           <p className="text-lg text-gray-400">
             Select the perfect subscription tier for your needs
           </p>
@@ -100,51 +103,15 @@ export function Subscribe() {
             const isRecommended = details?.recommended;
 
             return (
-              <div
+              <SubscriptionCard
                 key={plan.id}
-                className={`relative rounded-lg border ${
-                  isRecommended
-                    ? "border-blue-500 bg-blue-500/5"
-                    : "border-[#1a1a1a] bg-[#111]"
-                } p-6 transition-all hover:border-blue-400`}
-              >
-                {isRecommended && (
-                  <div className="absolute -top-3 left-6 bg-blue-500 text-white px-3 py-1 rounded-full text-xs font-semibold">
-                    Recommended
-                  </div>
-                )}
-
-                <h2 className="text-2xl font-bold mb-2">{plan.name}</h2>
-                <div className="mb-4">
-                  <span className="text-3xl font-bold">
-                    £{plan.priceGbpMonthly}
-                  </span>
-                  <span className="text-gray-400 ml-2">/month</span>
-                </div>
-
-                <p className="text-sm text-gray-400 mb-6">
-                  {details?.description || ""}
-                </p>
-
-                <button
-                  onClick={() => handleSelectPlan(plan.id)}
-                  disabled={isLoading && selectedPlan === plan.id}
-                  className="w-full rounded-lg bg-blue-500 py-2 font-medium text-white hover:bg-blue-600 disabled:opacity-50 transition-colors mb-6"
-                >
-                  {isLoading && selectedPlan === plan.id
-                    ? "Selecting..."
-                    : "Select plan"}
-                </button>
-
-                <div className="space-y-3 border-t border-[#2a2a2a] pt-6">
-                  {plan.features.map((feature, idx) => (
-                    <div key={idx} className="flex items-start gap-2">
-                      <span className="text-green-400 mt-0.5">✓</span>
-                      <span className="text-sm text-gray-300">{feature}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
+                tier={plan.name}
+                priceMonthly={plan.priceGbpMonthly}
+                features={plan.features}
+                isRecommended={isRecommended}
+                onSelect={() => handleSelectPlan(plan.id)}
+                isLoading={isLoading && selectedPlan === plan.id}
+              />
             );
           })}
         </div>

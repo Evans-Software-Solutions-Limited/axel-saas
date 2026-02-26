@@ -1,5 +1,8 @@
 import { useState } from "react";
 import { IconList, IconNetwork } from "@tabler/icons-react";
+import AgentStatusCard from "@/components/AgentStatusCard";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 
 interface Agent {
   id: string;
@@ -75,35 +78,34 @@ export function Office() {
   const [view, setView] = useState<"list" | "diagram">("list");
 
   return (
-    <div className="p-8">
+    <div className="p-6 bg-[#0a0a0a] min-h-screen">
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-4">Virtual Office</h1>
+        <h1 className="text-4xl font-bold text-white mb-4">Office</h1>
+        <p className="text-gray-400 mb-6">
+          Monitor your agents and manage tasks
+        </p>
 
         {/* View toggle */}
         <div className="flex gap-2">
-          <button
+          <Button
             onClick={() => setView("list")}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
-              view === "list"
-                ? "bg-blue-500 text-white"
-                : "bg-[#1a1a1a] text-gray-400 hover:text-white"
-            }`}
+            variant={view === "list" ? "default" : "outline"}
+            className={view === "list" ? "bg-blue-600 hover:bg-blue-700" : ""}
           >
-            <IconList size={18} />
+            <IconList size={18} className="mr-2" />
             List
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={() => setView("diagram")}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
-              view === "diagram"
-                ? "bg-blue-500 text-white"
-                : "bg-[#1a1a1a] text-gray-400 hover:text-white"
-            }`}
+            variant={view === "diagram" ? "default" : "outline"}
+            className={
+              view === "diagram" ? "bg-blue-600 hover:bg-blue-700" : ""
+            }
           >
-            <IconNetwork size={18} />
+            <IconNetwork size={18} className="mr-2" />
             Diagram
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -111,40 +113,17 @@ export function Office() {
         {/* Main content */}
         <div className="flex-1">
           {view === "list" ? (
-            <div className="space-y-3">
+            <div className="space-y-4">
               {MOCK_AGENTS.map((agent) => (
-                <div
+                <AgentStatusCard
                   key={agent.id}
-                  className="rounded-lg border border-[#1a1a1a] bg-[#111] p-4 flex items-center gap-4"
-                >
-                  {/* Avatar */}
-                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-lg font-bold">
-                    {agent.name.charAt(0)}
-                  </div>
-
-                  {/* Info */}
-                  <div className="flex-1">
-                    <h3 className="font-semibold text-white">{agent.name}</h3>
-                    <p className="text-sm text-gray-400">
-                      {STATUS_LABELS[agent.status]}
-                    </p>
-                  </div>
-
-                  {/* Status and task */}
-                  <div className="text-right">
-                    <div className="flex items-center gap-2 justify-end mb-1">
-                      <div
-                        className={`w-3 h-3 rounded-full ${
-                          STATUS_COLORS[agent.status]
-                        }`}
-                      />
-                      {agent.status === "working" && (
-                        <div className="w-3 h-3 rounded-full bg-blue-500 animate-pulse" />
-                      )}
-                    </div>
-                    <p className="text-xs text-gray-400">{agent.currentTask}</p>
-                  </div>
-                </div>
+                  agentName={agent.name}
+                  status={agent.status}
+                  currentTask={agent.currentTask}
+                  lastActiveTime={
+                    new Date(Date.now() - Math.random() * 3600000)
+                  }
+                />
               ))}
             </div>
           ) : (
@@ -160,7 +139,7 @@ export function Office() {
                     <div className="relative">
                       {/* Status ring */}
                       <div
-                        className={`absolute -inset-1 rounded-full ${
+                        className={`absolute -inset-2 rounded-full ${
                           STATUS_COLORS[agent.status]
                         } opacity-20`}
                       />
@@ -193,7 +172,9 @@ export function Office() {
         {/* Task sidebar */}
         <div className="w-80">
           <div className="rounded-lg border border-[#1a1a1a] bg-[#111] p-6">
-            <h2 className="text-lg font-bold mb-4">Unassigned Tasks</h2>
+            <h2 className="text-lg font-bold text-white mb-4">
+              Unassigned Tasks
+            </h2>
 
             <div className="space-y-3">
               {MOCK_TASKS.map((task) => (
@@ -205,14 +186,14 @@ export function Office() {
                     <h3 className="font-semibold text-white flex-1">
                       {task.title}
                     </h3>
-                    <span className="text-xs px-2 py-1 bg-blue-500/20 text-blue-300 rounded">
+                    <Badge variant="secondary" className="text-xs">
                       {task.project}
-                    </span>
+                    </Badge>
                   </div>
                   <p className="text-sm text-gray-400 mb-3">{task.summary}</p>
-                  <button className="w-full rounded-lg bg-blue-500 px-3 py-2 text-sm font-medium text-white hover:bg-blue-600 transition-colors">
+                  <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white text-sm">
                     Start task
-                  </button>
+                  </Button>
                 </div>
               ))}
             </div>

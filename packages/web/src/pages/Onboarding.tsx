@@ -1,8 +1,15 @@
 import { useState } from "react";
 import { useNavigate } from "react-router";
 import { api } from "@/lib/eden";
-import { IconLogout } from "@tabler/icons-react";
 import { useAuth } from "@/hooks/useAuth";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import AxelLogo from "@/components/AxelLogo";
+import StepIndicator from "@/components/StepIndicator";
+import { IconLogout } from "@tabler/icons-react";
 
 interface OnboardingData {
   name: string;
@@ -21,6 +28,7 @@ const STEP_LABELS = [
   "Your typical day",
   "Preferred channels",
   "Morning brief",
+  "Confirm",
 ];
 
 const HELP_WITH_OPTIONS = [
@@ -51,8 +59,6 @@ export function Onboarding() {
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
   const { signOut } = useAuth();
-
-  const progress = ((currentStep + 1) / STEP_LABELS.length) * 100;
 
   const handleSignOut = async () => {
     await signOut();
@@ -124,255 +130,306 @@ export function Onboarding() {
               ? data.channels.length > 0
               : currentStep === 5
                 ? true
-                : false;
+                : currentStep === 6
+                  ? true
+                  : false;
 
   return (
-    <div className="min-h-screen bg-[#0f0f0f] dark text-white">
+    <div className="min-h-screen bg-[#0a0a0a] dark text-white flex flex-col">
       {/* Header */}
-      <div className="border-b border-[#1a1a1a] bg-[#111] px-8 py-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-blue-600 bg-clip-text text-transparent">
-              Axel
-            </h1>
-          </div>
-          <button
+      <div className="border-b border-[#1a1a1a] bg-[#111] px-6 py-4">
+        <div className="flex items-center justify-between max-w-4xl mx-auto">
+          <AxelLogo size="md" variant="text" />
+          <Button
             onClick={handleSignOut}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-gray-400 hover:text-white hover:bg-[#1a1a1a] transition-colors"
+            variant="ghost"
+            className="text-gray-400 hover:text-white hover:bg-[#1a1a1a]"
           >
             <IconLogout size={20} />
             <span>Sign out</span>
-          </button>
+          </Button>
         </div>
       </div>
 
       {/* Main content */}
-      <div className="max-w-2xl mx-auto p-8">
-        {/* Progress bar */}
-        <div className="mb-12">
-          <div className="flex items-center justify-between mb-4">
-            <h1 className="text-3xl font-bold">Setup your assistant</h1>
-            <span className="text-sm text-gray-400">
-              Step {currentStep + 1} of {STEP_LABELS.length}
-            </span>
-          </div>
-          <div className="h-1 bg-[#1a1a1a] rounded-full overflow-hidden">
-            <div
-              className="h-full bg-blue-500 transition-all duration-300"
-              style={{ width: `${progress}%` }}
+      <div className="flex-1 flex items-center justify-center p-6">
+        <div className="w-full max-w-lg">
+          {/* Progress indicator */}
+          <div className="mb-8">
+            <StepIndicator
+              totalSteps={STEP_LABELS.length}
+              currentStep={currentStep}
             />
+            <div className="text-center mt-4">
+              <h1 className="text-2xl font-bold text-white mb-1">
+                Setup your assistant
+              </h1>
+              <p className="text-sm text-gray-400">
+                Step {currentStep + 1} of {STEP_LABELS.length}
+              </p>
+            </div>
           </div>
-        </div>
 
-        {/* Error message */}
-        {error && (
-          <div className="mb-6 rounded-lg bg-red-500/10 p-4 text-red-400 border border-red-500/20">
-            {error}
-          </div>
-        )}
-
-        {/* Content */}
-        <div className="rounded-lg border border-[#1a1a1a] bg-[#111] p-8">
-          {currentStep === 0 && (
-            <div>
-              <h2 className="text-2xl font-bold mb-6">What's your name?</h2>
-              <p className="text-gray-400 mb-4">What should I call you?</p>
-              <input
-                type="text"
-                value={data.name}
-                onChange={(e) => updateData({ name: e.target.value })}
-                placeholder="Your name"
-                className="w-full rounded-lg bg-[#1a1a1a] px-4 py-3 text-white placeholder-gray-500 border border-[#2a2a2a] focus:border-blue-500 focus:outline-none"
-                autoFocus
-              />
+          {/* Error message */}
+          {error && (
+            <div className="mb-6 rounded-lg bg-red-500/10 p-4 text-red-400 border border-red-500/20">
+              {error}
             </div>
           )}
 
-          {currentStep === 1 && (
-            <div>
-              <h2 className="text-2xl font-bold mb-6">
-                What do you do for work?
-              </h2>
-              <p className="text-gray-400 mb-4">
-                Brief description of your role
-              </p>
-              <input
-                type="text"
-                value={data.role || ""}
-                onChange={(e) => updateData({ role: e.target.value })}
-                placeholder="e.g., Founder at startup, Software engineer, etc."
-                className="w-full rounded-lg bg-[#1a1a1a] px-4 py-3 text-white placeholder-gray-500 border border-[#2a2a2a] focus:border-blue-500 focus:outline-none mb-6"
-                autoFocus
-              />
-              <div className="space-y-2">
-                <p className="text-sm text-gray-400 mb-3">Or select a role:</p>
-                <div className="grid grid-cols-2 gap-3">
-                  {ROLE_OPTIONS.map((role) => (
+          {/* Content Card */}
+          <Card className="bg-[#111] border-[#1a1a1a] p-8 space-y-6">
+            {currentStep === 0 && (
+              <div className="space-y-4">
+                <h2 className="text-2xl font-bold text-white">
+                  What's your name?
+                </h2>
+                <p className="text-gray-400">What should I call you?</p>
+                <Input
+                  type="text"
+                  value={data.name}
+                  onChange={(e) => updateData({ name: e.target.value })}
+                  placeholder="Your name"
+                  className="bg-[#1a1a1a] border-[#2a2a2a] text-white"
+                  autoFocus
+                />
+              </div>
+            )}
+
+            {currentStep === 1 && (
+              <div className="space-y-4">
+                <h2 className="text-2xl font-bold text-white">
+                  What do you do for work?
+                </h2>
+                <p className="text-gray-400">Brief description of your role</p>
+                <Input
+                  type="text"
+                  value={data.role || ""}
+                  onChange={(e) => updateData({ role: e.target.value })}
+                  placeholder="e.g., Founder at startup, Software engineer, etc."
+                  className="bg-[#1a1a1a] border-[#2a2a2a] text-white"
+                  autoFocus
+                />
+                <div>
+                  <p className="text-sm text-gray-400 mb-3">
+                    Or select a role:
+                  </p>
+                  <div className="grid grid-cols-2 gap-3">
+                    {ROLE_OPTIONS.map((role) => (
+                      <button
+                        key={role}
+                        onClick={() => updateData({ role })}
+                        className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
+                          data.role === role
+                            ? "bg-blue-600 text-white"
+                            : "bg-[#1a1a1a] text-gray-300 border border-[#2a2a2a] hover:border-blue-500"
+                        }`}
+                      >
+                        {role}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {currentStep === 2 && (
+              <div className="space-y-4">
+                <h2 className="text-2xl font-bold text-white">
+                  What do you mainly want help with?
+                </h2>
+                <p className="text-gray-400">Select all that apply</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {HELP_WITH_OPTIONS.map((option) => (
                     <button
-                      key={role}
-                      onClick={() => updateData({ role })}
-                      className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
-                        data.role === role
-                          ? "bg-blue-500 text-white"
+                      key={option}
+                      onClick={() => toggleHelpWith(option)}
+                      className={`rounded-lg px-4 py-3 text-left font-medium transition-colors ${
+                        data.helpWith.includes(option)
+                          ? "bg-blue-600 text-white"
                           : "bg-[#1a1a1a] text-gray-300 border border-[#2a2a2a] hover:border-blue-500"
                       }`}
                     >
-                      {role}
+                      {option}
                     </button>
                   ))}
                 </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {currentStep === 2 && (
-            <div>
-              <h2 className="text-2xl font-bold mb-6">
-                What do you mainly want help with?
-              </h2>
-              <p className="text-gray-400 mb-6">Select all that apply</p>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {HELP_WITH_OPTIONS.map((option) => (
-                  <button
-                    key={option}
-                    onClick={() => toggleHelpWith(option)}
-                    className={`rounded-lg px-4 py-3 text-left font-medium transition-colors ${
-                      data.helpWith.includes(option)
-                        ? "bg-blue-500 text-white"
-                        : "bg-[#1a1a1a] text-gray-300 border border-[#2a2a2a] hover:border-blue-500"
-                    }`}
-                  >
-                    {option}
-                  </button>
-                ))}
+            {currentStep === 3 && (
+              <div className="space-y-4">
+                <h2 className="text-2xl font-bold text-white">
+                  What does a typical day look like?
+                </h2>
+                <p className="text-gray-400">
+                  Optional — helps me understand your context
+                </p>
+                <Textarea
+                  value={data.typicalDay || ""}
+                  onChange={(e) => updateData({ typicalDay: e.target.value })}
+                  placeholder="Describe your typical day (e.g., client calls, emails, coding, meetings)"
+                  className="bg-[#1a1a1a] border-[#2a2a2a] text-white resize-none"
+                  autoFocus
+                />
               </div>
-            </div>
-          )}
+            )}
 
-          {currentStep === 3 && (
-            <div>
-              <h2 className="text-2xl font-bold mb-6">
-                What does a typical day look like?
-              </h2>
-              <p className="text-gray-400 mb-4">
-                Optional — helps me understand your context
-              </p>
-              <textarea
-                value={data.typicalDay || ""}
-                onChange={(e) => updateData({ typicalDay: e.target.value })}
-                placeholder="Describe your typical day (e.g., client calls, emails, coding, meetings)"
-                className="w-full rounded-lg bg-[#1a1a1a] px-4 py-3 text-white placeholder-gray-500 border border-[#2a2a2a] focus:border-blue-500 focus:outline-none h-32 resize-none"
-                autoFocus
-              />
-            </div>
-          )}
+            {currentStep === 4 && (
+              <div className="space-y-4">
+                <h2 className="text-2xl font-bold text-white">
+                  Which channels would you like to use?
+                </h2>
+                <p className="text-gray-400">Select all that apply</p>
+                <div className="space-y-3">
+                  {CHANNEL_OPTIONS.map((channel) => (
+                    <button
+                      key={channel}
+                      onClick={() => toggleChannel(channel)}
+                      className={`w-full rounded-lg px-4 py-3 text-left font-medium transition-colors border ${
+                        data.channels.includes(channel)
+                          ? "bg-blue-600 text-white border-blue-600"
+                          : "bg-[#1a1a1a] text-gray-300 border-[#2a2a2a] hover:border-blue-500"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span>{channel}</span>
+                        {channel === "Telegram" && (
+                          <Badge
+                            variant="default"
+                            className="text-xs bg-green-600"
+                          >
+                            Recommended
+                          </Badge>
+                        )}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
 
-          {currentStep === 4 && (
-            <div>
-              <h2 className="text-2xl font-bold mb-6">
-                Which channels would you like to use?
-              </h2>
-              <p className="text-gray-400 mb-6">Select all that apply</p>
-              <div className="space-y-3">
-                {CHANNEL_OPTIONS.map((channel) => (
+            {currentStep === 5 && (
+              <div className="space-y-4">
+                <h2 className="text-2xl font-bold text-white">
+                  Would you like a morning brief?
+                </h2>
+                <p className="text-gray-400">
+                  A daily summary delivered to your chosen channel
+                </p>
+                <div className="space-y-3">
                   <button
-                    key={channel}
-                    onClick={() => toggleChannel(channel)}
+                    onClick={() => updateData({ morningBrief: true })}
                     className={`w-full rounded-lg px-4 py-3 text-left font-medium transition-colors border ${
-                      data.channels.includes(channel)
-                        ? "bg-blue-500 text-white border-blue-500"
+                      data.morningBrief
+                        ? "bg-blue-600 text-white border-blue-600"
                         : "bg-[#1a1a1a] text-gray-300 border-[#2a2a2a] hover:border-blue-500"
                     }`}
                   >
-                    <div className="flex items-center justify-between">
-                      <span>{channel}</span>
-                      {channel === "Telegram" && (
-                        <span className="text-xs bg-green-500 px-2 py-1 rounded">
-                          Recommended
-                        </span>
-                      )}
-                    </div>
+                    Yes, I'd like a morning brief
                   </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {currentStep === 5 && (
-            <div>
-              <h2 className="text-2xl font-bold mb-6">
-                Would you like a morning brief?
-              </h2>
-              <p className="text-gray-400 mb-6">
-                A daily summary delivered to your chosen channel
-              </p>
-              <div className="space-y-4">
-                <button
-                  onClick={() => updateData({ morningBrief: true })}
-                  className={`w-full rounded-lg px-4 py-3 text-left font-medium transition-colors border ${
-                    data.morningBrief
-                      ? "bg-blue-500 text-white border-blue-500"
-                      : "bg-[#1a1a1a] text-gray-300 border-[#2a2a2a] hover:border-blue-500"
-                  }`}
-                >
-                  Yes, I'd like a morning brief
-                </button>
-                <button
-                  onClick={() => updateData({ morningBrief: false })}
-                  className={`w-full rounded-lg px-4 py-3 text-left font-medium transition-colors border ${
-                    !data.morningBrief
-                      ? "bg-blue-500 text-white border-blue-500"
-                      : "bg-[#1a1a1a] text-gray-300 border-[#2a2a2a] hover:border-blue-500"
-                  }`}
-                >
-                  No, I don't need a brief
-                </button>
-              </div>
-
-              {data.morningBrief && (
-                <div className="mt-6 pt-6 border-t border-[#2a2a2a]">
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Preferred time
-                  </label>
-                  <input
-                    type="time"
-                    value={data.briefTime || "08:00"}
-                    onChange={(e) => updateData({ briefTime: e.target.value })}
-                    className="w-full rounded-lg bg-[#1a1a1a] px-4 py-2 text-white border border-[#2a2a2a] focus:border-blue-500 focus:outline-none"
-                  />
+                  <button
+                    onClick={() => updateData({ morningBrief: false })}
+                    className={`w-full rounded-lg px-4 py-3 text-left font-medium transition-colors border ${
+                      !data.morningBrief
+                        ? "bg-blue-600 text-white border-blue-600"
+                        : "bg-[#1a1a1a] text-gray-300 border-[#2a2a2a] hover:border-blue-500"
+                    }`}
+                  >
+                    No, I don't need a brief
+                  </button>
                 </div>
+
+                {data.morningBrief && (
+                  <div className="pt-4 border-t border-[#2a2a2a]">
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      Preferred time
+                    </label>
+                    <Input
+                      type="time"
+                      value={data.briefTime || "08:00"}
+                      onChange={(e) =>
+                        updateData({ briefTime: e.target.value })
+                      }
+                      className="bg-[#1a1a1a] border-[#2a2a2a] text-white"
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+
+            {currentStep === 6 && (
+              <div className="space-y-6">
+                <div className="text-center">
+                  <h1 className="text-4xl font-bold text-white mb-2">
+                    Your assistant is ready ⚡
+                  </h1>
+                  <p className="text-gray-400">Confirm your setup and launch</p>
+                </div>
+
+                <div className="bg-[#1a1a1a] rounded-lg p-6 space-y-4">
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Name:</span>
+                    <span className="text-white font-medium">{data.name}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Role:</span>
+                    <span className="text-white font-medium">
+                      {data.role || "Not specified"}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Help with:</span>
+                    <span className="text-white font-medium">
+                      {data.helpWith.join(", ") || "Not selected"}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Channels:</span>
+                    <span className="text-white font-medium">
+                      {data.channels.join(", ")}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Morning brief:</span>
+                    <span className="text-white font-medium">
+                      {data.morningBrief ? `Yes at ${data.briefTime}` : "No"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Navigation buttons */}
+            <div className="flex gap-4 pt-4 border-t border-[#2a2a2a]">
+              <Button
+                onClick={handlePrevious}
+                disabled={currentStep === 0}
+                variant="outline"
+                className="flex-1"
+              >
+                Previous
+              </Button>
+
+              {currentStep < STEP_LABELS.length - 1 ? (
+                <Button
+                  onClick={handleNext}
+                  disabled={!canProceedToNext}
+                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+                >
+                  Next
+                </Button>
+              ) : (
+                <Button
+                  onClick={handleSubmit}
+                  disabled={isSubmitting}
+                  className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+                >
+                  {isSubmitting ? "Completing..." : "Launch"}
+                </Button>
               )}
             </div>
-          )}
-
-          {/* Navigation buttons */}
-          <div className="mt-8 flex gap-4">
-            <button
-              onClick={handlePrevious}
-              disabled={currentStep === 0}
-              className="flex-1 rounded-lg px-4 py-3 font-medium text-white bg-[#1a1a1a] border border-[#2a2a2a] hover:border-gray-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              Previous
-            </button>
-
-            {currentStep < STEP_LABELS.length - 1 ? (
-              <button
-                onClick={handleNext}
-                disabled={!canProceedToNext}
-                className="flex-1 rounded-lg px-4 py-3 font-medium text-white bg-blue-500 hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                Next
-              </button>
-            ) : (
-              <button
-                onClick={handleSubmit}
-                disabled={isSubmitting}
-                className="flex-1 rounded-lg px-4 py-3 font-medium text-white bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                {isSubmitting ? "Completing..." : "Complete setup"}
-              </button>
-            )}
-          </div>
+          </Card>
         </div>
       </div>
     </div>

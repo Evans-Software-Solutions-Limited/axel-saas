@@ -10,13 +10,11 @@ import Subscribe from "./pages/Subscribe";
 import Onboarding from "./pages/Onboarding";
 import Dashboard from "./pages/Dashboard";
 import Office from "./pages/Office";
-import {
-  Chat,
-  Tasks,
-  Crons,
-  Integrations,
-  Settings,
-} from "./pages/DashboardTabs";
+import Chat from "./pages/Chat";
+import Tasks from "./pages/Tasks";
+import Crons from "./pages/Crons";
+import Integrations from "./pages/Integrations";
+import Settings from "./pages/Settings";
 
 const queryClient = new QueryClient();
 
