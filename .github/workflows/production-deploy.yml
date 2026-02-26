@@ -71,3 +71,7 @@ jobs:
 
       - name: Deploy
         run: bunx sst deploy --stage production
+        env:
+          SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ vars.SUPABASE_ANON_KEY }}
+          VITE_WEB_URL: ${{ vars.VITE_WEB_URL }}

@@ -18,10 +18,6 @@ declare module "sst" {
       "type": "sst.sst.Secret"
       "value": string
     }
-    "AxelSaasSupabaseAnonKey": {
-      "type": "sst.sst.Secret"
-      "value": string
-    }
     "AxelSaasSupabaseDatabaseUrl": {
       "type": "sst.sst.Secret"
       "value": string

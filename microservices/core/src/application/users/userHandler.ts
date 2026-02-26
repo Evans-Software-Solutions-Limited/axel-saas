@@ -1,41 +1,37 @@
-import Elysia from "elysia";
-import { t } from "elysia";
-import { jwtVerify } from "jose";
+import Elysia, { t } from "elysia";
+import { createRemoteJWKSet, jwtVerify } from "jose";
 import { userRepository } from "../repositories/userRepository";
 
-function getJwtSecret(): string {
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { Resource } = require("sst");
-    if (Resource.AxelSaasJwtSecret?.value) {
-      return Resource.AxelSaasJwtSecret.value;
-    }
-  } catch {
-    // Resource not available, fall through to env var
-  }
+// Cached per Lambda warm instance — avoids re-fetching on every request
+let _jwks: ReturnType<typeof createRemoteJWKSet> | null = null;
 
-  const secret = process.env.JWT_SECRET;
-  if (!secret) {
-    throw new Error(
-      "JWT_SECRET is not set. Set it via: sst secret set AxelSaasJwtSecret <secret>",
+function getJwks() {
+  if (!_jwks) {
+    const supabaseUrl = process.env.SUPABASE_URL;
+    if (!supabaseUrl) {
+      throw new Error("SUPABASE_URL environment variable is not set");
+    }
+    _jwks = createRemoteJWKSet(
+      new URL(
+        `${supabaseUrl.replace(/\/$/, "")}/auth/v1/.well-known/jwks.json`,
+      ),
     );
   }
-  return secret;
+  return _jwks;
 }
 
 async function getAuthUser(authHeader: string | undefined) {
   if (!authHeader?.startsWith("Bearer ")) {
+    console.warn("[getAuthUser] Missing or malformed Authorization header");
     return null;
   }
 
   const token = authHeader.slice(7);
   try {
-    const secret = new TextEncoder().encode(getJwtSecret());
-    const { payload } = await jwtVerify(token, secret, {
-      algorithms: ["HS256"],
-    });
+    const { payload } = await jwtVerify(token, getJwks());
     return payload as { sub: string; email: string };
-  } catch {
+  } catch (err) {
+    console.error("[getAuthUser] JWT verification failed:", err);
     return null;
   }
 }

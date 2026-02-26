@@ -11,11 +11,13 @@
     "test": "vitest",
     "test:unit": "vitest run",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate"
+    "db:migrate": "drizzle-kit migrate",
+    "db:push": "drizzle-kit push",
+    "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
-    "@neondatabase/serverless": "^0.9.5",
     "drizzle-orm": "^0.45.1",
+    "postgres": "^3.4.8",
     "sst": "*"
   },
   "devDependencies": {

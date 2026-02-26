@@ -1,5 +1,5 @@
 import { Elysia } from "elysia";
-import { jwtVerify } from "jose";
+import { createRemoteJWKSet, jwtVerify } from "jose";
 
 // Supabase JWT payload shape
 export type SupabaseUser = {
@@ -10,30 +10,22 @@ export type SupabaseUser = {
   exp: number;
 };
 
-/**
- * Get the JWT secret from SST Resource or environment variable.
- * At runtime, SST injects Resource values into the Lambda environment.
- */
-function getJwtSecret(): string {
-  // Try to get from Resource (SST runtime)
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { Resource } = require("sst");
-    if (Resource.AxelSaasJwtSecret?.value) {
-      return Resource.AxelSaasJwtSecret.value;
-    }
-  } catch {
-    // Resource not available, fall through to env var
-  }
+// Cached per Lambda warm instance — avoids re-fetching on every request
+let _jwks: ReturnType<typeof createRemoteJWKSet> | null = null;
 
-  // Fall back to environment variable
-  const secret = process.env.JWT_SECRET;
-  if (!secret) {
-    throw new Error(
-      "JWT_SECRET is not set. Set it via: sst secret set AxelSaasJwtSecret <secret>",
+function getJwks() {
+  if (!_jwks) {
+    const supabaseUrl = process.env.SUPABASE_URL;
+    if (!supabaseUrl) {
+      throw new Error("SUPABASE_URL environment variable is not set");
+    }
+    _jwks = createRemoteJWKSet(
+      new URL(
+        `${supabaseUrl.replace(/\/$/, "")}/auth/v1/.well-known/jwks.json`,
+      ),
     );
   }
-  return secret;
+  return _jwks;
 }
 
 // Elysia plugin — attaches `user` to context on all routes that use it
@@ -46,13 +38,10 @@ export const supabaseAuth = new Elysia({ name: "SupabaseAuth" }).derive(
     }
     const token = authHeader.slice(7);
     try {
-      // Verify using the JWT secret (HS256 — Supabase default)
-      const secret = new TextEncoder().encode(getJwtSecret());
-      const { payload } = await jwtVerify(token, secret, {
-        algorithms: ["HS256"],
-      });
+      const { payload } = await jwtVerify(token, getJwks());
       return { user: payload as unknown as SupabaseUser };
-    } catch {
+    } catch (err) {
+      console.error("[supabaseAuth] JWT verification failed:", err);
       set.status = 401;
       throw new Error("Invalid or expired token");
     }

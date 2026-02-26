@@ -1,39 +1,39 @@
-import { neon } from "@neondatabase/serverless";
-import { drizzle } from "drizzle-orm/neon-http";
+import postgres from "postgres";
+import { drizzle } from "drizzle-orm/postgres-js";
 import * as schema from "./schema";
 
-/**
- * Create a Drizzle client backed by Neon's HTTP transport.
- *
- * Neon's HTTP transport is ideal for serverless Lambdas — no persistent connection
- * pool required. Each request is an HTTP fetch (cold-start friendly).
- *
- * Uses SST Resource.AxelSaasSupabaseDatabaseUrl at runtime.
- */
-export function createDb(databaseUrl?: string) {
-  const url =
-    databaseUrl ??
-    (() => {
-      try {
-        // eslint-disable-next-line @typescript-eslint/no-require-imports
-        const { Resource } = require("sst");
-        if (Resource.AxelSaasSupabaseDatabaseUrl?.value) {
-          return Resource.AxelSaasSupabaseDatabaseUrl.value;
-        }
-      } catch {
-        // Resource not available
-      }
-      return process.env.DATABASE_URL;
-    })();
+function getDbUrl(databaseUrl?: string): string {
+  if (databaseUrl) return databaseUrl;
 
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { Resource } = require("sst");
+    if (Resource.AxelSaasSupabaseDatabaseUrl?.value) {
+      return Resource.AxelSaasSupabaseDatabaseUrl.value;
+    }
+  } catch {
+    // Resource not available
+  }
+
+  const url = process.env.DATABASE_URL;
   if (!url) {
     throw new Error(
       "DATABASE_URL is not set. Set it via: sst secret set AxelSaasSupabaseDatabaseUrl <url>",
     );
   }
+  return url;
+}
 
-  const sql = neon(url);
-  return drizzle(sql, { schema });
+/**
+ * Create a Drizzle client backed by postgres-js.
+ *
+ * Use `prepare: false` so the driver works with Supabase's Transaction pooler
+ * (pgBouncer), which does not support prepared statements.
+ */
+export function createDb(databaseUrl?: string) {
+  const url = getDbUrl(databaseUrl);
+  const client = postgres(url, { prepare: false });
+  return drizzle(client, { schema });
 }
 
 /** Singleton used in Lambda handlers (one per cold start). */

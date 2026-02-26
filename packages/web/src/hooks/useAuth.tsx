@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import { supabase, type Session } from "@/lib/supabase";
 import { api } from "@/lib/eden";
@@ -17,7 +17,21 @@ export interface AuthState {
   isAuthenticated: boolean;
 }
 
-export function useAuth() {
+interface AuthContextValue extends AuthState {
+  signUp: (
+    email: string,
+    password: string,
+  ) => Promise<{ success: boolean; error?: string }>;
+  signIn: (
+    email: string,
+    password: string,
+  ) => Promise<{ success: boolean; error?: string }>;
+  signOut: () => Promise<{ success: boolean; error?: string }>;
+}
+
+const AuthContext = createContext<AuthContextValue | null>(null);
+
+export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -25,7 +39,6 @@ export function useAuth() {
   const [onboardingCompleted, setOnboardingCompleted] = useState(false);
   const navigate = useNavigate();
 
-  // Fetch onboarding status from backend API
   const fetchOnboardingStatus = async () => {
     try {
       const response = await api.core.users.me.get();
@@ -41,32 +54,28 @@ export function useAuth() {
   };
 
   useEffect(() => {
-    // Check current session
+    // Initial session check — drives isLoading and the first /users/me call.
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       if (session?.user) {
-        const user: AuthUser = {
-          id: session.user.id,
-          email: session.user.email,
-        };
-        setUser(user);
-        void fetchOnboardingStatus();
+        setUser({ id: session.user.id, email: session.user.email });
+        void fetchOnboardingStatus().finally(() => setIsLoading(false));
+      } else {
+        setIsLoading(false);
       }
-      setIsLoading(false);
     });
 
-    // Listen for auth changes
+    // Only re-fetch /users/me on an explicit SIGNED_IN event, not on every
+    // TOKEN_REFRESHED or INITIAL_SESSION (which is already handled above).
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange((event, session) => {
       setSession(session);
       if (session?.user) {
-        const user: AuthUser = {
-          id: session.user.id,
-          email: session.user.email,
-        };
-        setUser(user);
-        void fetchOnboardingStatus();
+        setUser({ id: session.user.id, email: session.user.email });
+        if (event === "SIGNED_IN") {
+          void fetchOnboardingStatus();
+        }
       } else {
         setUser(null);
         setOnboardingCompleted(false);
@@ -79,10 +88,7 @@ export function useAuth() {
   const signUp = async (email: string, password: string) => {
     setError(null);
     try {
-      const { error } = await supabase.auth.signUp({
-        email,
-        password,
-      });
+      const { error } = await supabase.auth.signUp({ email, password });
       if (error) throw error;
       return { success: true };
     } catch (err) {
@@ -122,15 +128,27 @@ export function useAuth() {
     }
   };
 
-  return {
-    user,
-    session,
-    isLoading,
-    error,
-    signUp,
-    signIn,
-    signOut,
-    isAuthenticated: !!user,
-    onboardingCompleted,
-  };
+  return (
+    <AuthContext.Provider
+      value={{
+        user,
+        session,
+        isLoading,
+        error,
+        onboardingCompleted,
+        isAuthenticated: !!user,
+        signUp,
+        signIn,
+        signOut,
+      }}
+    >
+      {children}
+    </AuthContext.Provider>
+  );
+}
+
+export function useAuth(): AuthContextValue {
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error("useAuth must be used within <AuthProvider>");
+  return ctx;
 }
