@@ -1,5 +1,4 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import Stripe from "stripe";
 
 // Mock dependencies
 vi.mock("stripe");
@@ -238,7 +237,7 @@ describe("StripeHandler", () => {
         developer: process.env.STRIPE_PRICE_DEVELOPER,
       };
 
-      for (const [tier, price] of Object.entries(prices)) {
+      for (const price of Object.values(prices)) {
         expect(price).toBeDefined();
         expect(price).not.toHaveLength(0);
       }

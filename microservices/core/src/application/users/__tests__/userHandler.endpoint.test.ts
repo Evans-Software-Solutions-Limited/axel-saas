@@ -32,6 +32,8 @@ vi.mock("@axel-saas/api-utils/auth/supabaseAuth", () => ({
   getUser: mockGetUser,
 }));
 
+// Import required for module load and mocks; handler used indirectly via mocked endpoints
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- needed for test setup
 import { userHandler } from "../userHandler";
 
 describe("UserHandler Endpoints", () => {

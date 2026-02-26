@@ -1,5 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
+interface MockAuthContext {
+  user?: { sub: string };
+  set: { status?: number };
+}
+
 // Mock auth before importing handlers
 vi.mock("@axel-saas/api-utils/auth/supabaseAuth", () => {
   return {
@@ -12,13 +17,13 @@ vi.mock("@axel-saas/api-utils/auth/supabaseAuth", () => {
         email: "test@example.com",
       };
     }),
-    requireAuth: (ctx: any) => {
+    requireAuth: (ctx: MockAuthContext) => {
       if (!ctx.user) {
         ctx.set.status = 401;
         return { success: false, error: "Unauthorized" };
       }
     },
-    getUser: (ctx: any) => ctx.user || { sub: "test-user-id" },
+    getUser: (ctx: MockAuthContext) => ctx.user || { sub: "test-user-id" },
   };
 });
 

@@ -46,17 +46,19 @@ describe("UserHandler - Available Methods", () => {
 
   it("should have fetch method if available", async () => {
     const { userHandler } = await import("../userHandler");
-    // Elysia instances may have fetch method
-    if (typeof (userHandler as any).fetch === "function") {
-      expect((userHandler as any).fetch).toBeDefined();
+    type ElysiaLike = { fetch?: unknown; handle?: unknown; routes: unknown[] };
+    const handler = userHandler as ElysiaLike;
+    if (typeof handler.fetch === "function") {
+      expect(handler.fetch).toBeDefined();
     }
   });
 
   it("should have handle method if available", async () => {
     const { userHandler } = await import("../userHandler");
-    // Elysia instances may have handle method
-    if (typeof (userHandler as any).handle === "function") {
-      expect((userHandler as any).handle).toBeDefined();
+    type ElysiaLike = { fetch?: unknown; handle?: unknown; routes: unknown[] };
+    const handler = userHandler as ElysiaLike;
+    if (typeof handler.handle === "function") {
+      expect(handler.handle).toBeDefined();
     }
   });
 

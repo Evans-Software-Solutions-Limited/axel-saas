@@ -1,5 +1,4 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import Stripe from "stripe";
 
 // Mock dependencies BEFORE importing handler
 vi.mock("stripe");
@@ -42,7 +41,9 @@ vi.stubEnv("STRIPE_PRICE_PRO", "price_pro_123");
 vi.stubEnv("STRIPE_PRICE_BUSINESS", "price_business_123");
 vi.stubEnv("STRIPE_PRICE_DEVELOPER", "price_developer_123");
 
-import { stripeHandler } from "../stripeHandler";
+import { stripeHandler as _stripeHandler } from "../stripeHandler";
+
+void _stripeHandler;
 
 describe("StripeHandler Webhook Tests", () => {
   beforeEach(() => {

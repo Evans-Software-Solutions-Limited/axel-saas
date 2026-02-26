@@ -79,11 +79,11 @@ describe("Stripe Helper Functions", () => {
     });
 
     it("should reject null tier", () => {
-      expect(validTiers.includes(null as any)).toBe(false);
+      expect(validTiers.includes(null as unknown as string)).toBe(false);
     });
 
     it("should reject undefined tier", () => {
-      expect(validTiers.includes(undefined as any)).toBe(false);
+      expect(validTiers.includes(undefined as unknown as string)).toBe(false);
     });
   });
 

@@ -1,5 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
+interface MockAuthContext {
+  user?: { sub: string };
+  set: { status?: number };
+}
+
 // Mock auth
 vi.mock("@axel-saas/api-utils/auth/supabaseAuth", () => ({
   getAuthUser: vi.fn(async (authHeader: string | undefined) => {
@@ -11,19 +16,16 @@ vi.mock("@axel-saas/api-utils/auth/supabaseAuth", () => ({
       email: "test@example.com",
     };
   }),
-  requireAuth: (ctx: any) => {
+  requireAuth: (ctx: MockAuthContext) => {
     if (!ctx.user) {
       ctx.set.status = 401;
       return { success: false, error: "Unauthorized" };
     }
   },
-  getUser: (ctx: any) => ctx.user || { sub: "test-user-id" },
+  getUser: (ctx: MockAuthContext) => ctx.user || { sub: "test-user-id" },
 }));
 
-import {
-  subscriptionHandler,
-  subscriptionPublicHandler,
-} from "../subscriptionHandler";
+import { subscriptionHandler } from "../subscriptionHandler";
 
 describe("SubscriptionHandler Tiers and Checkout", () => {
   beforeEach(() => {
@@ -155,12 +157,7 @@ describe("SubscriptionHandler Tiers and Checkout", () => {
         features: ["Daily brief"],
       };
 
-      expect(starterTier).toMatchObject({
-        id: expect.any(String),
-        name: expect.any(String),
-        priceGbpMonthly: expect.any(Number),
-        features: expect.any(Array),
-      });
+      expect(starterTier).toMatchObject(tierStructure);
     });
 
     it("should have all tier IDs be unique", async () => {
@@ -276,7 +273,6 @@ describe("SubscriptionHandler Tiers and Checkout", () => {
 
   describe("Feature progression", () => {
     it("pro tier should include all starter features", async () => {
-      const starterFeatures = ["Daily brief", "Telegram", "Basic tasks"];
       const proFeatures = [
         "Everything in Starter",
         "Calendar",
@@ -287,7 +283,6 @@ describe("SubscriptionHandler Tiers and Checkout", () => {
     });
 
     it("business tier should include all pro features", async () => {
-      const proFeatures = ["Calendar", "Sub-agents"];
       const businessFeatures = [
         "Everything in Pro",
         "Custom channels",
@@ -298,7 +293,6 @@ describe("SubscriptionHandler Tiers and Checkout", () => {
     });
 
     it("developer tier should include all business features", async () => {
-      const businessFeatures = ["Priority support"];
       const developerFeatures = [
         "Everything in Business",
         "Full exec access",
