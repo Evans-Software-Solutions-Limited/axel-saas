@@ -13,6 +13,9 @@ export default defineConfig({
         "**/sst-env.d.ts",
         "src/api.ts",
         "src/index.ts",
+        "**/index.ts",
+        "**/*.d.ts",
+        "**/api.ts",
       ],
       // Target 90% minimum coverage threshold
       thresholds: {
