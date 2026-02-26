@@ -57,16 +57,16 @@ export const userHandler = new Elysia({ name: "UserHandler" })
           return { success: false, error: "User not found" };
         }
 
-        return { 
-          success: true, 
+        return {
+          success: true,
           user: {
             id: user.id,
             email: user.email,
             fullName: user.fullName,
             onboardingCompleted: user.onboardingCompleted,
             createdAt: user.createdAt,
-            updatedAt: user.updatedAt
-          }
+            updatedAt: user.updatedAt,
+          },
         };
       } catch (error) {
         console.error("Get user error:", error);
