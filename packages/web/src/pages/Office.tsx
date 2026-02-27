@@ -1,201 +1,444 @@
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import * as React from "react";
 import { Badge } from "@/components/ui/badge";
 import {
-  IconCircleCheckFilled,
-  IconClock,
-  IconFile,
-  IconMail,
-  IconBolt,
-} from "@tabler/icons-react";
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 
-interface StatCard {
-  label: string;
-  value: string | number;
-  icon: React.ReactNode;
-  trend?: string;
+type AgentStatus = "idle" | "busy" | "working" | "special";
+
+interface RecentJob {
+  type: string;
+  description: string;
+  time: string;
+  status: "Completed" | "In Progress" | "Failed";
 }
 
-interface AgentCard {
+interface Agent {
+  id: string;
   name: string;
   role: string;
-  status: "online" | "busy" | "idle";
-  avatar: string;
-  currentTask?: string;
+  status: AgentStatus;
+  currentTask: string;
+  lastActive: string;
+  scenePosition: { top: string; left: string };
+  avatarColour: string;
+  stats: {
+    totalTasks: number;
+    todayTasks: number;
+    avgDuration: string;
+  };
+  recentJobs: RecentJob[];
 }
 
-const stats: StatCard[] = [
-  {
-    label: "Tasks completed today",
-    value: "12",
-    icon: <IconCircleCheckFilled className="w-6 h-6 text-success" />,
-    trend: "+2 from yesterday",
-  },
-  {
-    label: "Active automations",
-    value: "8",
-    icon: <IconBolt className="w-6 h-6 text-accent" />,
-  },
-  {
-    label: "Documents indexed",
-    value: "47",
-    icon: <IconFile className="w-6 h-6 text-warning" />,
-  },
-  {
-    label: "Messages handled",
-    value: "143",
-    icon: <IconMail className="w-6 h-6 text-muted" />,
-  },
-];
+const statusColours: Record<AgentStatus, string> = {
+  idle: "bg-green-500",
+  busy: "bg-yellow-500",
+  working: "bg-red-500",
+  special: "bg-purple-500",
+};
 
-const agents: AgentCard[] = [
+const jobStatusColours: Record<RecentJob["status"], string> = {
+  Completed: "bg-green-500/20 text-green-400",
+  "In Progress": "bg-yellow-500/20 text-yellow-400",
+  Failed: "bg-red-500/20 text-red-400",
+};
+
+const agents: Agent[] = [
   {
+    id: "axel",
     name: "Axel",
     role: "Chief Task Handler",
-    status: "online",
-    avatar: "A",
-    currentTask: "Processing email inbox",
+    status: "idle",
+    currentTask: "Ready and waiting",
+    lastActive: "Just now",
+    scenePosition: { top: "55%", left: "45%" },
+    avatarColour: "bg-blue-600",
+    stats: { totalTasks: 142, todayTasks: 7, avgDuration: "2m 14s" },
+    recentJobs: [
+      {
+        type: "Email",
+        description: "Replied to viewing enquiry from sarah@gmail.com",
+        time: "Today, 14:23",
+        status: "Completed",
+      },
+      {
+        type: "Task",
+        description: "Summarised weekly leads report",
+        time: "Today, 11:05",
+        status: "Completed",
+      },
+      {
+        type: "Doc",
+        description: "Drafted tenancy agreement for 12 Oak Street",
+        time: "Yesterday",
+        status: "Completed",
+      },
+      {
+        type: "Email",
+        description: "Processed maintenance request from tenant",
+        time: "Yesterday",
+        status: "Completed",
+      },
+      {
+        type: "Task",
+        description: "Qualified new lead: James Whitfield",
+        time: "2 days ago",
+        status: "Completed",
+      },
+    ],
   },
   {
-    name: "Automata",
-    role: "Workflow Engineer",
-    status: "online",
-    avatar: "AU",
-    currentTask: "Running scheduled reports",
+    id: "scribe",
+    name: "Scribe",
+    role: "Document Writer",
+    status: "working",
+    currentTask: "Drafting tenancy agreement",
+    lastActive: "1 min ago",
+    scenePosition: { top: "35%", left: "25%" },
+    avatarColour: "bg-emerald-600",
+    stats: { totalTasks: 38, todayTasks: 3, avgDuration: "5m 40s" },
+    recentJobs: [
+      {
+        type: "Doc",
+        description: "Tenancy agreement — 12 Oak Street",
+        time: "Now",
+        status: "In Progress",
+      },
+      {
+        type: "Doc",
+        description: "Reference letter for Tom Brady",
+        time: "Today, 10:00",
+        status: "Completed",
+      },
+      {
+        type: "Doc",
+        description: "Inventory report — Flat 4B",
+        time: "Yesterday",
+        status: "Completed",
+      },
+      {
+        type: "Doc",
+        description: "Viewing confirmation email template",
+        time: "3 days ago",
+        status: "Completed",
+      },
+      {
+        type: "Doc",
+        description: "Monthly newsletter draft",
+        time: "4 days ago",
+        status: "Completed",
+      },
+    ],
   },
   {
+    id: "relay",
+    name: "Relay",
+    role: "Comms Manager",
+    status: "busy",
+    currentTask: "Processing 3 emails",
+    lastActive: "30s ago",
+    scenePosition: { top: "40%", left: "65%" },
+    avatarColour: "bg-violet-600",
+    stats: { totalTasks: 291, todayTasks: 12, avgDuration: "45s" },
+    recentJobs: [
+      {
+        type: "Email",
+        description: "Auto-replied to 3 viewing enquiries",
+        time: "Just now",
+        status: "In Progress",
+      },
+      {
+        type: "Email",
+        description: "Sent qualification follow-up to Mark Chen",
+        time: "Today, 13:55",
+        status: "Completed",
+      },
+      {
+        type: "Call",
+        description: "Handled inbound call — 07712 345678",
+        time: "Today, 12:30",
+        status: "Completed",
+      },
+      {
+        type: "Email",
+        description: "Forwarded maintenance request to contractor",
+        time: "Today, 09:15",
+        status: "Completed",
+      },
+      {
+        type: "Email",
+        description: "Sent viewing confirmation to Lisa Park",
+        time: "Yesterday",
+        status: "Completed",
+      },
+    ],
+  },
+  {
+    id: "keeper",
     name: "Keeper",
     role: "Knowledge Manager",
-    status: "busy",
-    avatar: "K",
-    currentTask: "Indexing new documents",
+    status: "idle",
+    currentTask: "Ready and waiting",
+    lastActive: "1 hour ago",
+    scenePosition: { top: "60%", left: "20%" },
+    avatarColour: "bg-amber-600",
+    stats: { totalTasks: 19, todayTasks: 1, avgDuration: "8m 20s" },
+    recentJobs: [
+      {
+        type: "Task",
+        description: "Indexed updated tenancy policy document",
+        time: "Today, 08:00",
+        status: "Completed",
+      },
+      {
+        type: "Task",
+        description: "Updated compliance knowledge base",
+        time: "Yesterday",
+        status: "Completed",
+      },
+      {
+        type: "Task",
+        description: "Ingested 12 property listings",
+        time: "3 days ago",
+        status: "Completed",
+      },
+      {
+        type: "Task",
+        description: "Archived 2023 records",
+        time: "1 week ago",
+        status: "Completed",
+      },
+      {
+        type: "Task",
+        description: "Synced Google Drive documents",
+        time: "1 week ago",
+        status: "Completed",
+      },
+    ],
+  },
+  {
+    id: "ops",
+    name: "Ops",
+    role: "Automation Runner",
+    status: "special",
+    currentTask: "Running scheduled reports",
+    lastActive: "5 min ago",
+    scenePosition: { top: "50%", left: "70%" },
+    avatarColour: "bg-rose-600",
+    stats: { totalTasks: 84, todayTasks: 4, avgDuration: "3m 10s" },
+    recentJobs: [
+      {
+        type: "Task",
+        description: "Weekly leads report generated",
+        time: "Today, 17:00",
+        status: "In Progress",
+      },
+      {
+        type: "Task",
+        description: "Daily email digest sent",
+        time: "Today, 08:00",
+        status: "Completed",
+      },
+      {
+        type: "Task",
+        description: "Nightly backup completed",
+        time: "Yesterday, 02:00",
+        status: "Completed",
+      },
+      {
+        type: "Task",
+        description: "Monthly analytics report",
+        time: "1 week ago",
+        status: "Completed",
+      },
+      {
+        type: "Task",
+        description: "Lead qualification batch run",
+        time: "1 week ago",
+        status: "Completed",
+      },
+    ],
   },
 ];
 
-function StatusBadge({ status }: { status: "online" | "busy" | "idle" }) {
-  const colors = {
-    online: { bg: "bg-success/20", text: "text-success" },
-    busy: { bg: "bg-warning/20", text: "text-warning" },
-    idle: { bg: "bg-muted/20", text: "text-muted" },
-  };
-
-  return (
-    <Badge className={`${colors[status].bg} ${colors[status].text} border-0`}>
-      {status.charAt(0).toUpperCase() + status.slice(1)}
-    </Badge>
-  );
+interface OfficeProps {
+  onQuickChat?: () => void;
 }
 
-export function Office() {
+export function Office({ onQuickChat }: OfficeProps) {
+  const [activeAgent, setActiveAgent] = React.useState<string | undefined>(
+    undefined,
+  );
+  const accordionRef = React.useRef<HTMLDivElement>(null);
+
+  function handleAgentClick(agentId: string) {
+    setActiveAgent(agentId);
+    setTimeout(() => {
+      accordionRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    }, 50);
+  }
+
   return (
-    <div className="p-6 space-y-8">
-      {/* Stats Section */}
-      <div>
-        <h2 className="text-2xl font-bold text-text mb-4">Today's summary</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {stats.map((stat, idx) => (
-            <Card key={idx} className="border border-border bg-surface-raised">
-              <CardContent className="pt-6">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <p className="text-sm text-muted mb-2">{stat.label}</p>
-                    <p className="text-3xl font-bold text-text">{stat.value}</p>
-                    {stat.trend && (
-                      <p className="text-xs text-success mt-2">{stat.trend}</p>
-                    )}
-                  </div>
-                  <div>{stat.icon}</div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+    <div className="p-6 space-y-6">
+      <div
+        className="relative w-full overflow-hidden rounded-xl"
+        style={{ aspectRatio: "16/7" }}
+      >
+        <div className="absolute inset-0 bg-[#1a2035] flex items-center justify-center">
+          <img
+            src="/office-scene.png"
+            alt="AI Office"
+            className="w-full h-full object-cover"
+            style={{ imageRendering: "pixelated" }}
+            onError={(e) => {
+              (e.currentTarget as HTMLImageElement).style.display = "none";
+            }}
+          />
+          <span className="absolute text-white/20 text-2xl font-bold select-none pointer-events-none">
+            AI Office
+          </span>
         </div>
-      </div>
 
-      {/* Team Section */}
-      <div>
-        <h2 className="text-2xl font-bold text-text mb-4">Your AI team</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {agents.map((agent, idx) => (
-            <Card key={idx} className="border border-border bg-surface-raised">
-              <CardHeader>
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-lg bg-accent flex items-center justify-center text-white font-bold text-sm">
-                      {agent.avatar}
-                    </div>
-                    <div>
-                      <CardTitle className="text-base text-text">
-                        {agent.name}
-                      </CardTitle>
-                      <CardDescription className="text-xs">
-                        {agent.role}
-                      </CardDescription>
-                    </div>
-                  </div>
-                  <StatusBadge status={agent.status} />
-                </div>
-              </CardHeader>
-              <CardContent>
-                {agent.currentTask && (
-                  <div className="flex items-start gap-2">
-                    <IconClock className="w-4 h-4 text-muted mt-0.5 flex-shrink-0" />
-                    <p className="text-sm text-muted">{agent.currentTask}</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      </div>
-
-      {/* Recent Activity */}
-      <div>
-        <h2 className="text-2xl font-bold text-text mb-4">Recent activity</h2>
-        <Card className="border border-border">
-          <CardContent className="pt-6">
-            <div className="space-y-3">
-              {[
-                {
-                  time: "2 hours ago",
-                  action: "Processed 23 emails",
-                  agent: "Axel",
-                },
-                {
-                  time: "4 hours ago",
-                  action: "Indexed 5 new documents",
-                  agent: "Keeper",
-                },
-                {
-                  time: "6 hours ago",
-                  action: "Generated daily report",
-                  agent: "Automata",
-                },
-              ].map((activity, idx) => (
+        {agents.map((agent) => (
+          <div
+            key={agent.id}
+            className="absolute cursor-pointer group z-10"
+            style={{
+              top: agent.scenePosition.top,
+              left: agent.scenePosition.left,
+            }}
+            onClick={() => handleAgentClick(agent.id)}
+          >
+            <div className="relative flex items-center gap-2">
+              <div className="relative flex-shrink-0">
                 <div
-                  key={idx}
-                  className="flex items-center justify-between py-3 border-b border-border last:border-0"
-                >
-                  <div>
-                    <p className="text-text font-medium">{activity.action}</p>
-                    <p className="text-xs text-muted">{activity.time}</p>
-                  </div>
-                  <Badge variant="outline" className="border-border text-muted">
-                    {activity.agent}
-                  </Badge>
-                </div>
-              ))}
+                  className={`w-3 h-3 rounded-full ${statusColours[agent.status]}`}
+                />
+                {agent.status !== "idle" && (
+                  <div
+                    className={`absolute inset-0 rounded-full ${statusColours[agent.status]} animate-ping opacity-75`}
+                  />
+                )}
+              </div>
+              <div className="hidden sm:block bg-black/80 text-white text-xs px-3 py-1 rounded-full shadow-lg whitespace-nowrap border border-white/10">
+                {agent.name} · {agent.currentTask}
+              </div>
             </div>
-          </CardContent>
-        </Card>
+            <div className="absolute left-0 top-6 hidden group-hover:block bg-black/90 text-white text-xs p-3 rounded-lg shadow-xl z-20 min-w-48 border border-white/10 pointer-events-none">
+              <div className="font-semibold">{agent.name}</div>
+              <div className="text-white/60 mb-1">{agent.role}</div>
+              <div>{agent.currentTask}</div>
+              <div className="text-white/40 mt-1">
+                Last active: {agent.lastActive}
+              </div>
+            </div>
+          </div>
+        ))}
+
+        <button
+          className="absolute bottom-4 right-4 z-10 bg-black/70 hover:bg-black/90 text-white text-sm px-4 py-2 rounded-full shadow-lg border border-white/10 transition-colors cursor-pointer"
+          onClick={onQuickChat}
+        >
+          💬 Quick Chat
+        </button>
+      </div>
+
+      <div ref={accordionRef}>
+        <Accordion
+          type="single"
+          collapsible
+          value={activeAgent}
+          onValueChange={setActiveAgent}
+          className="w-full"
+        >
+          {agents.map((agent) => (
+            <AccordionItem
+              key={agent.id}
+              value={agent.id}
+              id={`agent-${agent.id}`}
+            >
+              <AccordionTrigger className="hover:no-underline px-2">
+                <div className="flex items-center gap-3 flex-1">
+                  <div
+                    className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold text-white flex-shrink-0 ${agent.avatarColour}`}
+                  >
+                    {agent.name[0]}
+                  </div>
+                  <div className="flex-1 text-left">
+                    <span className="font-semibold text-sm">{agent.name}</span>
+                    <span className="text-muted-foreground text-sm ml-2">
+                      {agent.role}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 mr-2">
+                    <div
+                      className={`w-2 h-2 rounded-full ${statusColours[agent.status]}`}
+                    />
+                    <span className="text-xs text-muted-foreground capitalize">
+                      {agent.status}
+                    </span>
+                  </div>
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="px-2">
+                <div className="flex gap-3 mb-4 flex-wrap">
+                  <div className="bg-card rounded-lg px-4 py-2 text-center min-w-20">
+                    <div className="text-lg font-bold">
+                      {agent.stats.totalTasks}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      Total tasks
+                    </div>
+                  </div>
+                  <div className="bg-card rounded-lg px-4 py-2 text-center min-w-20">
+                    <div className="text-lg font-bold">
+                      {agent.stats.todayTasks}
+                    </div>
+                    <div className="text-xs text-muted-foreground">Today</div>
+                  </div>
+                  <div className="bg-card rounded-lg px-4 py-2 text-center min-w-20">
+                    <div className="text-sm font-semibold">
+                      {agent.stats.avgDuration}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      Avg duration
+                    </div>
+                  </div>
+                </div>
+                <div className="space-y-0">
+                  {agent.recentJobs.map((job, i) => (
+                    <div
+                      key={i}
+                      className="flex items-center gap-3 py-2 border-b border-border last:border-0"
+                    >
+                      <Badge variant="outline" className="text-xs shrink-0">
+                        {job.type}
+                      </Badge>
+                      <span className="text-sm flex-1 min-w-0 truncate">
+                        {job.description}
+                      </span>
+                      <span className="text-xs text-muted-foreground shrink-0 hidden sm:block">
+                        {job.time}
+                      </span>
+                      <Badge
+                        className={`text-xs shrink-0 border-0 ${jobStatusColours[job.status]}`}
+                      >
+                        {job.status}
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+          ))}
+        </Accordion>
       </div>
     </div>
   );
 }
-
-export default Office;
