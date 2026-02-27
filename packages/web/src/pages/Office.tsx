@@ -23,7 +23,10 @@ interface Agent {
   status: AgentStatus;
   currentTask: string;
   lastActive: string;
+  /** Position in the office scene as percentage of the container */
   scenePosition: { top: string; left: string };
+  /** Path to the individual character sprite image (transparent PNG). */
+  spriteImage: string;
   avatarColour: string;
   stats: {
     totalTasks: number;
@@ -40,11 +43,52 @@ const statusColours: Record<AgentStatus, string> = {
   special: "bg-purple-500",
 };
 
+const statusGlow: Record<AgentStatus, string> = {
+  idle: "",
+  busy: "drop-shadow(0 0 6px rgba(234,179,8,0.9))",
+  working: "drop-shadow(0 0 6px rgba(239,68,68,0.9))",
+  special: "drop-shadow(0 0 6px rgba(168,85,247,0.9))",
+};
+
+/** Height (px) at which sprite images are rendered in the scene. */
+const SPRITE_HEIGHT = 80;
+
 const jobStatusColours: Record<RecentJob["status"], string> = {
   Completed: "bg-green-500/20 text-green-400",
   "In Progress": "bg-yellow-500/20 text-yellow-400",
   Failed: "bg-red-500/20 text-red-400",
 };
+
+const DeskPositions = [
+  {
+    top: "36%",
+    left: "16.75%",
+  },
+  {
+    top: "36%",
+    left: "38%",
+  },
+  {
+    top: "36%",
+    left: "57.5%",
+  },
+  {
+    top: "36%",
+    left: "79.5%",
+  },
+  {
+    top: "90%",
+    left: "22%",
+  },
+  {
+    top: "90%",
+    left: "58%",
+  },
+  {
+    top: "90%",
+    left: "89%",
+  },
+];
 
 const agents: Agent[] = [
   {
@@ -54,7 +98,8 @@ const agents: Agent[] = [
     status: "idle",
     currentTask: "Ready and waiting",
     lastActive: "Just now",
-    scenePosition: { top: "55%", left: "45%" },
+    scenePosition: DeskPositions[0],
+    spriteImage: "/sprites/sprite-axel.png",
     avatarColour: "bg-blue-600",
     stats: { totalTasks: 142, todayTasks: 7, avgDuration: "2m 14s" },
     recentJobs: [
@@ -97,7 +142,9 @@ const agents: Agent[] = [
     status: "working",
     currentTask: "Drafting tenancy agreement",
     lastActive: "1 min ago",
-    scenePosition: { top: "35%", left: "25%" },
+    // Top row, 4th cubicle from left
+    scenePosition: DeskPositions[1],
+    spriteImage: "/sprites/sprite-scribe.png",
     avatarColour: "bg-emerald-600",
     stats: { totalTasks: 38, todayTasks: 3, avgDuration: "5m 40s" },
     recentJobs: [
@@ -140,7 +187,9 @@ const agents: Agent[] = [
     status: "busy",
     currentTask: "Processing 3 emails",
     lastActive: "30s ago",
-    scenePosition: { top: "40%", left: "65%" },
+    // Bottom row, left L-desk
+    scenePosition: DeskPositions[2],
+    spriteImage: "/sprites/sprite-relay.png",
     avatarColour: "bg-violet-600",
     stats: { totalTasks: 291, todayTasks: 12, avgDuration: "45s" },
     recentJobs: [
@@ -183,7 +232,9 @@ const agents: Agent[] = [
     status: "idle",
     currentTask: "Ready and waiting",
     lastActive: "1 hour ago",
-    scenePosition: { top: "60%", left: "20%" },
+    // Bottom row, center L-desk
+    scenePosition: DeskPositions[3],
+    spriteImage: "/sprites/sprite-keeper.png",
     avatarColour: "bg-amber-600",
     stats: { totalTasks: 19, todayTasks: 1, avgDuration: "8m 20s" },
     recentJobs: [
@@ -226,7 +277,9 @@ const agents: Agent[] = [
     status: "special",
     currentTask: "Running scheduled reports",
     lastActive: "5 min ago",
-    scenePosition: { top: "50%", left: "70%" },
+    // Bottom row, right L-desk
+    scenePosition: DeskPositions[4],
+    spriteImage: "/sprites/sprite-ops.png",
     avatarColour: "bg-rose-600",
     stats: { totalTasks: 84, todayTasks: 4, avgDuration: "3m 10s" },
     recentJobs: [
@@ -265,7 +318,7 @@ const agents: Agent[] = [
 ];
 
 interface OfficeProps {
-  onQuickChat?: () => void;
+  readonly onQuickChat?: () => void;
 }
 
 export function Office({ onQuickChat }: OfficeProps) {
@@ -287,59 +340,81 @@ export function Office({ onQuickChat }: OfficeProps) {
   return (
     <div className="p-6 space-y-6">
       <div
-        className="relative w-full overflow-hidden rounded-xl"
-        style={{ aspectRatio: "16/7" }}
+        className="relative w-full overflow-hidden rounded-xl border border-white/5 bg-[#6bb8d4]"
+        style={{ aspectRatio: "16/9" }}
       >
-        <div className="absolute inset-0 bg-[#1a2035] flex items-center justify-center">
-          <img
-            src="/office-scene.png"
-            alt="AI Office"
-            className="w-full h-full object-cover"
-            style={{ imageRendering: "pixelated" }}
-            onError={(e) => {
-              (e.currentTarget as HTMLImageElement).style.display = "none";
-            }}
-          />
-          <span className="absolute text-white/20 text-2xl font-bold select-none pointer-events-none">
-            AI Office
-          </span>
-        </div>
+        {/* Pixel office background — generated clean scene, no baked-in characters */}
+        <img
+          src="/pixel-office-bg.png"
+          alt="AI Office"
+          className="absolute inset-0 w-full h-full object-contain"
+          style={{ imageRendering: "pixelated" }}
+          draggable={false}
+        />
 
-        {agents.map((agent) => (
-          <div
-            key={agent.id}
-            className="absolute cursor-pointer group z-10"
-            style={{
-              top: agent.scenePosition.top,
-              left: agent.scenePosition.left,
-            }}
-            onClick={() => handleAgentClick(agent.id)}
-          >
-            <div className="relative flex items-center gap-2">
-              <div className="relative flex-shrink-0">
-                <div
-                  className={`w-3 h-3 rounded-full ${statusColours[agent.status]}`}
-                />
-                {agent.status !== "idle" && (
+        {/* Per-agent sprite + status overlay */}
+        {agents.map((agent) => {
+          const isActive = activeAgent === agent.id;
+
+          return (
+            <button
+              key={agent.id}
+              type="button"
+              className="absolute cursor-pointer group z-10 bg-transparent border-0 p-0 focus:outline-none flex flex-col items-center"
+              style={{
+                top: agent.scenePosition.top,
+                left: agent.scenePosition.left,
+                transform: "translate(-50%, -100%)",
+              }}
+              onClick={() => handleAgentClick(agent.id)}
+            >
+              {/* Hover tooltip — floats above everything */}
+              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover:block bg-black/90 text-white text-xs p-3 rounded-lg shadow-xl z-20 min-w-44 border border-white/10 pointer-events-none">
+                <div className="font-semibold">{agent.name}</div>
+                <div className="text-white/60 mb-1 text-[10px]">
+                  {agent.role}
+                </div>
+                <div className="text-white/90">{agent.currentTask}</div>
+                <div className="text-white/40 mt-1 text-[10px]">
+                  Last active: {agent.lastActive}
+                </div>
+              </div>
+
+              {/* Name + status badge */}
+              <div className="flex items-center gap-1.5 mb-1 bg-black/75 px-2 py-0.5 rounded-full border border-white/10">
+                <div className="relative shrink-0">
                   <div
-                    className={`absolute inset-0 rounded-full ${statusColours[agent.status]} animate-ping opacity-75`}
+                    className={`w-2 h-2 rounded-full ${statusColours[agent.status]}`}
                   />
-                )}
+                  {agent.status !== "idle" && (
+                    <div
+                      className={`absolute inset-0 rounded-full ${statusColours[agent.status]} animate-ping opacity-75`}
+                    />
+                  )}
+                </div>
+                <span className="text-white text-[10px] whitespace-nowrap leading-tight">
+                  {agent.name}
+                </span>
               </div>
-              <div className="hidden sm:block bg-black/80 text-white text-xs px-3 py-1 rounded-full shadow-lg whitespace-nowrap border border-white/10">
-                {agent.name} · {agent.currentTask}
-              </div>
-            </div>
-            <div className="absolute left-0 top-6 hidden group-hover:block bg-black/90 text-white text-xs p-3 rounded-lg shadow-xl z-20 min-w-48 border border-white/10 pointer-events-none">
-              <div className="font-semibold">{agent.name}</div>
-              <div className="text-white/60 mb-1">{agent.role}</div>
-              <div>{agent.currentTask}</div>
-              <div className="text-white/40 mt-1">
-                Last active: {agent.lastActive}
-              </div>
-            </div>
-          </div>
-        ))}
+
+              {/* Individual character sprite */}
+              <img
+                src={agent.spriteImage}
+                alt={agent.name}
+                style={{
+                  height: SPRITE_HEIGHT,
+                  width: "auto",
+                  imageRendering: "pixelated",
+                  filter: isActive
+                    ? "drop-shadow(0 0 8px rgba(255,255,255,0.9))"
+                    : statusGlow[agent.status] || undefined,
+                  transition: "filter 0.2s ease",
+                }}
+                draggable={false}
+              />
+            </button>
+          );
+        })}
 
         <button
           className="absolute bottom-4 right-4 z-10 bg-black/70 hover:bg-black/90 text-white text-sm px-4 py-2 rounded-full shadow-lg border border-white/10 transition-colors cursor-pointer"
@@ -366,7 +441,7 @@ export function Office({ onQuickChat }: OfficeProps) {
               <AccordionTrigger className="hover:no-underline px-2">
                 <div className="flex items-center gap-3 flex-1">
                   <div
-                    className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold text-white flex-shrink-0 ${agent.avatarColour}`}
+                    className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold text-white shrink-0 ${agent.avatarColour}`}
                   >
                     {agent.name[0]}
                   </div>
