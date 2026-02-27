@@ -1,82 +1,53 @@
-import { useState } from "react";
-import { useNavigate, Outlet } from "react-router";
-import {
-  IconMessage,
-  IconUsers,
-  IconChecklist,
-  IconClock,
-  IconPlugConnected,
-  IconSettings,
-  IconLogout,
-} from "@tabler/icons-react";
+import { useLocation } from "react-router";
+import { Outlet } from "react-router";
+import { IconBell, IconSearch } from "@tabler/icons-react";
+import { Sidebar } from "@/components/Sidebar";
 import { useAuth } from "@/hooks/useAuth";
 
 export function Dashboard() {
-  const [activeTab, setActiveTab] = useState("office");
-  const navigate = useNavigate();
-  const { signOut } = useAuth();
+  const location = useLocation();
+  const { user } = useAuth();
 
-  const navItems = [
-    { id: "chat", label: "Chat", icon: IconMessage },
-    { id: "office", label: "Office", icon: IconUsers },
-    { id: "tasks", label: "Tasks", icon: IconChecklist },
-    { id: "crons", label: "Crons", icon: IconClock },
-    { id: "integrations", label: "Integrations", icon: IconPlugConnected },
-    { id: "settings", label: "Settings", icon: IconSettings },
-  ];
-
-  const handleNavigate = (tabId: string) => {
-    setActiveTab(tabId);
-    navigate(`/dashboard/${tabId}`);
-  };
-
-  const handleSignOut = async () => {
-    await signOut();
-    navigate("/login");
-  };
+  // Extract the tab name from the URL
+  const currentPath = location.pathname;
 
   return (
-    <div className="min-h-screen bg-[#0f0f0f] dark text-white flex">
+    <div className="bg-[#12141f] min-h-screen flex">
       {/* Sidebar */}
-      <div className="w-64 bg-[#111] border-r border-[#1a1a1a] p-6 flex flex-col">
-        <div className="mb-8">
-          <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-blue-600 bg-clip-text text-transparent">
-            Axel
-          </h1>
+      <Sidebar activePath={currentPath} />
+
+      {/* Main content area */}
+      <div className="ml-[220px] flex-1 flex flex-col">
+        {/* Top header */}
+        <div className="h-16 bg-[#1a1d2e] border-b border-[#2a2d3e] flex items-center justify-between px-8">
+          <div>
+            <h2 className="text-lg font-semibold text-white">
+              Welcome back,{user?.email ? ` ${user.email.split("@")[0]}` : ""}
+            </h2>
+            <p className="text-sm text-[#8b8fa8]">
+              Manage your AI assistants below
+            </p>
+          </div>
+
+          <div className="flex items-center gap-4">
+            <button className="p-2 hover:bg-[#252840] rounded-lg transition-colors duration-150">
+              <IconSearch size={20} className="text-[#8b8fa8]" />
+            </button>
+            <button className="p-2 hover:bg-[#252840] rounded-lg transition-colors duration-150">
+              <IconBell size={20} className="text-[#8b8fa8]" />
+            </button>
+            <div className="w-10 h-10 rounded-full bg-indigo-500/30 flex items-center justify-center">
+              <span className="text-indigo-300 font-bold">
+                {user?.email?.charAt(0).toUpperCase()}
+              </span>
+            </div>
+          </div>
         </div>
 
-        <nav className="flex-1 space-y-2">
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            return (
-              <button
-                key={item.id}
-                onClick={() => handleNavigate(item.id)}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition-colors ${
-                  activeTab === item.id
-                    ? "bg-blue-500 text-white"
-                    : "text-gray-400 hover:text-white hover:bg-[#1a1a1a]"
-                }`}
-              >
-                <Icon size={20} />
-                <span>{item.label}</span>
-              </button>
-            );
-          })}
-        </nav>
-
-        <button
-          onClick={handleSignOut}
-          className="flex items-center gap-3 px-4 py-3 rounded-lg font-medium text-gray-400 hover:text-white hover:bg-[#1a1a1a] transition-colors w-full"
-        >
-          <IconLogout size={20} />
-          <span>Sign out</span>
-        </button>
-      </div>
-
-      {/* Main content */}
-      <div className="flex-1 overflow-auto">
-        <Outlet />
+        {/* Page content */}
+        <div className="flex-1 overflow-auto">
+          <Outlet />
+        </div>
       </div>
     </div>
   );

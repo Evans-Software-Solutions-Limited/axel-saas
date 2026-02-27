@@ -52,8 +52,6 @@ export function Onboarding() {
   const navigate = useNavigate();
   const { signOut } = useAuth();
 
-  const progress = ((currentStep + 1) / STEP_LABELS.length) * 100;
-
   const handleSignOut = async () => {
     await signOut();
     navigate("/login");
@@ -127,18 +125,19 @@ export function Onboarding() {
                 : false;
 
   return (
-    <div className="min-h-screen bg-[#0f0f0f] dark text-white">
+    <div className="min-h-screen bg-[#12141f]">
       {/* Header */}
-      <div className="border-b border-[#1a1a1a] bg-[#111] px-8 py-4">
+      <div className="border-b border-[#2a2d3e] bg-[#1a1d2e] px-8 py-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-blue-600 bg-clip-text text-transparent">
-              Axel
-            </h1>
+            <div className="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center text-white text-sm font-bold">
+              ⚡
+            </div>
+            <h1 className="text-2xl font-bold text-white">Axel</h1>
           </div>
           <button
             onClick={handleSignOut}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-gray-400 hover:text-white hover:bg-[#1a1a1a] transition-colors"
+            className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-[#8b8fa8] hover:text-white hover:bg-[#252840] transition-colors duration-150"
           >
             <IconLogout size={20} />
             <span>Sign out</span>
@@ -147,42 +146,55 @@ export function Onboarding() {
       </div>
 
       {/* Main content */}
-      <div className="max-w-2xl mx-auto p-8">
-        {/* Progress bar */}
-        <div className="mb-12">
-          <div className="flex items-center justify-between mb-4">
-            <h1 className="text-3xl font-bold">Setup your assistant</h1>
-            <span className="text-sm text-gray-400">
-              Step {currentStep + 1} of {STEP_LABELS.length}
-            </span>
-          </div>
-          <div className="h-1 bg-[#1a1a1a] rounded-full overflow-hidden">
-            <div
-              className="h-full bg-blue-500 transition-all duration-300"
-              style={{ width: `${progress}%` }}
-            />
-          </div>
+      <div className="max-w-2xl mx-auto p-8 mt-8">
+        {/* Step indicator */}
+        <div className="mb-12 flex items-center justify-center gap-2">
+          {STEP_LABELS.map((_, index) => (
+            <div key={index} className="flex items-center">
+              <div
+                className={`w-8 h-8 rounded-full flex items-center justify-center font-semibold text-sm transition-all duration-150 ${
+                  index <= currentStep
+                    ? index < currentStep
+                      ? "bg-indigo-500 text-white"
+                      : "border-2 border-indigo-500 text-indigo-400"
+                    : "bg-[#252840] text-[#8b8fa8]"
+                }`}
+              >
+                {index < currentStep ? "✓" : index + 1}
+              </div>
+              {index < STEP_LABELS.length - 1 && (
+                <div
+                  className={`w-8 h-0.5 transition-all duration-150 ${
+                    index < currentStep ? "bg-indigo-500" : "bg-[#2a2d3e]"
+                  }`}
+                />
+              )}
+            </div>
+          ))}
         </div>
 
-        {/* Error message */}
-        {error && (
-          <div className="mb-6 rounded-lg bg-red-500/10 p-4 text-red-400 border border-red-500/20">
-            {error}
-          </div>
-        )}
+        {/* Main card */}
+        <div className="bg-[#1e2130] border border-[#2a2d3e] rounded-2xl p-8">
+          {/* Error message */}
+          {error && (
+            <div className="mb-6 rounded-lg bg-red-500/20 p-4 text-red-300 border border-red-500/30">
+              {error}
+            </div>
+          )}
 
-        {/* Content */}
-        <div className="rounded-lg border border-[#1a1a1a] bg-[#111] p-8">
+          {/* Content based on step */}
           {currentStep === 0 && (
             <div>
-              <h2 className="text-2xl font-bold mb-6">What's your name?</h2>
-              <p className="text-gray-400 mb-4">What should I call you?</p>
+              <h2 className="text-2xl font-bold text-white mb-2">
+                What's your name?
+              </h2>
+              <p className="text-[#8b8fa8] mb-6">What should I call you?</p>
               <input
                 type="text"
                 value={data.name}
                 onChange={(e) => updateData({ name: e.target.value })}
                 placeholder="Your name"
-                className="w-full rounded-lg bg-[#1a1a1a] px-4 py-3 text-white placeholder-gray-500 border border-[#2a2a2a] focus:border-blue-500 focus:outline-none"
+                className="w-full rounded-lg bg-[#252840] px-4 py-3 text-white placeholder-[#8b8fa8] border border-[#2a2d3e] focus:border-indigo-500 focus:outline-none transition-colors duration-150"
                 autoFocus
               />
             </div>
@@ -190,10 +202,10 @@ export function Onboarding() {
 
           {currentStep === 1 && (
             <div>
-              <h2 className="text-2xl font-bold mb-6">
+              <h2 className="text-2xl font-bold text-white mb-2">
                 What do you do for work?
               </h2>
-              <p className="text-gray-400 mb-4">
+              <p className="text-[#8b8fa8] mb-6">
                 Brief description of your role
               </p>
               <input
@@ -201,20 +213,20 @@ export function Onboarding() {
                 value={data.role || ""}
                 onChange={(e) => updateData({ role: e.target.value })}
                 placeholder="e.g., Founder at startup, Software engineer, etc."
-                className="w-full rounded-lg bg-[#1a1a1a] px-4 py-3 text-white placeholder-gray-500 border border-[#2a2a2a] focus:border-blue-500 focus:outline-none mb-6"
+                className="w-full rounded-lg bg-[#252840] px-4 py-3 text-white placeholder-[#8b8fa8] border border-[#2a2d3e] focus:border-indigo-500 focus:outline-none transition-colors duration-150 mb-6"
                 autoFocus
               />
               <div className="space-y-2">
-                <p className="text-sm text-gray-400 mb-3">Or select a role:</p>
+                <p className="text-sm text-[#8b8fa8] mb-3">Or select a role:</p>
                 <div className="grid grid-cols-2 gap-3">
                   {ROLE_OPTIONS.map((role) => (
                     <button
                       key={role}
                       onClick={() => updateData({ role })}
-                      className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
+                      className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors duration-150 ${
                         data.role === role
-                          ? "bg-blue-500 text-white"
-                          : "bg-[#1a1a1a] text-gray-300 border border-[#2a2a2a] hover:border-blue-500"
+                          ? "bg-indigo-500 text-white"
+                          : "bg-[#252840] text-[#8b8fa8] border border-[#2a2d3e] hover:border-indigo-500"
                       }`}
                     >
                       {role}
@@ -227,19 +239,19 @@ export function Onboarding() {
 
           {currentStep === 2 && (
             <div>
-              <h2 className="text-2xl font-bold mb-6">
+              <h2 className="text-2xl font-bold text-white mb-2">
                 What do you mainly want help with?
               </h2>
-              <p className="text-gray-400 mb-6">Select all that apply</p>
+              <p className="text-[#8b8fa8] mb-6">Select all that apply</p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {HELP_WITH_OPTIONS.map((option) => (
                   <button
                     key={option}
                     onClick={() => toggleHelpWith(option)}
-                    className={`rounded-lg px-4 py-3 text-left font-medium transition-colors ${
+                    className={`rounded-lg px-4 py-3 text-left font-medium transition-colors duration-150 border ${
                       data.helpWith.includes(option)
-                        ? "bg-blue-500 text-white"
-                        : "bg-[#1a1a1a] text-gray-300 border border-[#2a2a2a] hover:border-blue-500"
+                        ? "bg-indigo-500 text-white border-indigo-500"
+                        : "bg-[#252840] text-[#8b8fa8] border-[#2a2d3e] hover:border-indigo-500"
                     }`}
                   >
                     {option}
@@ -251,17 +263,17 @@ export function Onboarding() {
 
           {currentStep === 3 && (
             <div>
-              <h2 className="text-2xl font-bold mb-6">
+              <h2 className="text-2xl font-bold text-white mb-2">
                 What does a typical day look like?
               </h2>
-              <p className="text-gray-400 mb-4">
+              <p className="text-[#8b8fa8] mb-4">
                 Optional — helps me understand your context
               </p>
               <textarea
                 value={data.typicalDay || ""}
                 onChange={(e) => updateData({ typicalDay: e.target.value })}
                 placeholder="Describe your typical day (e.g., client calls, emails, coding, meetings)"
-                className="w-full rounded-lg bg-[#1a1a1a] px-4 py-3 text-white placeholder-gray-500 border border-[#2a2a2a] focus:border-blue-500 focus:outline-none h-32 resize-none"
+                className="w-full rounded-lg bg-[#252840] px-4 py-3 text-white placeholder-[#8b8fa8] border border-[#2a2d3e] focus:border-indigo-500 focus:outline-none transition-colors duration-150 h-32 resize-none"
                 autoFocus
               />
             </div>
@@ -269,25 +281,25 @@ export function Onboarding() {
 
           {currentStep === 4 && (
             <div>
-              <h2 className="text-2xl font-bold mb-6">
+              <h2 className="text-2xl font-bold text-white mb-2">
                 Which channels would you like to use?
               </h2>
-              <p className="text-gray-400 mb-6">Select all that apply</p>
+              <p className="text-[#8b8fa8] mb-6">Select all that apply</p>
               <div className="space-y-3">
                 {CHANNEL_OPTIONS.map((channel) => (
                   <button
                     key={channel}
                     onClick={() => toggleChannel(channel)}
-                    className={`w-full rounded-lg px-4 py-3 text-left font-medium transition-colors border ${
+                    className={`w-full rounded-lg px-4 py-3 text-left font-medium transition-colors duration-150 border ${
                       data.channels.includes(channel)
-                        ? "bg-blue-500 text-white border-blue-500"
-                        : "bg-[#1a1a1a] text-gray-300 border-[#2a2a2a] hover:border-blue-500"
+                        ? "bg-indigo-500 text-white border-indigo-500"
+                        : "bg-[#252840] text-[#8b8fa8] border-[#2a2d3e] hover:border-indigo-500"
                     }`}
                   >
                     <div className="flex items-center justify-between">
                       <span>{channel}</span>
                       {channel === "Telegram" && (
-                        <span className="text-xs bg-green-500 px-2 py-1 rounded">
+                        <span className="text-xs bg-green-500/20 text-green-300 px-2 py-1 rounded">
                           Recommended
                         </span>
                       )}
@@ -300,79 +312,72 @@ export function Onboarding() {
 
           {currentStep === 5 && (
             <div>
-              <h2 className="text-2xl font-bold mb-6">
-                Would you like a morning brief?
+              <h2 className="text-2xl font-bold text-white mb-2">
+                ⚡ Your assistant is ready
               </h2>
-              <p className="text-gray-400 mb-6">
-                A daily summary delivered to your chosen channel
+              <p className="text-[#8b8fa8] mb-6">
+                Review your setup and launch Axel
               </p>
-              <div className="space-y-4">
-                <button
-                  onClick={() => updateData({ morningBrief: true })}
-                  className={`w-full rounded-lg px-4 py-3 text-left font-medium transition-colors border ${
-                    data.morningBrief
-                      ? "bg-blue-500 text-white border-blue-500"
-                      : "bg-[#1a1a1a] text-gray-300 border-[#2a2a2a] hover:border-blue-500"
-                  }`}
-                >
-                  Yes, I'd like a morning brief
-                </button>
-                <button
-                  onClick={() => updateData({ morningBrief: false })}
-                  className={`w-full rounded-lg px-4 py-3 text-left font-medium transition-colors border ${
-                    !data.morningBrief
-                      ? "bg-blue-500 text-white border-blue-500"
-                      : "bg-[#1a1a1a] text-gray-300 border-[#2a2a2a] hover:border-blue-500"
-                  }`}
-                >
-                  No, I don't need a brief
-                </button>
+
+              {/* Summary */}
+              <div className="bg-[#252840] rounded-lg p-4 mb-6 space-y-3">
+                <div>
+                  <p className="text-xs text-[#8b8fa8]">Name</p>
+                  <p className="text-sm text-white font-medium">{data.name}</p>
+                </div>
+                {data.role && (
+                  <div>
+                    <p className="text-xs text-[#8b8fa8]">Role</p>
+                    <p className="text-sm text-white font-medium">
+                      {data.role}
+                    </p>
+                  </div>
+                )}
+                <div>
+                  <p className="text-xs text-[#8b8fa8]">Help with</p>
+                  <p className="text-sm text-white font-medium">
+                    {data.helpWith.join(", ")}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-[#8b8fa8]">Channels</p>
+                  <p className="text-sm text-white font-medium">
+                    {data.channels.join(", ")}
+                  </p>
+                </div>
               </div>
 
-              {data.morningBrief && (
-                <div className="mt-6 pt-6 border-t border-[#2a2a2a]">
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Preferred time
-                  </label>
-                  <input
-                    type="time"
-                    value={data.briefTime || "08:00"}
-                    onChange={(e) => updateData({ briefTime: e.target.value })}
-                    className="w-full rounded-lg bg-[#1a1a1a] px-4 py-2 text-white border border-[#2a2a2a] focus:border-blue-500 focus:outline-none"
-                  />
-                </div>
-              )}
+              {/* Confirm button */}
+              <button
+                onClick={handleSubmit}
+                disabled={isSubmitting}
+                className="w-full bg-indigo-500 text-white py-3 rounded-lg font-medium hover:bg-indigo-600 disabled:bg-indigo-500/50 transition-colors duration-150"
+              >
+                {isSubmitting ? "Launching..." : "Launch Axel"}
+              </button>
             </div>
           )}
 
           {/* Navigation buttons */}
-          <div className="mt-8 flex gap-4">
-            <button
-              onClick={handlePrevious}
-              disabled={currentStep === 0}
-              className="flex-1 rounded-lg px-4 py-3 font-medium text-white bg-[#1a1a1a] border border-[#2a2a2a] hover:border-gray-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              Previous
-            </button>
+          {currentStep < 5 && (
+            <div className="mt-8 flex gap-4">
+              <button
+                onClick={handlePrevious}
+                disabled={currentStep === 0}
+                className="flex-1 rounded-lg px-4 py-3 font-medium text-white bg-[#252840] border border-[#2a2d3e] hover:bg-[#2d3050] disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-150"
+              >
+                Previous
+              </button>
 
-            {currentStep < STEP_LABELS.length - 1 ? (
               <button
                 onClick={handleNext}
                 disabled={!canProceedToNext}
-                className="flex-1 rounded-lg px-4 py-3 font-medium text-white bg-blue-500 hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="flex-1 rounded-lg px-4 py-3 font-medium text-white bg-indigo-500 hover:bg-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-150"
               >
                 Next
               </button>
-            ) : (
-              <button
-                onClick={handleSubmit}
-                disabled={isSubmitting}
-                className="flex-1 rounded-lg px-4 py-3 font-medium text-white bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                {isSubmitting ? "Completing..." : "Complete setup"}
-              </button>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

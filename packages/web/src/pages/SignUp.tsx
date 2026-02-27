@@ -7,21 +7,21 @@ export function SignUp() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [localError, setLocalError] = useState<string | null>(null);
-  const { signUp, error } = useAuth();
+  const [error, setError] = useState("");
+  const { signUp } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLocalError(null);
+    setError("");
 
     if (password !== confirmPassword) {
-      setLocalError("Passwords do not match");
+      setError("Passwords do not match");
       return;
     }
 
     if (password.length < 6) {
-      setLocalError("Password must be at least 6 characters");
+      setError("Password must be at least 6 characters");
       return;
     }
 
@@ -29,29 +29,42 @@ export function SignUp() {
 
     const result = await signUp(email, password);
     if (result.success) {
-      // Redirect to subscribe page
-      navigate("/subscribe");
+      navigate("/onboarding");
+    } else {
+      setError(result.error || "Sign up failed");
     }
 
     setIsLoading(false);
   };
 
-  const displayError = localError || error;
-
   return (
-    <div className="min-h-screen bg-[#0f0f0f] dark flex items-center justify-center p-4">
+    <div className="min-h-screen bg-[#12141f] flex items-center justify-center p-4">
       <div className="w-full max-w-md">
-        <div className="rounded-lg border border-[#1a1a1a] bg-[#111] p-8">
-          <h1 className="mb-2 text-3xl font-bold text-white">Create account</h1>
-          <p className="mb-8 text-sm text-gray-400">
-            Get started with Axel, your AI personal assistant
+        {/* Logo */}
+        <div className="mb-8 text-center">
+          <div className="w-12 h-12 rounded-full bg-indigo-500 flex items-center justify-center mx-auto mb-4 text-white text-xl font-bold">
+            ⚡
+          </div>
+          <h1 className="text-3xl font-bold text-white">Axel</h1>
+        </div>
+
+        <div className="rounded-2xl border border-[#2a2d3e] bg-[#1e2130] p-8">
+          <h2 className="mb-2 text-2xl font-bold text-white">Create account</h2>
+          <p className="mb-8 text-sm text-[#8b8fa8]">
+            Join Axel and unlock AI-powered automation
           </p>
+
+          {error && (
+            <div className="mb-4 p-4 rounded-lg bg-red-500/20 border border-red-500/30 text-red-300 text-sm">
+              {error}
+            </div>
+          )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label
                 htmlFor="email"
-                className="block text-sm font-medium text-gray-300"
+                className="block text-sm font-medium text-white mb-2"
               >
                 Email
               </label>
@@ -61,7 +74,7 @@ export function SignUp() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                className="mt-1 w-full rounded-lg bg-[#1a1a1a] px-4 py-2 text-white placeholder-gray-500 border border-[#2a2a2a] focus:border-blue-500 focus:outline-none"
+                className="w-full rounded-lg bg-[#252840] px-4 py-3 text-white placeholder-[#8b8fa8] border border-[#2a2d3e] focus:border-indigo-500 focus:outline-none transition-colors duration-150"
                 placeholder="you@example.com"
               />
             </div>
@@ -69,7 +82,7 @@ export function SignUp() {
             <div>
               <label
                 htmlFor="password"
-                className="block text-sm font-medium text-gray-300"
+                className="block text-sm font-medium text-white mb-2"
               >
                 Password
               </label>
@@ -79,7 +92,7 @@ export function SignUp() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                className="mt-1 w-full rounded-lg bg-[#1a1a1a] px-4 py-2 text-white placeholder-gray-500 border border-[#2a2a2a] focus:border-blue-500 focus:outline-none"
+                className="w-full rounded-lg bg-[#252840] px-4 py-3 text-white placeholder-[#8b8fa8] border border-[#2a2d3e] focus:border-indigo-500 focus:outline-none transition-colors duration-150"
                 placeholder="••••••••"
               />
             </div>
@@ -87,7 +100,7 @@ export function SignUp() {
             <div>
               <label
                 htmlFor="confirmPassword"
-                className="block text-sm font-medium text-gray-300"
+                className="block text-sm font-medium text-white mb-2"
               >
                 Confirm Password
               </label>
@@ -97,32 +110,31 @@ export function SignUp() {
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 required
-                className="mt-1 w-full rounded-lg bg-[#1a1a1a] px-4 py-2 text-white placeholder-gray-500 border border-[#2a2a2a] focus:border-blue-500 focus:outline-none"
+                className="w-full rounded-lg bg-[#252840] px-4 py-3 text-white placeholder-[#8b8fa8] border border-[#2a2d3e] focus:border-indigo-500 focus:outline-none transition-colors duration-150"
                 placeholder="••••••••"
               />
             </div>
 
-            {displayError && (
-              <div className="rounded-lg bg-red-500/10 p-3 text-sm text-red-400 border border-red-500/20">
-                {displayError}
-              </div>
-            )}
-
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full rounded-lg bg-blue-500 py-2 font-medium text-white hover:bg-blue-600 disabled:opacity-50 transition-colors"
+              className="w-full bg-indigo-500 text-white py-3 rounded-lg font-medium hover:bg-indigo-600 disabled:bg-indigo-500/50 transition-colors duration-150 mt-6"
             >
               {isLoading ? "Creating account..." : "Create account"}
             </button>
           </form>
 
-          <p className="mt-6 text-center text-sm text-gray-400">
-            Already have an account?{" "}
-            <Link to="/login" className="text-blue-400 hover:text-blue-300">
-              Sign in
-            </Link>
-          </p>
+          <div className="mt-6 text-center">
+            <p className="text-sm text-[#8b8fa8]">
+              Already have an account?{" "}
+              <Link
+                to="/login"
+                className="text-indigo-400 hover:text-indigo-300 font-medium transition-colors duration-150"
+              >
+                Sign in
+              </Link>
+            </p>
+          </div>
         </div>
       </div>
     </div>

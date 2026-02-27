@@ -1,153 +1,153 @@
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router";
-import { api } from "@/lib/eden";
+import { IconCheck } from "@tabler/icons-react";
 
 interface Plan {
-  id: string;
   name: string;
-  priceGbpMonthly: number;
+  price: number;
+  description: string;
   features: string[];
+  highlighted: boolean;
 }
 
 export function Subscribe() {
-  const [plans, setPlans] = useState<Plan[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const navigate = useNavigate();
-
-  // Fetch plans on mount
-  useEffect(() => {
-    const fetchPlans = async () => {
-      try {
-        const response = await api.core.subscriptions.tiers.get();
-        if (response.data) {
-          setPlans(response.data as Plan[]);
-        }
-      } catch (err) {
-        console.error("Failed to fetch plans:", err);
-        setError("Failed to load subscription plans");
-      }
-    };
-    fetchPlans();
-  }, []);
-
-  const handleSelectPlan = async (planId: string) => {
-    setSelectedPlan(planId);
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const response = await api.core.subscriptions.checkout.post({
-        tierId: planId,
-      });
-
-      if (response.data?.success) {
-        // For now, redirect to onboarding since Stripe integration is coming soon
-        navigate("/onboarding");
-      } else {
-        setError("Failed to process subscription");
-      }
-    } catch (err) {
-      console.error("Subscription error:", err);
-      setError("Failed to process subscription");
-    }
-
-    setIsLoading(false);
-    setSelectedPlan(null);
-  };
-
-  const planDetails: Record<
-    string,
-    { description: string; recommended?: boolean }
-  > = {
-    starter: {
-      description: "Daily brief, Telegram, basic tasks, email triage",
+  const plans: Plan[] = [
+    {
+      name: "Starter",
+      price: 9,
+      description: "Perfect for getting started",
+      features: [
+        "1 AI agent",
+        "Basic chat interface",
+        "Email integration",
+        "Community support",
+      ],
+      highlighted: false,
     },
-    pro: {
-      description:
-        "Everything + calendar, email send, integrations, sub-agents",
-      recommended: true,
+    {
+      name: "Pro",
+      price: 29,
+      description: "Most popular choice",
+      features: [
+        "5 AI agents",
+        "Advanced chat features",
+        "Email, Calendar, Slack",
+        "Priority support",
+        "Custom workflows",
+      ],
+      highlighted: true,
     },
-    business: {
-      description: "Custom channels, multiple agents, priority support",
+    {
+      name: "Business",
+      price: 79,
+      description: "For growing teams",
+      features: [
+        "Unlimited agents",
+        "Advanced analytics",
+        "All integrations",
+        "Dedicated support",
+        "Team management",
+        "Custom branding",
+      ],
+      highlighted: false,
     },
-    developer: {
-      description:
-        "Full exec access, code gen, heavy sub-agent use, API access",
+    {
+      name: "Developer",
+      price: 149,
+      description: "Enterprise power",
+      features: [
+        "Everything in Business",
+        "API access",
+        "Webhook support",
+        "Custom integrations",
+        "SLA guarantee",
+        "On-premise option",
+      ],
+      highlighted: false,
     },
-  };
+  ];
 
   return (
-    <div className="min-h-screen bg-[#0f0f0f] dark text-white p-8">
-      <div className="max-w-6xl mx-auto">
-        <div className="mb-12">
-          <h1 className="mb-4 text-4xl font-bold">Choose your plan</h1>
-          <p className="text-lg text-gray-400">
-            Select the perfect subscription tier for your needs
-          </p>
-        </div>
+    <div className="min-h-screen bg-[#12141f] p-8">
+      <div className="mb-12 text-center">
+        <h1 className="text-4xl font-bold text-white mb-4">
+          Simple, Transparent Pricing
+        </h1>
+        <p className="text-lg text-[#8b8fa8]">
+          Choose the plan that fits your needs
+        </p>
+      </div>
 
-        {error && (
-          <div className="mb-6 rounded-lg bg-red-500/10 p-4 text-red-400 border border-red-500/20">
-            {error}
-          </div>
-        )}
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {plans.map((plan) => {
-            const details = planDetails[plan.id];
-            const isRecommended = details?.recommended;
-
-            return (
-              <div
-                key={plan.id}
-                className={`relative rounded-lg border ${
-                  isRecommended
-                    ? "border-blue-500 bg-blue-500/5"
-                    : "border-[#1a1a1a] bg-[#111]"
-                } p-6 transition-all hover:border-blue-400`}
-              >
-                {isRecommended && (
-                  <div className="absolute -top-3 left-6 bg-blue-500 text-white px-3 py-1 rounded-full text-xs font-semibold">
-                    Recommended
-                  </div>
-                )}
-
-                <h2 className="text-2xl font-bold mb-2">{plan.name}</h2>
-                <div className="mb-4">
-                  <span className="text-3xl font-bold">
-                    £{plan.priceGbpMonthly}
-                  </span>
-                  <span className="text-gray-400 ml-2">/month</span>
-                </div>
-
-                <p className="text-sm text-gray-400 mb-6">
-                  {details?.description || ""}
-                </p>
-
-                <button
-                  onClick={() => handleSelectPlan(plan.id)}
-                  disabled={isLoading && selectedPlan === plan.id}
-                  className="w-full rounded-lg bg-blue-500 py-2 font-medium text-white hover:bg-blue-600 disabled:opacity-50 transition-colors mb-6"
-                >
-                  {isLoading && selectedPlan === plan.id
-                    ? "Selecting..."
-                    : "Select plan"}
-                </button>
-
-                <div className="space-y-3 border-t border-[#2a2a2a] pt-6">
-                  {plan.features.map((feature, idx) => (
-                    <div key={idx} className="flex items-start gap-2">
-                      <span className="text-green-400 mt-0.5">✓</span>
-                      <span className="text-sm text-gray-300">{feature}</span>
-                    </div>
-                  ))}
-                </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-7xl mx-auto">
+        {plans.map((plan) => (
+          <div
+            key={plan.name}
+            className={`relative flex flex-col bg-[#1e2130] border rounded-2xl p-6 transition-all duration-150 ${
+              plan.highlighted
+                ? "ring-2 ring-indigo-500 md:scale-105 md:-mt-6 md:mb-6"
+                : "border-[#2a2d3e]"
+            }`}
+          >
+            {/* Badge */}
+            {plan.highlighted && (
+              <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
+                <span className="bg-indigo-500 text-white text-xs font-bold px-3 py-1 rounded-full">
+                  Most Popular
+                </span>
               </div>
-            );
-          })}
-        </div>
+            )}
+
+            {/* Plan info */}
+            <div className="mb-6">
+              <h3 className="text-lg font-bold text-white mb-2">{plan.name}</h3>
+              <p className="text-xs text-[#8b8fa8]">{plan.description}</p>
+            </div>
+
+            {/* Price */}
+            <div className="mb-6">
+              <div className="flex items-baseline gap-1">
+                <span className="text-3xl font-bold text-white">
+                  £{plan.price}
+                </span>
+                <span className="text-[#8b8fa8] text-sm">/month</span>
+              </div>
+            </div>
+
+            {/* Features */}
+            <div className="flex-1 mb-6">
+              <ul className="space-y-3">
+                {plan.features.map((feature) => (
+                  <li key={feature} className="flex items-start gap-3">
+                    <IconCheck
+                      size={18}
+                      className="text-indigo-400 flex-shrink-0 mt-0.5"
+                    />
+                    <span className="text-sm text-[#e8e9f0]">{feature}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* CTA Button */}
+            <button
+              className={`w-full py-3 rounded-lg font-medium transition-colors duration-150 ${
+                plan.highlighted
+                  ? "bg-indigo-500 text-white hover:bg-indigo-600"
+                  : "border border-[#2a2d3e] text-white hover:bg-[#252840]"
+              }`}
+            >
+              Get Started
+            </button>
+          </div>
+        ))}
+      </div>
+
+      {/* FAQ or Additional info */}
+      <div className="mt-16 text-center text-[#8b8fa8]">
+        <p>
+          All plans include a 14-day free trial. No credit card required.{" "}
+          <a href="#" className="text-indigo-400 hover:text-indigo-300">
+            See all features
+          </a>
+        </p>
       </div>
     </div>
   );
