@@ -1,6 +1,16 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router";
 import { useAuth } from "@/hooks/useAuth";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 export function Login() {
   const [email, setEmail] = useState("");
@@ -15,8 +25,6 @@ export function Login() {
 
     const result = await signIn(email, password);
     if (result.success) {
-      // Redirect based on onboarding status
-      // For now, redirect to onboarding
       navigate("/onboarding");
     }
 
@@ -24,73 +32,104 @@ export function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0f0f0f] dark flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
-        <div className="rounded-lg border border-[#1a1a1a] bg-[#111] p-8">
-          <h1 className="mb-2 text-3xl font-bold text-white">Welcome back</h1>
-          <p className="mb-8 text-sm text-gray-400">
-            Sign in to your Axel account
-          </p>
-
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label
-                htmlFor="email"
-                className="block text-sm font-medium text-gray-300"
-              >
-                Email
-              </label>
-              <input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                className="mt-1 w-full rounded-lg bg-[#1a1a1a] px-4 py-2 text-white placeholder-gray-500 border border-[#2a2a2a] focus:border-blue-500 focus:outline-none"
-                placeholder="you@example.com"
-              />
-            </div>
-
-            <div>
-              <label
-                htmlFor="password"
-                className="block text-sm font-medium text-gray-300"
-              >
-                Password
-              </label>
-              <input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                className="mt-1 w-full rounded-lg bg-[#1a1a1a] px-4 py-2 text-white placeholder-gray-500 border border-[#2a2a2a] focus:border-blue-500 focus:outline-none"
-                placeholder="••••••••"
-              />
-            </div>
-
-            {error && (
-              <div className="rounded-lg bg-red-500/10 p-3 text-sm text-red-400 border border-red-500/20">
-                {error}
-              </div>
-            )}
-
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="w-full rounded-lg bg-blue-500 py-2 font-medium text-white hover:bg-blue-600 disabled:opacity-50 transition-colors"
-            >
-              {isLoading ? "Signing in..." : "Sign in"}
-            </button>
-          </form>
-
-          <p className="mt-6 text-center text-sm text-gray-400">
-            Don't have an account?{" "}
-            <Link to="/signup" className="text-blue-400 hover:text-blue-300">
-              Sign up
-            </Link>
-          </p>
+    <div className="min-h-screen bg-surface flex items-center justify-center p-4">
+      <div className="w-full max-w-md space-y-8">
+        {/* Axel Wordmark & Tagline */}
+        <div className="text-center space-y-2">
+          <h1 className="text-3xl font-bold text-text">
+            <span className="text-accent">A</span>xel
+          </h1>
+          <p className="text-sm text-muted">Your 24/7 AI Employee</p>
         </div>
+
+        {/* Auth Card */}
+        <Card className="border border-border">
+          <CardHeader>
+            <CardTitle className="text-text">Welcome back</CardTitle>
+            <CardDescription>Sign in to your Axel account</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <form onSubmit={handleSubmit} className="space-y-4">
+              {/* Email Field */}
+              <div className="space-y-2">
+                <Label htmlFor="email" className="text-text">
+                  Email
+                </Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  placeholder="you@example.com"
+                  className="bg-surface-raised border-border text-text placeholder:text-muted"
+                />
+              </div>
+
+              {/* Password Field */}
+              <div className="space-y-2">
+                <Label htmlFor="password" className="text-text">
+                  Password
+                </Label>
+                <Input
+                  id="password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  placeholder="••••••••"
+                  className="bg-surface-raised border-border text-text placeholder:text-muted"
+                />
+              </div>
+
+              {/* Error Message */}
+              {error && (
+                <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive border border-destructive/30">
+                  {error}
+                </div>
+              )}
+
+              {/* Sign In Button */}
+              <Button
+                type="submit"
+                disabled={isLoading}
+                className="w-full bg-accent hover:bg-accent/90 text-white"
+              >
+                {isLoading ? "Signing in..." : "Sign in"}
+              </Button>
+            </form>
+
+            {/* Divider */}
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-border" />
+              </div>
+              <div className="relative flex justify-center text-xs">
+                <span className="px-2 bg-surface-raised text-muted">Or</span>
+              </div>
+            </div>
+
+            {/* Google Sign In */}
+            <Button
+              variant="outline"
+              className="w-full border-border text-text hover:bg-surface-raised"
+              disabled={isLoading}
+            >
+              Sign in with Google
+            </Button>
+
+            {/* Sign Up Link */}
+            <p className="text-center text-sm text-muted">
+              Don't have an account?{" "}
+              <Link
+                to="/signup"
+                className="text-accent hover:text-accent/80 font-medium"
+              >
+                Create one
+              </Link>
+            </p>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
