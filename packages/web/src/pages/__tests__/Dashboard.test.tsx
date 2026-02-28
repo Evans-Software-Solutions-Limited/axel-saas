@@ -1,0 +1,88 @@
+import { describe, it, expect } from "vitest";
+import { render, screen, fireEvent } from "@testing-library/react";
+import { MemoryRouter, Routes, Route } from "react-router";
+import { Dashboard } from "../Dashboard";
+
+function MockOutlet() {
+  return <div data-testid="outlet">Office content</div>;
+}
+
+describe("Dashboard", () => {
+  it("renders sidebar with Office nav item", () => {
+    render(
+      <MemoryRouter initialEntries={["/dashboard/office"]}>
+        <Routes>
+          <Route path="/dashboard" element={<Dashboard />}>
+            <Route path="office" element={<MockOutlet />} />
+          </Route>
+        </Routes>
+      </MemoryRouter>,
+    );
+    expect(screen.getAllByText("Office")[0]).toBeDefined();
+    expect(screen.getByTestId("outlet")).toBeDefined();
+  });
+
+  it("renders current nav label in header", () => {
+    render(
+      <MemoryRouter initialEntries={["/dashboard/office"]}>
+        <Routes>
+          <Route path="/dashboard" element={<Dashboard />}>
+            <Route path="office" element={<MockOutlet />} />
+          </Route>
+        </Routes>
+      </MemoryRouter>,
+    );
+    expect(screen.getByRole("heading", { name: /office/i })).toBeDefined();
+  });
+
+  it("navigates when nav item is clicked", () => {
+    render(
+      <MemoryRouter initialEntries={["/dashboard/office"]}>
+        <Routes>
+          <Route path="/dashboard" element={<Dashboard />}>
+            <Route path="office" element={<MockOutlet />} />
+            <Route path="chat" element={<div data-testid="chat">Chat</div>} />
+          </Route>
+        </Routes>
+      </MemoryRouter>,
+    );
+    const chatButton = screen.getByRole("button", { name: /chat/i });
+    fireEvent.click(chatButton);
+    expect(screen.getByTestId("chat")).toBeDefined();
+  });
+
+  it("toggles sidebar when menu button is clicked", () => {
+    render(
+      <MemoryRouter initialEntries={["/dashboard/office"]}>
+        <Routes>
+          <Route path="/dashboard" element={<Dashboard />}>
+            <Route path="office" element={<MockOutlet />} />
+          </Route>
+        </Routes>
+      </MemoryRouter>,
+    );
+    const menuButton = screen.getByRole("button", { name: "" });
+    const aside = document.querySelector("aside");
+    expect(aside).toBeDefined();
+    fireEvent.click(menuButton);
+    expect(aside?.className).toContain("w-20");
+  });
+
+  it("navigates to login when logout is clicked", () => {
+    render(
+      <MemoryRouter initialEntries={["/dashboard/office"]}>
+        <Routes>
+          <Route path="/dashboard" element={<Dashboard />}>
+            <Route path="office" element={<MockOutlet />} />
+          </Route>
+          <Route path="/login" element={<div data-testid="login">Login</div>} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    const logoutButtons = screen
+      .getAllByRole("button")
+      .filter((b) => b.textContent?.includes("Logout"));
+    fireEvent.click(logoutButtons[0]!);
+    expect(screen.getByTestId("login")).toBeDefined();
+  });
+});
