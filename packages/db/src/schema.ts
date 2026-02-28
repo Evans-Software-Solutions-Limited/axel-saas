@@ -29,6 +29,7 @@ export const subscriptionStatusEnum = pgEnum("subscription_status", [
 export const provisioningStatusEnum = pgEnum("provisioning_status", [
   "pending",
   "provisioning",
+  "config_generated",
   "active",
   "failed",
   "deprovisioned",
@@ -155,3 +156,34 @@ export const onboardingAnswers = pgTable(
 
 export type OnboardingAnswers = typeof onboardingAnswers.$inferSelect;
 export type NewOnboardingAnswers = typeof onboardingAnswers.$inferInsert;
+
+// ─── Provisioning Files ────────────────────────────────────────────────────────
+
+export const provisioningFiles = pgTable(
+  "provisioning_files",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    fileName: text("file_name").notNull(),
+    content: text("content").notNull(),
+    generatedAt: timestamp("generated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => ({
+    userIdFileNameIdx: uniqueIndex(
+      "provisioning_files_user_id_file_name_idx",
+    ).on(table.userId, table.fileName),
+  }),
+);
+
+export type ProvisioningFiles = typeof provisioningFiles.$inferSelect;
+export type NewProvisioningFiles = typeof provisioningFiles.$inferInsert;

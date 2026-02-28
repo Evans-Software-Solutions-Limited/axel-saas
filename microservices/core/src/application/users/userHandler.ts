@@ -5,6 +5,11 @@ import {
   getUser,
 } from "@axel-saas/api-utils/auth/supabaseAuth";
 import { userRepository } from "../repositories/userRepository";
+import { provisioningRepository } from "../repositories/provisioningRepository";
+import {
+  ConfigGenerationService,
+  type OnboardingData,
+} from "../provisioning/configGenerationService";
 
 export const userHandler = new Elysia({ name: "UserHandler" })
   .derive(async ({ headers }) => ({
@@ -61,7 +66,74 @@ export const userHandler = new Elysia({ name: "UserHandler" })
           return { success: false, error: "User not found" };
         }
 
+        // Store onboarding answers
         await userRepository.updateOnboardingAnswers(dbUser.id, body);
+
+        // Generate config files from answers
+        const onboardingData: OnboardingData = {
+          name: body.name,
+          role: body.role || "Professional",
+          goals: body.goals || "",
+          helpWith:
+            typeof body.helpWith === "string"
+              ? body.helpWith
+              : body.helpWith?.join(", ") || "",
+          painPoints: body.painPoints || "",
+          knowledgeAreas: body.knowledgeAreas || "",
+        };
+
+        const generatedFiles =
+          ConfigGenerationService.generateConfigFiles(onboardingData);
+
+        // Write files to disk
+        let workspacePath = undefined;
+        try {
+          workspacePath = await ConfigGenerationService.writeFilesToDisk(
+            dbUser.id,
+            generatedFiles,
+          );
+        } catch (diskError) {
+          console.warn(
+            "Failed to write files to disk:",
+            diskError instanceof Error ? diskError.message : String(diskError),
+          );
+          // Continue anyway — files are stored in DB
+        }
+
+        // Store generated files in database
+        for (const [fileName, content] of Object.entries(generatedFiles)) {
+          await userRepository.storeProvisioningFile(
+            dbUser.id,
+            fileName,
+            content,
+          );
+        }
+
+        // Update provisioning state
+        let provisioningState = await provisioningRepository.findByUserId(
+          dbUser.id,
+        );
+        if (!provisioningState) {
+          provisioningState = await provisioningRepository.create({
+            userId: dbUser.id,
+            status: "config_generated",
+            workspacePath,
+          });
+        } else {
+          await provisioningRepository.updateStatus(
+            provisioningState.id,
+            "config_generated",
+          );
+          if (workspacePath) {
+            // Store workspace path if we got one
+            await provisioningRepository.updateProvisioned(
+              provisioningState.id,
+              workspacePath,
+            );
+          }
+        }
+
+        // Update user to mark onboarding as completed
         await userRepository.updateUser(dbUser.id, {
           onboardingCompleted: true,
         });
@@ -77,14 +149,13 @@ export const userHandler = new Elysia({ name: "UserHandler" })
       body: t.Object({
         name: t.String(),
         role: t.Optional(t.String()),
-        helpWith: t.Array(t.String()),
-        typicalDay: t.Optional(t.String()),
-        channels: t.Array(t.String()),
-        morningBrief: t.Boolean(),
-        briefTime: t.Optional(t.String()),
+        goals: t.Optional(t.String()),
+        helpWith: t.Optional(t.Union([t.String(), t.Array(t.String())])),
+        painPoints: t.Optional(t.String()),
+        knowledgeAreas: t.Optional(t.String()),
       }),
       detail: {
-        description: "Complete user onboarding",
+        description: "Complete user onboarding with config generation",
         tags: ["Users"],
       },
     },

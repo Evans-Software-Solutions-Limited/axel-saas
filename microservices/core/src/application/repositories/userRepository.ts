@@ -1,15 +1,17 @@
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import {
   type Db,
   type User,
   type NewUser,
   type Subscription,
   type ProvisioningState,
+  type ProvisioningFiles,
   getDb,
   users,
   subscriptions,
   provisioningState,
   onboardingAnswers,
+  provisioningFiles,
 } from "@axel-saas/db";
 
 export type UserWithRelations = User & {
@@ -149,6 +151,65 @@ export class UserRepository {
         completedAt: new Date(),
       });
     }
+  }
+
+  async storeProvisioningFile(
+    userId: string,
+    fileName: string,
+    content: string,
+  ): Promise<ProvisioningFiles> {
+    const existing = await this.db
+      .select()
+      .from(provisioningFiles)
+      .where(
+        and(
+          eq(provisioningFiles.userId, userId),
+          eq(provisioningFiles.fileName, fileName),
+        ),
+      )
+      .limit(1);
+
+    if (existing.length > 0) {
+      await this.db
+        .update(provisioningFiles)
+        .set({ content, updatedAt: new Date() })
+        .where(
+          and(
+            eq(provisioningFiles.userId, userId),
+            eq(provisioningFiles.fileName, fileName),
+          ),
+        );
+      const [updated] = await this.db
+        .select()
+        .from(provisioningFiles)
+        .where(
+          and(
+            eq(provisioningFiles.userId, userId),
+            eq(provisioningFiles.fileName, fileName),
+          ),
+        )
+        .limit(1);
+      if (!updated) throw new Error("Failed to update provisioning file");
+      return updated;
+    } else {
+      const [created] = await this.db
+        .insert(provisioningFiles)
+        .values({
+          userId,
+          fileName,
+          content,
+        })
+        .returning();
+      if (!created) throw new Error("Failed to create provisioning file");
+      return created;
+    }
+  }
+
+  async getProvisioningFiles(userId: string): Promise<ProvisioningFiles[]> {
+    return this.db
+      .select()
+      .from(provisioningFiles)
+      .where(eq(provisioningFiles.userId, userId));
   }
 }
 

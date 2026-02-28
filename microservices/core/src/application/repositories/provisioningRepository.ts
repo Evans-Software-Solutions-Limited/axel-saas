@@ -75,3 +75,37 @@ export class ProvisioningRepository {
       .where(eq(provisioningState.id, provisioningId));
   }
 }
+
+let _provisioningRepository: ProvisioningRepository | null = null;
+
+export const getProvisioningRepository = (): ProvisioningRepository => {
+  if (!_provisioningRepository) {
+    _provisioningRepository = new ProvisioningRepository();
+  }
+  return _provisioningRepository;
+};
+
+// Export instance getter for backward compatibility
+export const provisioningRepository = {
+  findByUserId: (userId: string) =>
+    getProvisioningRepository().findByUserId(userId),
+  create: (input: NewProvisioningState) =>
+    getProvisioningRepository().create(input),
+  updateStatus: (
+    provisioningId: string,
+    status: ProvisioningStatus,
+    errorMessage?: string,
+  ) =>
+    getProvisioningRepository().updateStatus(
+      provisioningId,
+      status,
+      errorMessage,
+    ),
+  updateTaskArn: (provisioningId: string, ecsTaskArn: string) =>
+    getProvisioningRepository().updateTaskArn(provisioningId, ecsTaskArn),
+  updateProvisioned: (provisioningId: string, workspacePath: string) =>
+    getProvisioningRepository().updateProvisioned(
+      provisioningId,
+      workspacePath,
+    ),
+} as const;

@@ -216,4 +216,144 @@ describe("UserRepository", () => {
       expect(mockDb.insert).toHaveBeenCalled();
     });
   });
+
+  describe("storeProvisioningFile", () => {
+    it("creates new provisioning file", async () => {
+      const mockFileRow = {
+        id: "file-uuid-1",
+        userId: "user-uuid-1",
+        fileName: "SOUL.md",
+        content: "# SOUL.md\nTest content",
+        generatedAt: NOW,
+        createdAt: NOW,
+        updatedAt: NOW,
+      };
+
+      (mockDb.select as ReturnType<typeof vi.fn>).mockReturnValue(
+        mockChain([]),
+      );
+      (mockDb.insert as ReturnType<typeof vi.fn>).mockReturnValue(
+        mockChain([mockFileRow]),
+      );
+
+      const file = await repo.storeProvisioningFile(
+        "user-uuid-1",
+        "SOUL.md",
+        "# SOUL.md\nTest content",
+      );
+
+      expect(mockDb.insert).toHaveBeenCalled();
+      expect(file.fileName).toBe("SOUL.md");
+      expect(file.content).toBe("# SOUL.md\nTest content");
+    });
+
+    it("updates existing provisioning file", async () => {
+      const mockFileRow = {
+        id: "file-uuid-1",
+        userId: "user-uuid-1",
+        fileName: "SOUL.md",
+        content: "Updated content",
+        generatedAt: NOW,
+        createdAt: NOW,
+        updatedAt: NOW,
+      };
+
+      (mockDb.select as ReturnType<typeof vi.fn>)
+        .mockReturnValueOnce(mockChain([{ fileName: "SOUL.md" }]))
+        .mockReturnValueOnce(mockChain([mockFileRow]));
+
+      (mockDb.update as ReturnType<typeof vi.fn>).mockReturnValue(
+        mockChain([]),
+      );
+
+      const file = await repo.storeProvisioningFile(
+        "user-uuid-1",
+        "SOUL.md",
+        "Updated content",
+      );
+
+      expect(mockDb.update).toHaveBeenCalled();
+      expect(file.content).toBe("Updated content");
+    });
+
+    it("throws if file creation fails", async () => {
+      (mockDb.select as ReturnType<typeof vi.fn>).mockReturnValue(
+        mockChain([]),
+      );
+      (mockDb.insert as ReturnType<typeof vi.fn>).mockReturnValue(
+        mockChain([]),
+      );
+
+      await expect(
+        repo.storeProvisioningFile(
+          "user-uuid-1",
+          "SOUL.md",
+          "content",
+        ),
+      ).rejects.toThrow("Failed to create provisioning file");
+    });
+
+    it("throws if file update fails", async () => {
+      (mockDb.select as ReturnType<typeof vi.fn>)
+        .mockReturnValueOnce(mockChain([{ fileName: "SOUL.md" }]))
+        .mockReturnValueOnce(mockChain([]));
+
+      (mockDb.update as ReturnType<typeof vi.fn>).mockReturnValue(
+        mockChain([]),
+      );
+
+      await expect(
+        repo.storeProvisioningFile(
+          "user-uuid-1",
+          "SOUL.md",
+          "content",
+        ),
+      ).rejects.toThrow("Failed to update provisioning file");
+    });
+  });
+
+  describe("getProvisioningFiles", () => {
+    it("returns all provisioning files for user", async () => {
+      const mockFiles = [
+        {
+          id: "file-uuid-1",
+          userId: "user-uuid-1",
+          fileName: "SOUL.md",
+          content: "# SOUL.md",
+          generatedAt: NOW,
+          createdAt: NOW,
+          updatedAt: NOW,
+        },
+        {
+          id: "file-uuid-2",
+          userId: "user-uuid-1",
+          fileName: "USER.md",
+          content: "# USER.md",
+          generatedAt: NOW,
+          createdAt: NOW,
+          updatedAt: NOW,
+        },
+      ];
+
+      (mockDb.select as ReturnType<typeof vi.fn>).mockReturnValue(
+        mockChain(mockFiles),
+      );
+
+      const files = await repo.getProvisioningFiles("user-uuid-1");
+
+      expect(files).toHaveLength(2);
+      expect(files[0].fileName).toBe("SOUL.md");
+      expect(files[1].fileName).toBe("USER.md");
+    });
+
+    it("returns empty array if no files found", async () => {
+      (mockDb.select as ReturnType<typeof vi.fn>).mockReturnValue(
+        mockChain([]),
+      );
+
+      const files = await repo.getProvisioningFiles("user-uuid-1");
+
+      expect(files).toHaveLength(0);
+    });
+  });
 });

@@ -1,0 +1,11 @@
+version: "3.8"
+
+services:
+  axel-user:
+    build: .
+    volumes:
+      - ./workspace-test:/data/workspace
+    environment:
+      - OPENCLAW_GATEWAY_PORT=3001
+    ports:
+      - "3001:3001"
