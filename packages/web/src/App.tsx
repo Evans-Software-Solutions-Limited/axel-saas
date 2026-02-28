@@ -9,7 +9,7 @@ import SignUp from "./pages/SignUp";
 import Subscribe from "./pages/Subscribe";
 import Onboarding from "./pages/Onboarding";
 import Dashboard from "./pages/Dashboard";
-import Office from "./pages/Office";
+import { Office } from "./pages/Office";
 import {
   Chat,
   Tasks,

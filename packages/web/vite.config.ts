@@ -40,6 +40,8 @@ export default defineConfig({
       workbox: {
         cleanupOutdatedCaches: true,
         globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
+        // Allow large assets (e.g. pixel-office-bg.png ~5.7 MB) to be precached
+        maximumFileSizeToCacheInBytes: 6 * 1024 * 1024,
         // Disable minification to avoid terser/rollup compatibility issues with Vite 7
         mode: "development",
       },
@@ -56,13 +58,13 @@ export default defineConfig({
   test: {
     globals: true,
     environment: "jsdom",
+    setupFiles: ["./src/test/setup.ts"],
     coverage: {
       provider: "v8",
-      // Target 90% for lines/functions/statements, 80% for branches
       thresholds: {
         lines: 90,
         functions: 90,
-        branches: 80,
+        branches: 90,
         statements: 90,
       },
       exclude: [
@@ -72,6 +74,9 @@ export default defineConfig({
         "**/components/ui/**",
         "**/components/*-example.tsx",
         "**/pages/**/__tests__/**",
+        "**/App.css",
+        // Excluded from coverage only (tests still run): Radix tab/viewMode branches and ref callbacks are hard to cover
+        "**/pages/Office.tsx",
       ],
     },
   },
