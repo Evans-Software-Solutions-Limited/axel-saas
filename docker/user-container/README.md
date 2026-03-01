@@ -131,6 +131,10 @@ Look for:
 - File permission issues on workspace volume
 - Port already in use
 
+### Error: Cannot find module '/data/workspace/openclaw'
+
+This happened when the container's working directory was the mounted workspace (which can be empty). The Dockerfile now uses `WORKDIR /app` and runs `openclaw gateway run --allow-unconfigured` so the process does not run from `/data/workspace`. The workspace is still mounted at `/data/workspace` for SOUL.md, USER.md, etc.
+
 ### Gateway not responding
 
 ```bash

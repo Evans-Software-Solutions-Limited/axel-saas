@@ -8,6 +8,8 @@
   ],
   "scripts": {
     "dev": "sst dev",
+    "db:push": "bun run --env-file=.env --filter @axel-saas/db db:push",
+    "db:migrate": "bun run --env-file=.env --filter @axel-saas/db db:migrate",
     "prettier:check": "prettier --check .",
     "prettier:write": "prettier --write .",
     "typecheck": "turbo run typecheck --cache-dir .turbo",

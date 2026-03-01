@@ -1,0 +1,14 @@
+{
+  "gateway": {
+    "bind": "lan",
+    "port": 18789,
+    "controlUi": {
+      "dangerouslyAllowHostHeaderOriginFallback": true
+    }
+  },
+  "agents": {
+    "defaults": {
+      "workspace": "~/.openclaw/workspace"
+    }
+  }
+}

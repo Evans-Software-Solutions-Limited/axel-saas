@@ -1,12 +1,20 @@
-FROM node:20-slim
+FROM node:22-slim
 
-# Install OpenClaw
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends git ca-certificates \
+  && rm -rf /var/lib/apt/lists/*
+
 RUN npm install -g openclaw
 
-# Create workspace structure
-RUN mkdir -p /data/workspace
+ENV HOME=/home/node
+USER node
 
-WORKDIR /data/workspace
+RUN mkdir -p /home/node/.openclaw/workspace
+WORKDIR /home/node/.openclaw/workspace
 
-# Entrypoint: start OpenClaw gateway
-CMD ["openclaw", "gateway", "start"]
+# <-- add this
+COPY --chown=node:node openclaw.json /home/node/.openclaw/openclaw.json
+
+EXPOSE 18789
+
+CMD ["openclaw","gateway","run","--dev","--allow-unconfigured","--port","18789","--bind","lan"]

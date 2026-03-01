@@ -1,0 +1,2 @@
+# Keep this directory so the docker-compose volume mount target exists.
+# Add SOUL.md, USER.md, MEMORY.md, etc. here for local testing.
