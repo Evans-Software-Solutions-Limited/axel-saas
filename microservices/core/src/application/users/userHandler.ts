@@ -53,6 +53,50 @@ export const userHandler = new Elysia({ name: "UserHandler" })
       },
     },
   )
+  .get(
+    "/users/gateway-token",
+    async (ctx) => {
+      const { set } = ctx;
+      try {
+        const dbUser = await userRepository.getUserBySupabaseId(
+          getUser(ctx).sub,
+        );
+        if (!dbUser) {
+          set.status = 404;
+          return { success: false, error: "User not found" };
+        }
+
+        const provisioningState = await provisioningRepository.findByUserId(
+          dbUser.id,
+        );
+        if (!provisioningState || !provisioningState.gatewayToken) {
+          set.status = 404;
+          return {
+            success: false,
+            error: "Gateway token not found. Complete onboarding first.",
+          };
+        }
+
+        return {
+          success: true,
+          gatewayToken: provisioningState.gatewayToken,
+        };
+      } catch (error) {
+        console.error("Get gateway token error:", error);
+        set.status = 500;
+        return {
+          success: false,
+          error: "Failed to fetch gateway token",
+        };
+      }
+    },
+    {
+      detail: {
+        description: "Get OpenClaw gateway token for WebSocket connection",
+        tags: ["Users"],
+      },
+    },
+  )
   .post(
     "/users/onboarding",
     async (ctx) => {
@@ -69,6 +113,9 @@ export const userHandler = new Elysia({ name: "UserHandler" })
         // Store onboarding answers
         await userRepository.updateOnboardingAnswers(dbUser.id, body);
 
+        // Generate gateway token
+        const gatewayToken = ConfigGenerationService.generateGatewayToken();
+
         // Generate config files from answers
         const onboardingData: OnboardingData = {
           name: body.name,
@@ -82,8 +129,10 @@ export const userHandler = new Elysia({ name: "UserHandler" })
           knowledgeAreas: body.knowledgeAreas || "",
         };
 
-        const generatedFiles =
-          ConfigGenerationService.generateConfigFiles(onboardingData);
+        const generatedFiles = ConfigGenerationService.generateConfigFiles(
+          onboardingData,
+          gatewayToken,
+        );
 
         // Write files to disk
         let workspacePath = undefined;
@@ -132,6 +181,12 @@ export const userHandler = new Elysia({ name: "UserHandler" })
             );
           }
         }
+
+        // Store the gateway token
+        await provisioningRepository.updateGatewayToken(
+          provisioningState.id,
+          gatewayToken,
+        );
 
         // Update user to mark onboarding as completed
         await userRepository.updateUser(dbUser.id, {

@@ -17,17 +17,76 @@ describe("ConfigGenerationService", () => {
     knowledgeAreas: "SaaS metrics, user research, agile methodology",
   };
 
+  describe("generateGatewayToken", () => {
+    it("should generate a valid hex token", () => {
+      const token = ConfigGenerationService.generateGatewayToken();
+
+      expect(typeof token).toBe("string");
+      expect(token).toMatch(/^[0-9a-f]+$/); // hex only
+      expect(token.length).toBe(64); // 32 bytes = 64 hex chars
+    });
+
+    it("should generate unique tokens", () => {
+      const token1 = ConfigGenerationService.generateGatewayToken();
+      const token2 = ConfigGenerationService.generateGatewayToken();
+
+      expect(token1).not.toBe(token2);
+    });
+  });
+
   describe("generateConfigFiles", () => {
-    it("should generate all 6 config files", () => {
+    it("should generate all 7 config files including openclaw.json", () => {
       const files = ConfigGenerationService.generateConfigFiles(sampleData);
 
-      expect(Object.keys(files)).toHaveLength(6);
+      expect(Object.keys(files)).toHaveLength(7);
       expect(files).toHaveProperty("SOUL.md");
       expect(files).toHaveProperty("USER.md");
       expect(files).toHaveProperty("MEMORY.md");
       expect(files).toHaveProperty("AGENTS.md");
       expect(files).toHaveProperty("HEARTBEAT.md");
       expect(files).toHaveProperty("TOOLS.md");
+      expect(files).toHaveProperty("openclaw.json");
+    });
+
+    it("should generate openclaw.json with default config", () => {
+      const files = ConfigGenerationService.generateConfigFiles(sampleData);
+      const config = JSON.parse(files["openclaw.json"]);
+
+      expect(config.gateway).toBeDefined();
+      expect(config.gateway.bind).toBe("lan");
+      expect(config.gateway.port).toBe(18789);
+      expect(config.gateway.controlUi).toBeDefined();
+      expect(
+        config.gateway.controlUi.dangerouslyAllowHostHeaderOriginFallback,
+      ).toBe(true);
+      expect(config.agents).toBeDefined();
+      expect(config.agents.defaults.workspace).toBe("~/.openclaw/workspace");
+    });
+
+    it("should include gateway token in openclaw.json when provided", () => {
+      const token = "test-token-value";
+      const files = ConfigGenerationService.generateConfigFiles(
+        sampleData,
+        token,
+      );
+      const config = JSON.parse(files["openclaw.json"]);
+
+      expect(config.gateway.token).toBe(token);
+    });
+
+    it("should not include token in openclaw.json when not provided", () => {
+      const files = ConfigGenerationService.generateConfigFiles(sampleData);
+      const config = JSON.parse(files["openclaw.json"]);
+
+      expect(config.gateway.token).toBeUndefined();
+    });
+
+    it("should generate valid JSON in openclaw.json", () => {
+      const files = ConfigGenerationService.generateConfigFiles(sampleData);
+
+      expect(() => {
+        JSON.parse(files["openclaw.json"]);
+      }).not.toThrow();
     });
 
     it("should include user data in SOUL.md", () => {
@@ -120,7 +179,7 @@ describe("ConfigGenerationService", () => {
       }
     });
 
-    it("should write files to disk", async () => {
+    it("should write files to disk including openclaw.json", async () => {
       const files = ConfigGenerationService.generateConfigFiles(sampleData);
       const writePath = await ConfigGenerationService.writeFilesToDisk(
         testUserId,
@@ -132,14 +191,17 @@ describe("ConfigGenerationService", () => {
       const soulPath = path.join(writePath, "SOUL.md");
       const userPath = path.join(writePath, "USER.md");
       const memoryPath = path.join(writePath, "MEMORY.md");
+      const configPath = path.join(writePath, "openclaw.json");
 
       const soulContent = await fs.readFile(soulPath, "utf-8");
       const userContent = await fs.readFile(userPath, "utf-8");
       const memoryContent = await fs.readFile(memoryPath, "utf-8");
+      const configContent = await fs.readFile(configPath, "utf-8");
 
       expect(soulContent).toContain(sampleData.name);
       expect(userContent).toContain(sampleData.role);
       expect(memoryContent).toContain(sampleData.goals);
+      expect(JSON.parse(configContent)).toHaveProperty("gateway");
     });
 
     it("should create directory structure if missing", async () => {
@@ -222,9 +284,10 @@ describe("ConfigGenerationService", () => {
       expect(files["SOUL.md"]).toContain("# SOUL.md");
       expect(files["USER.md"]).toContain("# USER.md");
       expect(files["MEMORY.md"]).toContain("# MEMORY.md");
+      expect(files["openclaw.json"]).toContain("gateway");
     });
 
-    it("should generate all 6 files with consistent structure", () => {
+    it("should generate all 7 files with consistent structure", () => {
       const files = ConfigGenerationService.generateConfigFiles(sampleData);
 
       // Check that each file has expected markdown headers

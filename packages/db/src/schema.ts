@@ -110,6 +110,7 @@ export const provisioningState = pgTable(
     status: provisioningStatusEnum("status").notNull().default("pending"),
     ecsTaskArn: text("ecs_task_arn"),
     workspacePath: text("workspace_path"),
+    gatewayToken: text("gateway_token"),
     errorMessage: text("error_message"),
     provisionedAt: timestamp("provisioned_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })

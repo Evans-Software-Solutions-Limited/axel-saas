@@ -74,6 +74,16 @@ export class ProvisioningRepository {
       })
       .where(eq(provisioningState.id, provisioningId));
   }
+
+  async updateGatewayToken(
+    provisioningId: string,
+    gatewayToken: string,
+  ): Promise<void> {
+    await this.db
+      .update(provisioningState)
+      .set({ gatewayToken, updatedAt: new Date() })
+      .where(eq(provisioningState.id, provisioningId));
+  }
 }
 
 let _provisioningRepository: ProvisioningRepository | null = null;
@@ -107,5 +117,10 @@ export const provisioningRepository = {
     getProvisioningRepository().updateProvisioned(
       provisioningId,
       workspacePath,
+    ),
+  updateGatewayToken: (provisioningId: string, gatewayToken: string) =>
+    getProvisioningRepository().updateGatewayToken(
+      provisioningId,
+      gatewayToken,
     ),
 } as const;

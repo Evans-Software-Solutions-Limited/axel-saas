@@ -47,6 +47,7 @@ const mockProvisioningRow = {
   status: "pending" as const,
   ecsTaskArn: null,
   workspacePath: null,
+  gatewayToken: null,
   errorMessage: null,
   provisionedAt: null,
   createdAt: NOW,
@@ -133,6 +134,14 @@ describe("ProvisioningRepository", () => {
         "prov-uuid-1",
         "/home/ubuntu/.openclaw/workspace/user-1",
       );
+      expect(mockDb.update).toHaveBeenCalledOnce();
+    });
+  });
+
+  describe("updateGatewayToken", () => {
+    it("updates gateway token", async () => {
+      const token = "test-gateway-token-123";
+      await repo.updateGatewayToken("prov-uuid-1", token);
       expect(mockDb.update).toHaveBeenCalledOnce();
     });
   });

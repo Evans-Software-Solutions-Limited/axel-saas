@@ -1,20 +1,32 @@
-FROM node:22-slim
+FROM node:20-slim
 
-RUN apt-get update \
-  && apt-get install -y --no-install-recommends git ca-certificates \
-  && rm -rf /var/lib/apt/lists/*
-
+# Install OpenClaw
 RUN npm install -g openclaw
 
-ENV HOME=/home/node
-USER node
+# Create workspace structure
+RUN mkdir -p /data/workspace
 
-RUN mkdir -p /home/node/.openclaw/workspace
-WORKDIR /home/node/.openclaw/workspace
+WORKDIR /data/workspace
 
-# <-- add this
-COPY --chown=node:node openclaw.json /home/node/.openclaw/openclaw.json
+# Create default openclaw.json configuration
+# The gateway token can be injected via OPENCLAW_GATEWAY_TOKEN env var
+RUN cat > /data/workspace/openclaw.json << 'EOFCONFIG'
+{
+  "gateway": {
+    "bind": "lan",
+    "port": 18789,
+    "controlUi": {
+      "dangerouslyAllowHostHeaderOriginFallback": true
+    }
+  },
+  "agents": {
+    "defaults": {
+      "workspace": "~/.openclaw/workspace"
+    }
+  }
+}
+EOFCONFIG
 
-EXPOSE 18789
-
-CMD ["openclaw","gateway","run","--dev","--allow-unconfigured","--port","18789","--bind","lan"]
+# Entrypoint: start OpenClaw gateway
+# The gateway will automatically use OPENCLAW_GATEWAY_TOKEN if set
+CMD ["openclaw", "gateway", "start"]

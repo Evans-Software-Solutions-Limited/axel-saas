@@ -1,5 +1,6 @@
 import path from "path";
 import fs from "fs/promises";
+import crypto from "crypto";
 
 export interface OnboardingData {
   name: string;
@@ -19,13 +20,23 @@ const WORKSPACE_BASE_PATH =
 
 /**
  * Generate workspace config files from onboarding answers.
- * Creates SOUL.md, USER.md, MEMORY.md, AGENTS.md, HEARTBEAT.md, and TOOLS.md
+ * Creates SOUL.md, USER.md, MEMORY.md, AGENTS.md, HEARTBEAT.md, TOOLS.md, and openclaw.json
  */
 export class ConfigGenerationService {
   /**
+   * Generate a random gateway token (32 bytes hex)
+   */
+  static generateGatewayToken(): string {
+    return crypto.randomBytes(32).toString("hex");
+  }
+
+  /**
    * Generate all config files from onboarding data
    */
-  static generateConfigFiles(data: OnboardingData): GeneratedFiles {
+  static generateConfigFiles(
+    data: OnboardingData,
+    gatewayToken?: string,
+  ): GeneratedFiles {
     const files: GeneratedFiles = {};
 
     files["SOUL.md"] = this.generateSoulMd(data);
@@ -34,8 +45,36 @@ export class ConfigGenerationService {
     files["AGENTS.md"] = this.generateAgentsMd();
     files["HEARTBEAT.md"] = this.generateHeartbeatMd();
     files["TOOLS.md"] = this.generateToolsMd();
+    files["openclaw.json"] = this.generateOpenclawJson(gatewayToken);
 
     return files;
+  }
+
+  /**
+   * Generate openclaw.json with gateway token support
+   */
+  private static generateOpenclawJson(gatewayToken?: string): string {
+    const config: Record<string, unknown> = {
+      gateway: {
+        bind: "lan",
+        port: 18789,
+        controlUi: {
+          dangerouslyAllowHostHeaderOriginFallback: true,
+        },
+      },
+      agents: {
+        defaults: {
+          workspace: "~/.openclaw/workspace",
+        },
+      },
+    };
+
+    // Add token to gateway config if provided
+    if (gatewayToken) {
+      (config.gateway as Record<string, unknown>).token = gatewayToken;
+    }
+
+    return JSON.stringify(config, null, 2);
   }
 
   /**

@@ -83,4 +83,12 @@ describe("UserHandler - Available Methods", () => {
     );
     expect(route).toBeDefined();
   });
+
+  it("should have GET /users/gateway-token in routes", async () => {
+    const { userHandler } = await import("../userHandler");
+    const route = userHandler.routes.find(
+      (r) => r.method === "GET" && r.path === "/users/gateway-token",
+    );
+    expect(route).toBeDefined();
+  });
 });
