@@ -285,11 +285,7 @@ describe("UserRepository", () => {
       );
 
       await expect(
-        repo.storeProvisioningFile(
-          "user-uuid-1",
-          "SOUL.md",
-          "content",
-        ),
+        repo.storeProvisioningFile("user-uuid-1", "SOUL.md", "content"),
       ).rejects.toThrow("Failed to create provisioning file");
     });
 
@@ -303,11 +299,7 @@ describe("UserRepository", () => {
       );
 
       await expect(
-        repo.storeProvisioningFile(
-          "user-uuid-1",
-          "SOUL.md",
-          "content",
-        ),
+        repo.storeProvisioningFile("user-uuid-1", "SOUL.md", "content"),
       ).rejects.toThrow("Failed to update provisioning file");
     });
   });
