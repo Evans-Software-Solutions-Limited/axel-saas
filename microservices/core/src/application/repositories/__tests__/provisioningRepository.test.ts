@@ -1,5 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { ProvisioningRepository } from "../provisioningRepository";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type { Db } from "@axel-saas/db";
 
 /**
@@ -56,14 +55,23 @@ const mockProvisioningRow = {
 
 describe("ProvisioningRepository", () => {
   let mockDb: Partial<Db>;
-  let repo: ProvisioningRepository;
+  let ProvisioningRepository: typeof import("../provisioningRepository").ProvisioningRepository;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     mockDb = {
       insert: vi.fn(() => mockChain([mockProvisioningRow])),
       select: vi.fn(() => mockChain([mockProvisioningRow])),
       update: vi.fn(() => mockChain([])),
     } as unknown as Partial<Db>;
+
+    // Import the class normally for direct class tests
+    const module = await import("../provisioningRepository");
+    ProvisioningRepository = module.ProvisioningRepository;
+  });
+
+  let repo: InstanceType<typeof ProvisioningRepository>;
+
+  beforeEach(() => {
     repo = new ProvisioningRepository(mockDb as Db);
   });
 
@@ -144,5 +152,149 @@ describe("ProvisioningRepository", () => {
       await repo.updateGatewayToken("prov-uuid-1", token);
       expect(mockDb.update).toHaveBeenCalledOnce();
     });
+  });
+});
+
+describe("exported provisioningRepository wrapper (singleton)", () => {
+  beforeEach(() => {
+    // Clear any cached modules
+    vi.resetModules();
+  });
+
+  afterEach(() => {
+    vi.resetModules();
+  });
+
+  it("provisioningRepository.findByUserId calls wrapper and returns function result", async () => {
+    const mockDb = {
+      insert: vi.fn(() => mockChain([mockProvisioningRow])),
+      select: vi.fn(() => mockChain([mockProvisioningRow])),
+      update: vi.fn(() => mockChain([])),
+    };
+
+    vi.doMock("@axel-saas/db", () => ({
+      getDb: vi.fn(() => mockDb),
+      provisioningState: {},
+      provisioningStatusEnum: { enumValues: ["pending", "provisioning", "active", "failed"] },
+    }));
+
+    const { provisioningRepository } = await import("../provisioningRepository");
+    const result = await provisioningRepository.findByUserId("user-uuid-1");
+    
+    expect(result).not.toBeNull();
+    expect(result?.userId).toBe("user-uuid-1");
+    expect(mockDb.select).toHaveBeenCalled();
+
+    vi.doUnmock("@axel-saas/db");
+  });
+
+  it("provisioningRepository.create calls wrapper and creates row", async () => {
+    const mockDb = {
+      insert: vi.fn(() => mockChain([mockProvisioningRow])),
+      select: vi.fn(() => mockChain([mockProvisioningRow])),
+      update: vi.fn(() => mockChain([])),
+    };
+
+    vi.doMock("@axel-saas/db", () => ({
+      getDb: vi.fn(() => mockDb),
+      provisioningState: {},
+      provisioningStatusEnum: { enumValues: ["pending", "provisioning", "active", "failed"] },
+    }));
+
+    const { provisioningRepository } = await import("../provisioningRepository");
+    const result = await provisioningRepository.create({
+      userId: "user-uuid-1",
+      status: "pending",
+    });
+    
+    expect(result).not.toBeNull();
+    expect(result.id).toBe("prov-uuid-1");
+    expect(mockDb.insert).toHaveBeenCalled();
+
+    vi.doUnmock("@axel-saas/db");
+  });
+
+  it("provisioningRepository.updateStatus calls wrapper", async () => {
+    const mockDb = {
+      insert: vi.fn(() => mockChain([mockProvisioningRow])),
+      select: vi.fn(() => mockChain([mockProvisioningRow])),
+      update: vi.fn(() => mockChain([])),
+    };
+
+    vi.doMock("@axel-saas/db", () => ({
+      getDb: vi.fn(() => mockDb),
+      provisioningState: {},
+      provisioningStatusEnum: { enumValues: ["pending", "provisioning", "active", "failed"] },
+    }));
+
+    const { provisioningRepository } = await import("../provisioningRepository");
+    await provisioningRepository.updateStatus("prov-uuid-1", "provisioning");
+    
+    expect(mockDb.update).toHaveBeenCalled();
+
+    vi.doUnmock("@axel-saas/db");
+  });
+
+  it("provisioningRepository.updateTaskArn calls wrapper", async () => {
+    const mockDb = {
+      insert: vi.fn(() => mockChain([mockProvisioningRow])),
+      select: vi.fn(() => mockChain([mockProvisioningRow])),
+      update: vi.fn(() => mockChain([])),
+    };
+
+    vi.doMock("@axel-saas/db", () => ({
+      getDb: vi.fn(() => mockDb),
+      provisioningState: {},
+      provisioningStatusEnum: { enumValues: ["pending", "provisioning", "active", "failed"] },
+    }));
+
+    const { provisioningRepository } = await import("../provisioningRepository");
+    await provisioningRepository.updateTaskArn("prov-uuid-1", "arn:aws:ecs:task");
+    
+    expect(mockDb.update).toHaveBeenCalled();
+
+    vi.doUnmock("@axel-saas/db");
+  });
+
+  it("provisioningRepository.updateProvisioned calls wrapper", async () => {
+    const mockDb = {
+      insert: vi.fn(() => mockChain([mockProvisioningRow])),
+      select: vi.fn(() => mockChain([mockProvisioningRow])),
+      update: vi.fn(() => mockChain([])),
+    };
+
+    vi.doMock("@axel-saas/db", () => ({
+      getDb: vi.fn(() => mockDb),
+      provisioningState: {},
+      provisioningStatusEnum: { enumValues: ["pending", "provisioning", "active", "failed"] },
+    }));
+
+    const { provisioningRepository } = await import("../provisioningRepository");
+    await provisioningRepository.updateProvisioned("prov-uuid-1", "/workspace");
+    
+    expect(mockDb.update).toHaveBeenCalled();
+
+    vi.doUnmock("@axel-saas/db");
+  });
+
+  it("provisioningRepository.updateGatewayToken calls wrapper", async () => {
+    const mockDb = {
+      insert: vi.fn(() => mockChain([mockProvisioningRow])),
+      select: vi.fn(() => mockChain([mockProvisioningRow])),
+      update: vi.fn(() => mockChain([])),
+    };
+
+    vi.doMock("@axel-saas/db", () => ({
+      getDb: vi.fn(() => mockDb),
+      provisioningState: {},
+      provisioningStatusEnum: { enumValues: ["pending", "provisioning", "active", "failed"] },
+    }));
+
+    const { provisioningRepository } = await import("../provisioningRepository");
+    await provisioningRepository.updateGatewayToken("prov-uuid-1", "token-xyz");
+    
+    expect(mockDb.update).toHaveBeenCalled();
+
+    vi.doUnmock("@axel-saas/db");
   });
 });
