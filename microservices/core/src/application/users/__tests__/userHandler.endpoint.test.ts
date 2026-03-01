@@ -5,17 +5,6 @@ vi.mock("@axel-saas/db", () => ({
   getDb: vi.fn(() => ({})),
 }));
 
-// Mock userRepository with real behavior
-const mockUserRepository = {
-  getUserBySupabaseId: vi.fn(),
-  updateUser: vi.fn(),
-  updateOnboardingAnswers: vi.fn(),
-};
-
-vi.mock("../../repositories/userRepository", () => ({
-  userRepository: mockUserRepository,
-}));
-
 // Mock auth utils
 const mockGetAuthUser = vi.fn();
 const mockGetUser = vi.fn();
@@ -31,6 +20,13 @@ vi.mock("@axel-saas/api-utils/auth/supabaseAuth", () => ({
   requireAuth: mockRequireAuth,
   getUser: mockGetUser,
 }));
+
+// Create mocks for repository methods (not mocking the module itself)
+const mockUserRepository = {
+  getUserBySupabaseId: vi.fn(),
+  updateUser: vi.fn(),
+  updateOnboardingAnswers: vi.fn(),
+};
 
 // Import required for module load and mocks; handler used indirectly via mocked endpoints
 // eslint-disable-next-line @typescript-eslint/no-unused-vars -- needed for test setup

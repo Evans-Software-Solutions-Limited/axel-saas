@@ -7,14 +7,6 @@ vi.mock("@axel-saas/api-utils/auth/supabaseAuth", () => ({
   getUser: vi.fn(),
 }));
 
-vi.mock("../../repositories/userRepository", () => ({
-  userRepository: {
-    getUserBySupabaseId: vi.fn(),
-    updateOnboardingAnswers: vi.fn(),
-    updateUser: vi.fn(),
-  },
-}));
-
 describe("UserHandler Logic Tests", () => {
   beforeEach(() => {
     vi.clearAllMocks();

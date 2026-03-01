@@ -88,14 +88,14 @@ export class ProvisioningRepository {
 
 let _provisioningRepository: ProvisioningRepository | null = null;
 
-export const getProvisioningRepository = (): ProvisioningRepository => {
+const getProvisioningRepository = (): ProvisioningRepository => {
   if (!_provisioningRepository) {
     _provisioningRepository = new ProvisioningRepository();
   }
   return _provisioningRepository;
 };
 
-// Export instance getter for backward compatibility
+// Export instance for use throughout the application
 export const provisioningRepository = {
   findByUserId: (userId: string) =>
     getProvisioningRepository().findByUserId(userId),

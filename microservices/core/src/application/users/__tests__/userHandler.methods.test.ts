@@ -14,17 +14,6 @@ vi.mock("@axel-saas/api-utils/auth/supabaseAuth", () => {
   };
 });
 
-// Mock repository
-vi.mock("../repositories/userRepository", () => {
-  return {
-    userRepository: {
-      getUserBySupabaseId: vi.fn(),
-      updateOnboardingAnswers: vi.fn(),
-      updateUser: vi.fn(),
-    },
-  };
-});
-
 describe("UserHandler - Available Methods", () => {
   beforeEach(() => {
     vi.clearAllMocks();
