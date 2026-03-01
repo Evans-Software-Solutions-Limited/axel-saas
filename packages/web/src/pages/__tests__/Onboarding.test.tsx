@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, act } from "@testing-library/react";
+import { render, screen, act, fireEvent } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import Onboarding from "../Onboarding";
 
@@ -40,12 +40,11 @@ describe("Onboarding - Chat-Style Flow", () => {
       </MemoryRouter>,
     );
 
-    const input = screen.getByPlaceholderText("Your name") as HTMLInputElement;
+    const input = screen.getByPlaceholderText("Type your answer...") as HTMLInputElement;
     expect(input).toBeDefined();
 
     await act(async () => {
-      input.value = "Alice";
-      input.dispatchEvent(new Event("change", { bubbles: true }));
+      fireEvent.change(input, { target: { value: "Alice" } });
     });
 
     expect(input.value).toBe("Alice");
@@ -58,7 +57,7 @@ describe("Onboarding - Chat-Style Flow", () => {
       </MemoryRouter>,
     );
 
-    const input = screen.getByPlaceholderText("Your name");
+    const input = screen.getByPlaceholderText("Type your answer...");
     expect(input).toBeDefined();
   });
 
@@ -80,15 +79,14 @@ describe("Onboarding - Chat-Style Flow", () => {
       </MemoryRouter>,
     );
 
-    const input = screen.getByPlaceholderText("Your name") as HTMLInputElement;
+    const input = screen.getByPlaceholderText("Type your answer...") as HTMLInputElement;
 
     await act(async () => {
-      input.value = "Alice";
-      input.dispatchEvent(new Event("change", { bubbles: true }));
+      fireEvent.change(input, { target: { value: "Alice" } });
     });
 
-    const sendButton = screen.getByRole("button");
-    expect((sendButton as HTMLButtonElement).disabled).toBe(false);
+    const sendButton = screen.getByRole("button") as HTMLButtonElement;
+    expect(sendButton.disabled).toBe(false);
   });
 
   it("renders progress bar", () => {
@@ -109,7 +107,7 @@ describe("Onboarding - Chat-Style Flow", () => {
       </MemoryRouter>,
     );
 
-    const avatar = screen.getByText("⚡");
-    expect(avatar).toBeDefined();
+    const avatars = screen.getAllByText("⚡");
+    expect(avatars.length).toBeGreaterThan(0);
   });
 });

@@ -99,7 +99,7 @@ describe("App", () => {
         <App />
       </MemoryRouter>,
     );
-    expect(screen.getByText("Let's get started")).toBeDefined();
+    expect(screen.getByText(/Hey! I'm Axel/)).toBeDefined();
   });
 
   it("redirects authenticated user with onboarding to dashboard", () => {
