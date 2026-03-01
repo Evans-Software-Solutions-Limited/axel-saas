@@ -175,12 +175,15 @@ describe("exported provisioningRepository wrapper (singleton)", () => {
     vi.doMock("@axel-saas/db", () => ({
       getDb: vi.fn(() => mockDb),
       provisioningState: {},
-      provisioningStatusEnum: { enumValues: ["pending", "provisioning", "active", "failed"] },
+      provisioningStatusEnum: {
+        enumValues: ["pending", "provisioning", "active", "failed"],
+      },
     }));
 
-    const { provisioningRepository } = await import("../provisioningRepository");
+    const { provisioningRepository } =
+      await import("../provisioningRepository");
     const result = await provisioningRepository.findByUserId("user-uuid-1");
-    
+
     expect(result).not.toBeNull();
     expect(result?.userId).toBe("user-uuid-1");
     expect(mockDb.select).toHaveBeenCalled();
@@ -198,15 +201,18 @@ describe("exported provisioningRepository wrapper (singleton)", () => {
     vi.doMock("@axel-saas/db", () => ({
       getDb: vi.fn(() => mockDb),
       provisioningState: {},
-      provisioningStatusEnum: { enumValues: ["pending", "provisioning", "active", "failed"] },
+      provisioningStatusEnum: {
+        enumValues: ["pending", "provisioning", "active", "failed"],
+      },
     }));
 
-    const { provisioningRepository } = await import("../provisioningRepository");
+    const { provisioningRepository } =
+      await import("../provisioningRepository");
     const result = await provisioningRepository.create({
       userId: "user-uuid-1",
       status: "pending",
     });
-    
+
     expect(result).not.toBeNull();
     expect(result.id).toBe("prov-uuid-1");
     expect(mockDb.insert).toHaveBeenCalled();
@@ -224,12 +230,15 @@ describe("exported provisioningRepository wrapper (singleton)", () => {
     vi.doMock("@axel-saas/db", () => ({
       getDb: vi.fn(() => mockDb),
       provisioningState: {},
-      provisioningStatusEnum: { enumValues: ["pending", "provisioning", "active", "failed"] },
+      provisioningStatusEnum: {
+        enumValues: ["pending", "provisioning", "active", "failed"],
+      },
     }));
 
-    const { provisioningRepository } = await import("../provisioningRepository");
+    const { provisioningRepository } =
+      await import("../provisioningRepository");
     await provisioningRepository.updateStatus("prov-uuid-1", "provisioning");
-    
+
     expect(mockDb.update).toHaveBeenCalled();
 
     vi.doUnmock("@axel-saas/db");
@@ -245,12 +254,18 @@ describe("exported provisioningRepository wrapper (singleton)", () => {
     vi.doMock("@axel-saas/db", () => ({
       getDb: vi.fn(() => mockDb),
       provisioningState: {},
-      provisioningStatusEnum: { enumValues: ["pending", "provisioning", "active", "failed"] },
+      provisioningStatusEnum: {
+        enumValues: ["pending", "provisioning", "active", "failed"],
+      },
     }));
 
-    const { provisioningRepository } = await import("../provisioningRepository");
-    await provisioningRepository.updateTaskArn("prov-uuid-1", "arn:aws:ecs:task");
-    
+    const { provisioningRepository } =
+      await import("../provisioningRepository");
+    await provisioningRepository.updateTaskArn(
+      "prov-uuid-1",
+      "arn:aws:ecs:task",
+    );
+
     expect(mockDb.update).toHaveBeenCalled();
 
     vi.doUnmock("@axel-saas/db");
@@ -266,12 +281,15 @@ describe("exported provisioningRepository wrapper (singleton)", () => {
     vi.doMock("@axel-saas/db", () => ({
       getDb: vi.fn(() => mockDb),
       provisioningState: {},
-      provisioningStatusEnum: { enumValues: ["pending", "provisioning", "active", "failed"] },
+      provisioningStatusEnum: {
+        enumValues: ["pending", "provisioning", "active", "failed"],
+      },
     }));
 
-    const { provisioningRepository } = await import("../provisioningRepository");
+    const { provisioningRepository } =
+      await import("../provisioningRepository");
     await provisioningRepository.updateProvisioned("prov-uuid-1", "/workspace");
-    
+
     expect(mockDb.update).toHaveBeenCalled();
 
     vi.doUnmock("@axel-saas/db");
@@ -287,12 +305,15 @@ describe("exported provisioningRepository wrapper (singleton)", () => {
     vi.doMock("@axel-saas/db", () => ({
       getDb: vi.fn(() => mockDb),
       provisioningState: {},
-      provisioningStatusEnum: { enumValues: ["pending", "provisioning", "active", "failed"] },
+      provisioningStatusEnum: {
+        enumValues: ["pending", "provisioning", "active", "failed"],
+      },
     }));
 
-    const { provisioningRepository } = await import("../provisioningRepository");
+    const { provisioningRepository } =
+      await import("../provisioningRepository");
     await provisioningRepository.updateGatewayToken("prov-uuid-1", "token-xyz");
-    
+
     expect(mockDb.update).toHaveBeenCalled();
 
     vi.doUnmock("@axel-saas/db");
