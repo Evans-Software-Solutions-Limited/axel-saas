@@ -40,7 +40,9 @@ describe("Onboarding - Chat-Style Flow", () => {
       </MemoryRouter>,
     );
 
-    const input = screen.getByPlaceholderText("Type your answer...") as HTMLInputElement;
+    const input = screen.getByPlaceholderText(
+      "Type your answer...",
+    ) as HTMLInputElement;
     expect(input).toBeDefined();
 
     await act(async () => {
@@ -79,7 +81,9 @@ describe("Onboarding - Chat-Style Flow", () => {
       </MemoryRouter>,
     );
 
-    const input = screen.getByPlaceholderText("Type your answer...") as HTMLInputElement;
+    const input = screen.getByPlaceholderText(
+      "Type your answer...",
+    ) as HTMLInputElement;
 
     await act(async () => {
       fireEvent.change(input, { target: { value: "Alice" } });
