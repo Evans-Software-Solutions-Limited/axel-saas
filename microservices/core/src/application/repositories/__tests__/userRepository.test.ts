@@ -576,16 +576,16 @@ describe("UserRepository", () => {
 
   describe("updateOnboardingAnswers - insert and update branches", () => {
     it("inserts new answers with completedAt timestamp", async () => {
-      const insertSpy = vi.fn().mockReturnValue(
-        mockChain([{ userId: "user-uuid-1", answers: { name: "John" } }]),
-      );
+      const insertSpy = vi
+        .fn()
+        .mockReturnValue(
+          mockChain([{ userId: "user-uuid-1", answers: { name: "John" } }]),
+        );
 
       (mockDb.select as ReturnType<typeof vi.fn>).mockReturnValue(
         mockChain([]),
       );
-      (mockDb.insert as ReturnType<typeof vi.fn>).mockImplementation(
-        insertSpy,
-      );
+      (mockDb.insert as ReturnType<typeof vi.fn>).mockImplementation(insertSpy);
 
       await repo.updateOnboardingAnswers("user-uuid-1", { name: "John" });
 
@@ -598,9 +598,7 @@ describe("UserRepository", () => {
       (mockDb.select as ReturnType<typeof vi.fn>).mockReturnValue(
         mockChain([{ userId: "user-uuid-1" }]),
       );
-      (mockDb.update as ReturnType<typeof vi.fn>).mockImplementation(
-        updateSpy,
-      );
+      (mockDb.update as ReturnType<typeof vi.fn>).mockImplementation(updateSpy);
 
       await repo.updateOnboardingAnswers("user-uuid-1", {
         name: "Jane",
@@ -648,9 +646,7 @@ describe("UserRepository", () => {
       (mockDb.select as ReturnType<typeof vi.fn>).mockReturnValue(
         mockChain([]),
       );
-      (mockDb.insert as ReturnType<typeof vi.fn>).mockImplementation(
-        createSpy,
-      );
+      (mockDb.insert as ReturnType<typeof vi.fn>).mockImplementation(createSpy);
 
       const file = await repo.storeProvisioningFile(
         "user-uuid-1",
@@ -798,31 +794,39 @@ describe("UserRepository", () => {
   describe("Coverage enforcement - getUserBySupabaseId lines 117-122", () => {
     it("must call db.select() return object with from method", async () => {
       const dbSelectReturnValue = mockChain([mockUserRow]);
-      (mockDb.select as ReturnType<typeof vi.fn>).mockReturnValue(dbSelectReturnValue);
-      
+      (mockDb.select as ReturnType<typeof vi.fn>).mockReturnValue(
+        dbSelectReturnValue,
+      );
+
       const testResult = await repo.getUserBySupabaseId("supabase-123");
-      
+
       expect(mockDb.select).toHaveBeenCalled();
       expect(testResult).toEqual(mockUserRow);
       expect(testResult).not.toBeNull();
     });
 
     it("lines 117-120: query chain execution path", async () => {
-      (mockDb.select as ReturnType<typeof vi.fn>).mockReturnValue(mockChain([mockUserRow]));
+      (mockDb.select as ReturnType<typeof vi.fn>).mockReturnValue(
+        mockChain([mockUserRow]),
+      );
       const result = await repo.getUserBySupabaseId("supabase-123");
       expect(result?.id).toBe("user-uuid-1");
       expect(result?.email).toBe("user@example.com");
     });
 
     it("line 122: return null when userRow is undefined", async () => {
-      (mockDb.select as ReturnType<typeof vi.fn>).mockReturnValue(mockChain([]));
+      (mockDb.select as ReturnType<typeof vi.fn>).mockReturnValue(
+        mockChain([]),
+      );
       const result = await repo.getUserBySupabaseId("test-id");
       expect(result).toBeNull();
       expect(result === null).toBe(true);
     });
 
     it("line 122: return userRow when it exists", async () => {
-      (mockDb.select as ReturnType<typeof vi.fn>).mockReturnValue(mockChain([mockUserRow]));
+      (mockDb.select as ReturnType<typeof vi.fn>).mockReturnValue(
+        mockChain([mockUserRow]),
+      );
       const result = await repo.getUserBySupabaseId("test-id");
       expect(result).toEqual(mockUserRow);
       expect(result === null).toBe(false);
@@ -831,20 +835,28 @@ describe("UserRepository", () => {
 
   describe("Coverage enforcement - updateUser lines 125-129", () => {
     it("method updateUser must execute and complete", async () => {
-      (mockDb.update as ReturnType<typeof vi.fn>).mockReturnValue(mockChain([]));
-      const updatePromise = repo.updateUser("user-uuid-1", { email: "test@test.com" });
+      (mockDb.update as ReturnType<typeof vi.fn>).mockReturnValue(
+        mockChain([]),
+      );
+      const updatePromise = repo.updateUser("user-uuid-1", {
+        email: "test@test.com",
+      });
       await expect(updatePromise).resolves.toBeUndefined();
       expect(mockDb.update).toHaveBeenCalled();
     });
 
     it("updateUser calls updateById through execution", async () => {
-      (mockDb.update as ReturnType<typeof vi.fn>).mockReturnValue(mockChain([]));
+      (mockDb.update as ReturnType<typeof vi.fn>).mockReturnValue(
+        mockChain([]),
+      );
       await repo.updateUser("user-uuid-1", { fullName: "Test" });
       expect(mockDb.update).toHaveBeenCalled();
     });
 
     it("line 129: await this.updateById(...) must execute", async () => {
-      (mockDb.update as ReturnType<typeof vi.fn>).mockReturnValue(mockChain([]));
+      (mockDb.update as ReturnType<typeof vi.fn>).mockReturnValue(
+        mockChain([]),
+      );
       const updates = { email: "new@test.com", fullName: "Test Name" };
       await repo.updateUser("user-uuid-1", updates);
       expect(mockDb.update).toHaveBeenCalled();
