@@ -1,0 +1,21 @@
+{
+  "gateway": {
+    "bind": "0.0.0.0",
+    "port": 18789
+  },
+  "agents": {
+    "defaults": {
+      "workspace": "/data/workspace",
+      "model": "haiku",
+      "toolsAllowlist": [
+        "web_search",
+        "web_fetch",
+        "tts",
+        "memory_search",
+        "memory_get",
+        "message",
+        "session_status"
+      ]
+    }
+  }
+}
