@@ -16,4 +16,4 @@ RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 WORKDIR /data/workspace
 
 ENTRYPOINT ["docker-entrypoint.sh"]
-CMD ["openclaw", "gateway", "start", "--foreground"]
+CMD ["openclaw", "gateway", "run"]
