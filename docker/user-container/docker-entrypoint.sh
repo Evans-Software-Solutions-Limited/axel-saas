@@ -57,5 +57,11 @@ sed -i "s/\[TIER_CAPABILITIES_PLACEHOLDER\]/$TIER_CAPABILITIES/" "$WORKSPACE/AGE
 # Create required directories
 mkdir -p "$WORKSPACE/memory" "$WORKSPACE/projects"
 
+# Symlink workspace config to where openclaw looks for it (~/.openclaw/openclaw.json)
+# TODO(hardening): templates use dangerouslyAllowHostHeaderOriginFallback=true for dev;
+#   production containers should set gateway.controlUi.allowedOrigins to explicit origins instead.
+mkdir -p /root/.openclaw
+ln -sf "$WORKSPACE/openclaw.json" /root/.openclaw/openclaw.json
+
 echo "Workspace ready (tier: $TIER)"
 exec "$@"
