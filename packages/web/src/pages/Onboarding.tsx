@@ -1,22 +1,9 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import {
-  IconChevronRight,
-  IconUpload,
-  IconCircleCheckFilled,
-} from "@tabler/icons-react";
 
 type TaskType =
   | "email"
@@ -27,14 +14,17 @@ type TaskType =
   | "social-media";
 type ChannelType = "email" | "slack" | "whatsapp" | "teams";
 
-interface OnboardingState {
-  step: number;
+interface OnboardingResponse {
+  role: "assistant" | "user";
+  content: string;
+}
+
+interface OnboardingData {
   name: string;
   businessName: string;
   businessDescription: string;
   tasks: TaskType[];
   channels: ChannelType[];
-  documents: File[];
 }
 
 const TASK_OPTIONS: { id: TaskType; label: string; description: string }[] = [
@@ -77,21 +67,101 @@ const CHANNEL_OPTIONS: { id: ChannelType; label: string }[] = [
   { id: "teams", label: "Microsoft Teams" },
 ];
 
+type OnboardingPhase =
+  | "intro"
+  | "name"
+  | "businessName"
+  | "businessDescription"
+  | "tasks"
+  | "channels"
+  | "complete";
+
+const PHASE_PROMPTS: Record<OnboardingPhase, string> = {
+  intro:
+    "Hi there! I'm Axel, your new AI employee. I'd love to get to know you and understand how I can help. Shall we start?",
+  name: "Great! First, what should I call you?",
+  businessName: `Nice to meet you, {{name }}! So, what does your business do — or what's the name you'd like me to use?`,
+  businessDescription: `Got it — {{businessName }}. Tell me a bit about what your business does. What's the core focus or service?`,
+  tasks: `Interesting! Now, what are the main tasks you'd like me to handle day-to-day?`,
+  channels: `Perfect. Last question — which communication channels should I monitor and respond to?`,
+  complete: `That's all I need for now! Let me summarize what we've discussed...`,
+};
+
 export function Onboarding() {
-  const [state, setState] = useState<OnboardingState>({
-    step: 1,
+  const [phase, setPhase] = useState<OnboardingPhase>("intro");
+  const [messages, setMessages] = useState<OnboardingResponse[]>([]);
+  const [data, setData] = useState<OnboardingData>({
     name: "",
     businessName: "",
     businessDescription: "",
     tasks: [],
     channels: [],
-    documents: [],
   });
-
+  const [inputValue, setInputValue] = useState("");
+  const messagesEndRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
 
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
+
+  const addMessage = (role: OnboardingResponse["role"], content: string) => {
+    setMessages((prev) => [...prev, { role, content }]);
+  };
+
+  const getPrompt = (phase: OnboardingPhase): string => {
+    let prompt = PHASE_PROMPTS[phase];
+    prompt = prompt.replace("{{name}}", data.name);
+    prompt = prompt.replace("{{businessName}}", data.businessName);
+    return prompt;
+  };
+
+  const startOnboarding = () => {
+    addMessage("assistant", getPrompt("name"));
+    setPhase("name");
+  };
+
+  const handleNameSubmit = () => {
+    if (!inputValue.trim()) return;
+    setData((prev) => ({ ...prev, name: inputValue.trim() }));
+    addMessage("user", inputValue.trim());
+    addMessage(
+      "assistant",
+      getPrompt("businessName").replace("{{name}}", inputValue.trim()),
+    );
+    setPhase("businessName");
+    setInputValue("");
+  };
+
+  const handleBusinessNameSubmit = () => {
+    if (!inputValue.trim()) return;
+    setData((prev) => ({ ...prev, businessName: inputValue.trim() }));
+    addMessage("user", inputValue.trim());
+    addMessage(
+      "assistant",
+      getPrompt("businessDescription").replace(
+        "{{businessName}}",
+        inputValue.trim(),
+      ),
+    );
+    setPhase("businessDescription");
+    setInputValue("");
+  };
+
+  const handleBusinessDescriptionSubmit = () => {
+    if (!inputValue.trim()) return;
+    setData((prev) => ({ ...prev, businessDescription: inputValue.trim() }));
+    addMessage("user", inputValue.trim());
+    addMessage("assistant", getPrompt("tasks"));
+    setPhase("tasks");
+  };
+
   const toggleTask = (task: TaskType) => {
-    setState((prev) => ({
+    setData((prev) => ({
       ...prev,
       tasks: prev.tasks.includes(task)
         ? prev.tasks.filter((t) => t !== task)
@@ -99,8 +169,19 @@ export function Onboarding() {
     }));
   };
 
+  const handleTasksSubmit = () => {
+    if (data.tasks.length === 0) return;
+    const taskLabels = data.tasks
+      .map((t) => TASK_OPTIONS.find((opt) => opt.id === t)?.label)
+      .filter(Boolean)
+      .join(", ");
+    addMessage("user", taskLabels);
+    addMessage("assistant", getPrompt("channels"));
+    setPhase("channels");
+  };
+
   const toggleChannel = (channel: ChannelType) => {
-    setState((prev) => ({
+    setData((prev) => ({
       ...prev,
       channels: prev.channels.includes(channel)
         ? prev.channels.filter((c) => c !== channel)
@@ -108,366 +189,323 @@ export function Onboarding() {
     }));
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
-    setState((prev) => ({
-      ...prev,
-      documents: [...prev.documents, ...files],
-    }));
+  const handleChannelsSubmit = () => {
+    if (data.channels.length === 0) return;
+    const channelLabels = data.channels
+      .map((c) => CHANNEL_OPTIONS.find((opt) => opt.id === c)?.label)
+      .filter(Boolean)
+      .join(", ");
+    const taskLabels = data.tasks
+      .map((t) => TASK_OPTIONS.find((opt) => opt.id === t)?.label)
+      .filter(Boolean)
+      .join(", ");
+    addMessage("user", channelLabels);
+    setPhase("complete");
+    // Show summary
+    const summary = `Here's what I've learned:\n\n**You:** ${data.name}\n**Business:** ${data.businessName}\n**What you do:** ${data.businessDescription}\n**Tasks:** ${taskLabels}\n**Channels:** ${channelLabels}`;
+    addMessage("assistant", summary);
   };
 
-  const handleNext = () => {
-    if (state.step < 6) {
-      setState((prev) => ({ ...prev, step: prev.step + 1 }));
-    } else {
-      // Complete onboarding
-      navigate("/dashboard");
+  const handleComplete = () => {
+    // TODO: Save onboarding data to backend when API is ready
+    navigate("/dashboard");
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      if (phase === "name") handleNameSubmit();
+      else if (phase === "businessName") handleBusinessNameSubmit();
+      else if (phase === "businessDescription")
+        handleBusinessDescriptionSubmit();
     }
   };
 
-  const handleBack = () => {
-    if (state.step > 1) {
-      setState((prev) => ({ ...prev, step: prev.step - 1 }));
-    }
-  };
+  // Render intro phase
+  if (phase === "intro") {
+    return (
+      <div className="min-h-screen bg-surface p-6">
+        <div className="max-w-2xl mx-auto">
+          <Card className="border border-border">
+            <CardContent className="pt-8 pb-8">
+              <div className="text-center space-y-4">
+                <div className="text-5xl mb-4">👋</div>
+                <h1 className="text-2xl font-bold text-text">
+                  Welcome to Axel
+                </h1>
+                <p className="text-muted max-w-md mx-auto">
+                  I'm your AI employee, designed to help you with emails,
+                  scheduling, documents, and more. Let's get acquainted so I can
+                  start being useful.
+                </p>
+                <Button
+                  onClick={startOnboarding}
+                  className="bg-accent hover:bg-accent/90 text-white mt-4"
+                >
+                  Let's get started
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
 
-  const isStepValid = () => {
-    switch (state.step) {
-      case 1:
-        return state.name.trim() && state.businessName.trim();
-      case 2:
-        return state.businessDescription.trim();
-      case 3:
-        return state.tasks.length > 0;
-      case 4:
-        return state.channels.length > 0;
-      case 5:
-        return true; // Documents are optional
-      case 6:
-        return true;
-      default:
-        return false;
-    }
-  };
+  // Render task selection phase
+  if (phase === "tasks") {
+    return (
+      <div className="min-h-screen bg-surface p-6">
+        <div className="max-w-2xl mx-auto">
+          <Card className="border border-border">
+            <CardContent className="pt-6 pb-6">
+              <div className="space-y-4">
+                <div className="flex items-start gap-3">
+                  <div className="w-8 h-8 rounded-full bg-accent flex items-center justify-center text-white font-semibold text-sm shrink-0">
+                    A
+                  </div>
+                  <div className="text-text">{getPrompt("tasks")}</div>
+                </div>
 
+                <div className="space-y-3 pl-11">
+                  {TASK_OPTIONS.map((option) => (
+                    <button
+                      key={option.id}
+                      onClick={() => toggleTask(option.id)}
+                      className={`w-full p-4 rounded-lg border-2 text-left transition-all ${
+                        data.tasks.includes(option.id)
+                          ? "border-accent bg-surface-elevated"
+                          : "border-border hover:border-border/60"
+                      }`}
+                    >
+                      <div className="font-semibold text-text">
+                        {option.label}
+                      </div>
+                      <div className="text-sm text-muted">
+                        {option.description}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+
+                <div className="flex justify-end pl-11 pt-2">
+                  <Button
+                    onClick={handleTasksSubmit}
+                    disabled={data.tasks.length === 0}
+                    className="bg-accent hover:bg-accent/90 text-white"
+                  >
+                    Continue
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
+  // Render channel selection phase
+  if (phase === "channels") {
+    return (
+      <div className="min-h-screen bg-surface p-6">
+        <div className="max-w-2xl mx-auto">
+          <Card className="border border-border">
+            <CardContent className="pt-6 pb-6">
+              <div className="space-y-4">
+                <div className="flex items-start gap-3">
+                  <div className="w-8 h-8 rounded-full bg-accent flex items-center justify-center text-white font-semibold text-sm shrink-0">
+                    A
+                  </div>
+                  <div className="text-text">{getPrompt("channels")}</div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 pl-11">
+                  {CHANNEL_OPTIONS.map((option) => (
+                    <button
+                      key={option.id}
+                      onClick={() => toggleChannel(option.id)}
+                      className={`p-4 rounded-lg border-2 transition-all ${
+                        data.channels.includes(option.id)
+                          ? "border-accent bg-surface-elevated"
+                          : "border-border hover:border-border/60"
+                      }`}
+                    >
+                      <div className="font-semibold text-text text-center">
+                        {option.label}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+
+                <div className="flex justify-end pl-11 pt-2">
+                  <Button
+                    onClick={handleChannelsSubmit}
+                    disabled={data.channels.length === 0}
+                    className="bg-accent hover:bg-accent/90 text-white"
+                  >
+                    Continue
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
+  // Render complete phase
+  if (phase === "complete") {
+    const taskLabels = data.tasks
+      .map((t) => TASK_OPTIONS.find((opt) => opt.id === t)?.label)
+      .filter(Boolean);
+    const channelLabels = data.channels
+      .map((c) => CHANNEL_OPTIONS.find((opt) => opt.id === c)?.label)
+      .filter(Boolean);
+
+    return (
+      <div className="min-h-screen bg-surface p-6">
+        <div className="max-w-2xl mx-auto">
+          <Card className="border border-border">
+            <CardContent className="pt-6 pb-6">
+              <div className="text-center space-y-4 mb-6">
+                <div className="text-5xl">🎉</div>
+                <h2 className="text-xl font-bold text-text">
+                  All done, {data.name}!
+                </h2>
+                <p className="text-muted">
+                  Here's what we'll work on together:
+                </p>
+              </div>
+
+              <div className="bg-surface-elevated rounded-lg p-4 border border-border space-y-4 mb-6">
+                <div>
+                  <p className="text-xs text-muted uppercase font-semibold mb-2">
+                    About you
+                  </p>
+                  <p className="text-text">
+                    {data.name} — {data.businessName}
+                  </p>
+                  <p className="text-sm text-muted mt-1">
+                    {data.businessDescription}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-xs text-muted uppercase font-semibold mb-2">
+                    Tasks I'll handle
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {taskLabels.map((label) => (
+                      <Badge
+                        key={label}
+                        className="bg-surface text-text border border-border"
+                      >
+                        {label}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <p className="text-xs text-muted uppercase font-semibold mb-2">
+                    Channels
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {channelLabels.map((label) => (
+                      <Badge
+                        key={label}
+                        className="bg-surface text-text border border-border"
+                      >
+                        {label}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="text-center">
+                <Button
+                  onClick={handleComplete}
+                  className="bg-accent hover:bg-accent/90 text-white"
+                >
+                  Enter dashboard
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
+  // Render conversational phases (name, businessName, businessDescription)
   return (
     <div className="min-h-screen bg-surface p-6">
       <div className="max-w-2xl mx-auto">
-        {/* Step Indicator */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between mb-4">
-            {[1, 2, 3, 4, 5, 6].map((step) => (
-              <div key={step} className="flex items-center flex-1">
+        <Card className="border border-border">
+          <CardContent className="pt-6 pb-6">
+            {/* Messages */}
+            <div className="space-y-4 mb-6 max-h-[50vh] overflow-y-auto">
+              {messages.map((msg, idx) => (
                 <div
-                  className={`w-8 h-8 rounded-full flex items-center justify-center font-semibold text-sm ${
-                    step < state.step
-                      ? "bg-success text-white"
-                      : step === state.step
-                        ? "bg-accent text-white"
-                        : "bg-surface-raised border border-border text-muted"
+                  key={idx}
+                  className={`flex items-start gap-3 ${
+                    msg.role === "user" ? "flex-row-reverse" : ""
                   }`}
                 >
-                  {step < state.step ? "✓" : step}
-                </div>
-                {step < 6 && (
+                  {msg.role === "assistant" && (
+                    <div className="w-8 h-8 rounded-full bg-accent flex items-center justify-center text-white font-semibold text-sm shrink-0">
+                      A
+                    </div>
+                  )}
                   <div
-                    className={`flex-1 h-1 mx-2 ${
-                      step < state.step ? "bg-success" : "bg-border"
-                    }`}
-                  />
-                )}
-              </div>
-            ))}
-          </div>
-          <p className="text-muted text-sm">Step {state.step} of 6</p>
-        </div>
-
-        {/* Step Content */}
-        <Card className="border border-border">
-          <CardHeader>
-            {state.step === 1 && (
-              <>
-                <CardTitle className="text-text">Let's get started</CardTitle>
-                <CardDescription>
-                  First, tell us about you and your business
-                </CardDescription>
-              </>
-            )}
-            {state.step === 2 && (
-              <>
-                <CardTitle className="text-text">
-                  What does your business do?
-                </CardTitle>
-                <CardDescription>
-                  Give us a brief description of your business
-                </CardDescription>
-              </>
-            )}
-            {state.step === 3 && (
-              <>
-                <CardTitle className="text-text">
-                  What should Axel handle?
-                </CardTitle>
-                <CardDescription>
-                  Select the tasks you want your AI employee to manage
-                </CardDescription>
-              </>
-            )}
-            {state.step === 4 && (
-              <>
-                <CardTitle className="text-text">Where do you work?</CardTitle>
-                <CardDescription>
-                  Select the channels Axel should monitor
-                </CardDescription>
-              </>
-            )}
-            {state.step === 5 && (
-              <>
-                <CardTitle className="text-text">Share knowledge</CardTitle>
-                <CardDescription>
-                  Upload key documents so Axel knows your policies and style
-                </CardDescription>
-              </>
-            )}
-            {state.step === 6 && (
-              <>
-                <CardTitle className="text-text">
-                  Meet your new employee
-                </CardTitle>
-                <CardDescription>
-                  Your onboarding is complete. Ready to get started?
-                </CardDescription>
-              </>
-            )}
-          </CardHeader>
-
-          <CardContent className="space-y-6">
-            {/* Step 1: Name & Business */}
-            {state.step === 1 && (
-              <>
-                <div className="space-y-2">
-                  <Label htmlFor="name" className="text-text">
-                    Your name
-                  </Label>
-                  <Input
-                    id="name"
-                    value={state.name}
-                    onChange={(e) =>
-                      setState((prev) => ({ ...prev, name: e.target.value }))
-                    }
-                    placeholder="John Doe"
-                    className="bg-surface-raised border-border text-text"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="businessName" className="text-text">
-                    Business name
-                  </Label>
-                  <Input
-                    id="businessName"
-                    value={state.businessName}
-                    onChange={(e) =>
-                      setState((prev) => ({
-                        ...prev,
-                        businessName: e.target.value,
-                      }))
-                    }
-                    placeholder="Your Company Inc."
-                    className="bg-surface-raised border-border text-text"
-                  />
-                </div>
-              </>
-            )}
-
-            {/* Step 2: Business Description */}
-            {state.step === 2 && (
-              <div className="space-y-2">
-                <Label htmlFor="description" className="text-text">
-                  Business description
-                </Label>
-                <Textarea
-                  id="description"
-                  value={state.businessDescription}
-                  onChange={(e) =>
-                    setState((prev) => ({
-                      ...prev,
-                      businessDescription: e.target.value,
-                    }))
-                  }
-                  placeholder="Tell us what your company does..."
-                  className="bg-surface-raised border-border text-text min-h-32"
-                />
-              </div>
-            )}
-
-            {/* Step 3: Tasks */}
-            {state.step === 3 && (
-              <div className="space-y-3">
-                {TASK_OPTIONS.map((option) => (
-                  <button
-                    key={option.id}
-                    onClick={() => toggleTask(option.id)}
-                    className={`w-full p-4 rounded-lg border-2 text-left transition-all ${
-                      state.tasks.includes(option.id)
-                        ? "border-accent bg-surface-elevated"
-                        : "border-border hover:border-border/60"
+                    className={`p-3 rounded-lg max-w-[80%] ${
+                      msg.role === "user"
+                        ? "bg-accent text-white"
+                        : "bg-surface-elevated text-text border border-border"
                     }`}
                   >
-                    <div className="font-semibold text-text">
-                      {option.label}
-                    </div>
-                    <div className="text-sm text-muted">
-                      {option.description}
-                    </div>
-                  </button>
-                ))}
-              </div>
-            )}
-
-            {/* Step 4: Channels */}
-            {state.step === 4 && (
-              <div className="grid grid-cols-2 gap-3">
-                {CHANNEL_OPTIONS.map((option) => (
-                  <button
-                    key={option.id}
-                    onClick={() => toggleChannel(option.id)}
-                    className={`p-4 rounded-lg border-2 transition-all ${
-                      state.channels.includes(option.id)
-                        ? "border-accent bg-surface-elevated"
-                        : "border-border hover:border-border/60"
-                    }`}
-                  >
-                    <div className="font-semibold text-text text-center">
-                      {option.label}
-                    </div>
-                  </button>
-                ))}
-              </div>
-            )}
-
-            {/* Step 5: Document Upload */}
-            {state.step === 5 && (
-              <div className="space-y-4">
-                <div className="border-2 border-dashed border-border rounded-lg p-8 text-center">
-                  <IconUpload className="w-8 h-8 text-muted mx-auto mb-3" />
-                  <label className="cursor-pointer">
-                    <span className="text-accent font-semibold hover:underline">
-                      Click to upload
-                    </span>
-                    <span className="text-muted"> or drag and drop</span>
-                    <input
-                      type="file"
-                      multiple
-                      onChange={handleFileUpload}
-                      className="hidden"
-                      accept=".pdf,.doc,.docx,.txt"
-                    />
-                  </label>
-                  <p className="text-xs text-muted mt-2">
-                    PDF, DOC, DOCX, or TXT (up to 10MB each)
-                  </p>
-                </div>
-
-                {state.documents.length > 0 && (
-                  <div className="space-y-2">
-                    <p className="text-sm font-semibold text-text">
-                      Uploaded files:
-                    </p>
-                    {state.documents.map((doc, idx) => (
-                      <div
-                        key={idx}
-                        className="flex items-center gap-2 p-2 bg-surface-raised rounded border border-border text-sm text-muted"
-                      >
-                        <IconCircleCheckFilled className="w-4 h-4 text-success" />
-                        {doc.name}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Step 6: Summary */}
-            {state.step === 6 && (
-              <div className="space-y-6 text-center">
-                <div className="text-5xl">👋</div>
-                <div>
-                  <p className="text-text font-semibold mb-2">
-                    Welcome {state.name}!
-                  </p>
-                  <p className="text-muted text-sm">
-                    Your AI employee is ready to help with:
-                  </p>
-                </div>
-
-                <div className="space-y-3 text-left">
-                  <div>
-                    <p className="text-xs text-muted uppercase font-semibold mb-2">
-                      Tasks
-                    </p>
-                    <div className="flex flex-wrap gap-2">
-                      {state.tasks.map((task) => (
-                        <Badge
-                          key={task}
-                          className="bg-surface-elevated text-text border border-border"
-                        >
-                          {TASK_OPTIONS.find((t) => t.id === task)?.label}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div>
-                    <p className="text-xs text-muted uppercase font-semibold mb-2">
-                      Channels
-                    </p>
-                    <div className="flex flex-wrap gap-2">
-                      {state.channels.map((channel) => (
-                        <Badge
-                          key={channel}
-                          className="bg-surface-elevated text-text border border-border"
-                        >
-                          {CHANNEL_OPTIONS.find((c) => c.id === channel)?.label}
-                        </Badge>
-                      ))}
-                    </div>
+                    {msg.content}
                   </div>
                 </div>
+              ))}
+              <div ref={messagesEndRef} />
+            </div>
 
-                <p className="text-sm text-muted">
-                  You can update these settings anytime in Settings.
-                </p>
-              </div>
-            )}
+            {/* Input */}
+            <div className="flex gap-2">
+              <Input
+                value={inputValue}
+                onChange={(e) => setInputValue(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder={
+                  phase === "name"
+                    ? "Your name"
+                    : phase === "businessName"
+                      ? "Your business name"
+                      : "Tell me about your business..."
+                }
+                className="bg-surface-raised border-border text-text"
+                autoFocus
+              />
+              <Button
+                onClick={
+                  phase === "name"
+                    ? handleNameSubmit
+                    : phase === "businessName"
+                      ? handleBusinessNameSubmit
+                      : handleBusinessDescriptionSubmit
+                }
+                disabled={!inputValue.trim()}
+                className="bg-accent hover:bg-accent/90 text-white"
+              >
+                Send
+              </Button>
+            </div>
           </CardContent>
         </Card>
-
-        {/* Navigation Buttons */}
-        <div className="flex gap-4 mt-6 justify-between">
-          <Button
-            onClick={handleBack}
-            variant="outline"
-            disabled={state.step === 1}
-            className="border-border text-text"
-          >
-            Back
-          </Button>
-          <Button
-            onClick={handleNext}
-            disabled={!isStepValid()}
-            className="bg-accent hover:bg-accent/90 text-white"
-          >
-            {state.step === 6 ? (
-              <>
-                Enter dashboard <IconChevronRight className="w-4 h-4 ml-2" />
-              </>
-            ) : (
-              <>
-                Next <IconChevronRight className="w-4 h-4 ml-2" />
-              </>
-            )}
-          </Button>
-        </div>
       </div>
     </div>
   );

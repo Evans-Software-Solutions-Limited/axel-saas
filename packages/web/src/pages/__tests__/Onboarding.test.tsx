@@ -1,190 +1,269 @@
 import { describe, it, expect } from "vitest";
-import { render, screen, fireEvent, act } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { Onboarding } from "../Onboarding";
 
-/** Advance through steps so we end up viewing the given step (1-6). */
-function advanceToStep(
-  targetStep: number,
-  opts: {
-    name?: string;
-    business?: string;
-    description?: string;
-    task?: string;
-    channel?: string;
-  } = {},
-) {
-  if (targetStep >= 2) {
-    if (opts.name)
-      fireEvent.change(screen.getByPlaceholderText(/john doe/i), {
-        target: { value: opts.name },
-      });
-    if (opts.business)
-      fireEvent.change(screen.getByPlaceholderText(/your company/i), {
-        target: { value: opts.business },
-      });
-    fireEvent.click(screen.getByRole("button", { name: /next/i }));
-  }
-  if (targetStep >= 3) {
-    if (opts.description)
-      fireEvent.change(screen.getByLabelText(/business description/i), {
-        target: { value: opts.description },
-      });
-    fireEvent.click(screen.getByRole("button", { name: /next/i }));
-  }
-  if (targetStep >= 4) {
-    if (opts.task) fireEvent.click(screen.getByText(opts.task));
-    fireEvent.click(screen.getByRole("button", { name: /next/i }));
-  }
-  if (targetStep >= 5) {
-    if (opts.channel) fireEvent.click(screen.getByText(opts.channel));
-    fireEvent.click(screen.getByRole("button", { name: /next/i }));
-  }
-  if (targetStep >= 6) {
-    fireEvent.click(screen.getByRole("button", { name: /next/i }));
-  }
-}
-
-describe("Onboarding", () => {
-  it("renders first step with business details", () => {
+describe("Onboarding - Conversational Flow", () => {
+  it("renders intro screen with welcome message", () => {
     render(
       <MemoryRouter>
         <Onboarding />
       </MemoryRouter>,
     );
-    expect(screen.getAllByText(/let's get started/i)[0]).toBeDefined();
+    expect(screen.getByText(/welcome to axel/i)).toBeDefined();
     expect(
-      screen.getByText(/first, tell us about you and your business/i),
+      screen.getByRole("button", { name: /let's get started/i }),
     ).toBeDefined();
   });
 
-  it("renders task type options after advancing to step 3", () => {
+  it("starts conversation when clicking get started", () => {
     render(
       <MemoryRouter>
         <Onboarding />
       </MemoryRouter>,
     );
-    fireEvent.change(screen.getByPlaceholderText(/john doe/i), {
-      target: { value: "Test User" },
-    });
-    fireEvent.change(screen.getByPlaceholderText(/your company/i), {
-      target: { value: "Test Co" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: /next/i }));
-    expect(screen.getByText(/what does your business do/i)).toBeDefined();
-    fireEvent.change(screen.getByLabelText(/business description/i), {
-      target: { value: "We test software" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: /next/i }));
-    expect(screen.getByText(/email management/i)).toBeDefined();
-    expect(screen.getByText(/document management/i)).toBeDefined();
+    fireEvent.click(screen.getByRole("button", { name: /let's get started/i }));
+    expect(screen.getByText(/first, what should i call you/i)).toBeDefined();
   });
 
-  it("renders step 4 channels and allows selecting", () => {
+  it("asks for business name after providing name", () => {
     render(
       <MemoryRouter>
         <Onboarding />
       </MemoryRouter>,
     );
-    advanceToStep(4, {
-      name: "A",
-      business: "B",
-      description: "C",
-      task: "Email management",
-    });
-    expect(screen.getByText(/where do you work/i)).toBeDefined();
-    expect(screen.getByText("Email")).toBeDefined();
-    expect(screen.getByText("Slack")).toBeDefined();
-    fireEvent.click(screen.getByText("Slack"));
-    fireEvent.click(screen.getByRole("button", { name: /next/i }));
-    expect(screen.getByText(/share knowledge/i)).toBeDefined();
+    // Start onboarding
+    fireEvent.click(screen.getByRole("button", { name: /let's get started/i }));
+
+    // Enter name
+    const input = screen.getByPlaceholderText(/your name/i);
+    fireEvent.change(input, { target: { value: "John" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+
+    expect(screen.getByText(/so, what does your business do/i)).toBeDefined();
   });
 
-  it("renders step 5 document upload", () => {
+  it("asks for business description after providing business name", () => {
     render(
       <MemoryRouter>
         <Onboarding />
       </MemoryRouter>,
     );
-    advanceToStep(5, {
-      name: "A",
-      business: "B",
-      description: "C",
-      task: "Email management",
-      channel: "Email",
-    });
-    expect(screen.getByText(/share knowledge/i)).toBeDefined();
-    expect(screen.getByText(/click to upload/i)).toBeDefined();
-  });
 
-  it("renders step 6 summary with Enter dashboard button", () => {
-    render(
-      <MemoryRouter>
-        <Onboarding />
-      </MemoryRouter>,
-    );
-    advanceToStep(6, {
-      name: "Jane",
-      business: "Acme",
-      description: "We build things",
-      task: "Document management",
-      channel: "Slack",
-    });
-    expect(screen.getByText(/meet your new employee/i)).toBeDefined();
-    expect(screen.getByText(/welcome jane/i)).toBeDefined();
-    expect(screen.getByText("Document management")).toBeDefined();
-    expect(screen.getByText("Slack")).toBeDefined();
+    // Start and provide name
+    fireEvent.click(screen.getByRole("button", { name: /let's get started/i }));
+    const nameInput = screen.getByPlaceholderText(/your name/i);
+    fireEvent.change(nameInput, { target: { value: "John" } });
+    fireEvent.keyDown(nameInput, { key: "Enter" });
+
+    // Provide business name
+    const businessInput = screen.getByPlaceholderText(/your business name/i);
+    fireEvent.change(businessInput, { target: { value: "Acme Inc" } });
+    fireEvent.keyDown(businessInput, { key: "Enter" });
+
     expect(
-      screen.getByRole("button", { name: /enter dashboard/i }),
+      screen.getByText(/tell me a bit about what your business does/i),
     ).toBeDefined();
   });
 
-  it("completes onboarding when Enter dashboard is clicked", async () => {
+  it("shows task selection after business description", () => {
     render(
       <MemoryRouter>
         <Onboarding />
       </MemoryRouter>,
     );
-    advanceToStep(6, {
-      name: "Jane",
-      business: "Acme",
-      description: "We build things",
-      task: "Document management",
-      channel: "Slack",
-    });
-    const enterBtn = screen.getByRole("button", { name: /enter dashboard/i });
-    await act(async () => {
-      fireEvent.click(enterBtn);
-    });
-    expect(enterBtn).toBeDefined();
+
+    // Start and provide name
+    fireEvent.click(screen.getByRole("button", { name: /let's get started/i }));
+    const nameInput = screen.getByPlaceholderText(/your name/i);
+    fireEvent.change(nameInput, { target: { value: "John" } });
+    fireEvent.keyDown(nameInput, { key: "Enter" });
+
+    // Provide business name
+    const businessInput = screen.getByPlaceholderText(/your business name/i);
+    fireEvent.change(businessInput, { target: { value: "Acme" } });
+    fireEvent.keyDown(businessInput, { key: "Enter" });
+
+    // Provide business description
+    const descInput = screen.getByPlaceholderText(
+      /tell me about your business/i,
+    );
+    fireEvent.change(descInput, { target: { value: "We build software" } });
+    fireEvent.keyDown(descInput, { key: "Enter" });
+
+    expect(screen.getByText(/what are the main tasks/i)).toBeDefined();
+    expect(screen.getByText("Email management")).toBeDefined();
   });
 
-  it("Back button goes to previous step", () => {
+  it("allows selecting multiple tasks", () => {
     render(
       <MemoryRouter>
         <Onboarding />
       </MemoryRouter>,
     );
-    fireEvent.change(screen.getByPlaceholderText(/john doe/i), {
-      target: { value: "X" },
+
+    // Navigate to tasks
+    fireEvent.click(screen.getByRole("button", { name: /let's get started/i }));
+    fireEvent.change(screen.getByPlaceholderText(/your name/i), {
+      target: { value: "John" },
     });
-    fireEvent.change(screen.getByPlaceholderText(/your company/i), {
-      target: { value: "Y" },
+    fireEvent.keyDown(screen.getByPlaceholderText(/your name/i), {
+      key: "Enter",
     });
-    fireEvent.click(screen.getByRole("button", { name: /next/i }));
-    expect(screen.getByText(/what does your business do/i)).toBeDefined();
-    fireEvent.click(screen.getByRole("button", { name: /back/i }));
-    expect(screen.getAllByText(/let's get started/i)[0]).toBeDefined();
+    fireEvent.change(screen.getByPlaceholderText(/your business name/i), {
+      target: { value: "Acme" },
+    });
+    fireEvent.keyDown(screen.getByPlaceholderText(/your business name/i), {
+      key: "Enter",
+    });
+    fireEvent.change(
+      screen.getByPlaceholderText(/tell me about your business/i),
+      { target: { value: "Software" } },
+    );
+    fireEvent.keyDown(
+      screen.getByPlaceholderText(/tell me about your business/i),
+      { key: "Enter" },
+    );
+
+    // Select tasks
+    fireEvent.click(screen.getByText("Email management"));
+    fireEvent.click(screen.getByText("Document management"));
+
+    // Click continue
+    fireEvent.click(screen.getByRole("button", { name: /continue/i }));
+
+    // Should go to channels
+    expect(screen.getByText(/which communication channels/i)).toBeDefined();
   });
 
-  it("disables Next on step 3 when no task selected", () => {
+  it("allows selecting channels and completes onboarding", () => {
     render(
       <MemoryRouter>
         <Onboarding />
       </MemoryRouter>,
     );
-    advanceToStep(3, { name: "A", business: "B", description: "Desc" });
-    const nextBtn = screen.getByRole("button", { name: /next/i });
-    expect((nextBtn as HTMLButtonElement).disabled).toBe(true);
+
+    // Navigate to tasks
+    fireEvent.click(screen.getByRole("button", { name: /let's get started/i }));
+    fireEvent.change(screen.getByPlaceholderText(/your name/i), {
+      target: { value: "Jane" },
+    });
+    fireEvent.keyDown(screen.getByPlaceholderText(/your name/i), {
+      key: "Enter",
+    });
+    fireEvent.change(screen.getByPlaceholderText(/your business name/i), {
+      target: { value: "TestCo" },
+    });
+    fireEvent.keyDown(screen.getByPlaceholderText(/your business name/i), {
+      key: "Enter",
+    });
+    fireEvent.change(
+      screen.getByPlaceholderText(/tell me about your business/i),
+      { target: { value: "Testing" } },
+    );
+    fireEvent.keyDown(
+      screen.getByPlaceholderText(/tell me about your business/i),
+      { key: "Enter" },
+    );
+
+    // Select tasks and continue
+    fireEvent.click(screen.getByText("Email management"));
+    fireEvent.click(screen.getByRole("button", { name: /continue/i }));
+
+    // Select channels
+    fireEvent.click(screen.getByText("Email"));
+    fireEvent.click(screen.getByRole("button", { name: /continue/i }));
+
+    // Should show summary
+    expect(screen.getByText(/all done, jane/i)).toBeDefined();
+    expect(screen.getByText("Enter dashboard")).toBeDefined();
+  });
+
+  it("disables continue on tasks phase when no tasks selected", () => {
+    render(
+      <MemoryRouter>
+        <Onboarding />
+      </MemoryRouter>,
+    );
+
+    // Navigate to tasks
+    fireEvent.click(screen.getByRole("button", { name: /let's get started/i }));
+    fireEvent.change(screen.getByPlaceholderText(/your name/i), {
+      target: { value: "John" },
+    });
+    fireEvent.keyDown(screen.getByPlaceholderText(/your name/i), {
+      key: "Enter",
+    });
+    fireEvent.change(screen.getByPlaceholderText(/your business name/i), {
+      target: { value: "Acme" },
+    });
+    fireEvent.keyDown(screen.getByPlaceholderText(/your business name/i), {
+      key: "Enter",
+    });
+    fireEvent.change(
+      screen.getByPlaceholderText(/tell me about your business/i),
+      { target: { value: "Software" } },
+    );
+    fireEvent.keyDown(
+      screen.getByPlaceholderText(/tell me about your business/i),
+      { key: "Enter" },
+    );
+
+    const continueBtn = screen.getByRole("button", { name: /continue/i });
+    expect((continueBtn as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("disables continue on channels phase when no channels selected", () => {
+    render(
+      <MemoryRouter>
+        <Onboarding />
+      </MemoryRouter>,
+    );
+
+    // Navigate to channels
+    fireEvent.click(screen.getByRole("button", { name: /let's get started/i }));
+    fireEvent.change(screen.getByPlaceholderText(/your name/i), {
+      target: { value: "John" },
+    });
+    fireEvent.keyDown(screen.getByPlaceholderText(/your name/i), {
+      key: "Enter",
+    });
+    fireEvent.change(screen.getByPlaceholderText(/your business name/i), {
+      target: { value: "Acme" },
+    });
+    fireEvent.keyDown(screen.getByPlaceholderText(/your business name/i), {
+      key: "Enter",
+    });
+    fireEvent.change(
+      screen.getByPlaceholderText(/tell me about your business/i),
+      { target: { value: "Software" } },
+    );
+    fireEvent.keyDown(
+      screen.getByPlaceholderText(/tell me about your business/i),
+      { key: "Enter" },
+    );
+    fireEvent.click(screen.getByText("Email management"));
+    fireEvent.click(screen.getByRole("button", { name: /continue/i }));
+
+    const continueBtn = screen.getByRole("button", { name: /continue/i });
+    expect((continueBtn as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("prevents empty submissions in text inputs", () => {
+    render(
+      <MemoryRouter>
+        <Onboarding />
+      </MemoryRouter>,
+    );
+
+    // Start onboarding
+    fireEvent.click(screen.getByRole("button", { name: /let's get started/i }));
+
+    // Try to submit empty input
+    const input = screen.getByPlaceholderText(/your name/i);
+    fireEvent.keyDown(input, { key: "Enter" });
+
+    // Should still be on name phase (no error, just no submission)
+    expect(screen.getByText(/first, what should i call you/i)).toBeDefined();
   });
 });
