@@ -424,7 +424,7 @@ describe("StripeHandler - Invoice Endpoints", () => {
               description: "Pro Plan",
               amount: 7900,
               quantity: 1,
-              unit_amount: 7900,
+              price: { unit_amount: 7900 },
               period: {
                 start: 1701388800,
                 end: 1704067200,

@@ -305,9 +305,7 @@ export const stripeHandler = new Elysia({ name: "StripeHandler" })
             description: line.description,
             amount: line.amount,
             quantity: line.quantity,
-            unitAmount: (
-              line as Stripe.InvoiceLineItem & { unit_amount?: number }
-            ).unit_amount,
+            unitAmount: line.price?.unit_amount ?? null,
             period: {
               start: line.period?.start,
               end: line.period?.end,
