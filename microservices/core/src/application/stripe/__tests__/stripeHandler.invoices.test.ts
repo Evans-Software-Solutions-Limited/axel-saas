@@ -125,7 +125,13 @@ describe("StripeHandler - Invoice Endpoints", () => {
         }),
       );
 
-      const data = await response.json() as { success: boolean; error?: string; invoices?: Array<{id: string; number: string; status: string}>; invoice?: Record<string, unknown>; hasMore?: boolean };
+      const data = (await response.json()) as {
+        success: boolean;
+        error?: string;
+        invoices?: Array<{ id: string; number: string; status: string }>;
+        invoice?: Record<string, unknown>;
+        hasMore?: boolean;
+      };
       expect(response.status).toBe(404);
       expect(data.success).toBe(false);
       expect(data.error).toBe("No subscription found");
@@ -176,12 +182,12 @@ describe("StripeHandler - Invoice Endpoints", () => {
         }),
       );
 
-      const data = await response.json() as { 
-        success: boolean; 
-        error?: string; 
-        invoices?: Array<{id: string; number: string; status: string}>;
+      const data = (await response.json()) as {
+        success: boolean;
+        error?: string;
+        invoices?: Array<{ id: string; number: string; status: string }>;
         invoice?: Record<string, unknown>;
-        hasMore?: boolean 
+        hasMore?: boolean;
       };
       expect(response.status).toBe(200);
       expect(data.success).toBe(true);
@@ -286,7 +292,13 @@ describe("StripeHandler - Invoice Endpoints", () => {
         }),
       );
 
-      const data = await response.json() as { success: boolean; error?: string; invoices?: Array<{id: string; number: string; status: string}>; invoice?: Record<string, unknown>; hasMore?: boolean };
+      const data = (await response.json()) as {
+        success: boolean;
+        error?: string;
+        invoices?: Array<{ id: string; number: string; status: string }>;
+        invoice?: Record<string, unknown>;
+        hasMore?: boolean;
+      };
       expect(response.status).toBe(404);
       expect(data.success).toBe(false);
       expect(data.error).toBe("No subscription found");
@@ -379,12 +391,12 @@ describe("StripeHandler - Invoice Endpoints", () => {
         }),
       );
 
-      const data = await response.json() as { 
-        success: boolean; 
-        error?: string; 
-        invoices?: Array<{id: string; number: string; status: string}>; 
-        invoice?: {id: string; lines?: Array<{description: string}>}; 
-        hasMore?: boolean 
+      const data = (await response.json()) as {
+        success: boolean;
+        error?: string;
+        invoices?: Array<{ id: string; number: string; status: string }>;
+        invoice?: { id: string; lines?: Array<{ description: string }> };
+        hasMore?: boolean;
       };
       expect(response.status).toBe(200);
       expect(data.success).toBe(true);
