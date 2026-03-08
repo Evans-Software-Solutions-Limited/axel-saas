@@ -285,6 +285,110 @@ describe("StripeHandler - Invoice Endpoints", () => {
       );
     });
 
+    it("should forward starting_after cursor to Stripe", async () => {
+      mockUserRepository.getUserBySupabaseId.mockResolvedValue({
+        id: "test-user-id",
+        email: "test@example.com",
+      });
+      mockSubscriptionRepository.findByUserId.mockResolvedValue({
+        id: "sub-id",
+        userId: "test-user-id",
+        stripeCustomerId: "cus_test123",
+        stripeSubscriptionId: "sub_test123",
+        tier: "pro",
+        status: "active",
+      });
+
+      mockStripeInstance.invoices.list.mockResolvedValue({
+        data: [],
+        has_more: false,
+      });
+
+      await stripeHandler.handle(
+        new Request(
+          "http://localhost/stripe/invoices?starting_after=inv_cursor",
+          {
+            headers: { Authorization: "Bearer valid-test-token" },
+          },
+        ),
+      );
+
+      expect(mockStripeInstance.invoices.list).toHaveBeenCalledWith(
+        expect.objectContaining({
+          starting_after: "inv_cursor",
+        }),
+      );
+    });
+
+    it("should return nextCursor when hasMore is true", async () => {
+      mockUserRepository.getUserBySupabaseId.mockResolvedValue({
+        id: "test-user-id",
+        email: "test@example.com",
+      });
+      mockSubscriptionRepository.findByUserId.mockResolvedValue({
+        id: "sub-id",
+        userId: "test-user-id",
+        stripeCustomerId: "cus_test123",
+        stripeSubscriptionId: "sub_test123",
+        tier: "pro",
+        status: "active",
+      });
+
+      mockStripeInstance.invoices.list.mockResolvedValue({
+        data: [
+          { id: "inv_first", number: "INV-001", status: "paid" },
+          { id: "inv_last", number: "INV-002", status: "paid" },
+        ],
+        has_more: true,
+      });
+
+      const response = await stripeHandler.handle(
+        new Request("http://localhost/stripe/invoices", {
+          headers: { Authorization: "Bearer valid-test-token" },
+        }),
+      );
+
+      const data = (await response.json()) as {
+        hasMore: boolean;
+        nextCursor: string | null;
+      };
+      expect(data.hasMore).toBe(true);
+      expect(data.nextCursor).toBe("inv_last");
+    });
+
+    it("should return null nextCursor when hasMore is false", async () => {
+      mockUserRepository.getUserBySupabaseId.mockResolvedValue({
+        id: "test-user-id",
+        email: "test@example.com",
+      });
+      mockSubscriptionRepository.findByUserId.mockResolvedValue({
+        id: "sub-id",
+        userId: "test-user-id",
+        stripeCustomerId: "cus_test123",
+        stripeSubscriptionId: "sub_test123",
+        tier: "pro",
+        status: "active",
+      });
+
+      mockStripeInstance.invoices.list.mockResolvedValue({
+        data: [{ id: "inv_only", number: "INV-001", status: "paid" }],
+        has_more: false,
+      });
+
+      const response = await stripeHandler.handle(
+        new Request("http://localhost/stripe/invoices", {
+          headers: { Authorization: "Bearer valid-test-token" },
+        }),
+      );
+
+      const data = (await response.json()) as {
+        hasMore: boolean;
+        nextCursor: string | null;
+      };
+      expect(data.hasMore).toBe(false);
+      expect(data.nextCursor).toBeNull();
+    });
+
     it("should return 400 for a negative limit", async () => {
       mockUserRepository.getUserBySupabaseId.mockResolvedValue({
         id: "test-user-id",

@@ -223,12 +223,15 @@ export const stripeHandler = new Elysia({ name: "StripeHandler" })
     }
     const limit = Number.isNaN(rawLimit) ? 10 : Math.min(rawLimit, 100);
 
+    const startingAfter = (query.starting_after as string) || undefined;
+
     const stripe = getStripeInstance();
 
     try {
       const invoices = await stripe.invoices.list({
         customer: stripeCustomerId,
         limit,
+        ...(startingAfter && { starting_after: startingAfter }),
         expand: ["data.payment_intent"],
       });
 
@@ -249,6 +252,9 @@ export const stripeHandler = new Elysia({ name: "StripeHandler" })
           periodEnd: inv.period_end,
         })),
         hasMore: invoices.has_more,
+        nextCursor: invoices.has_more
+          ? (invoices.data[invoices.data.length - 1]?.id ?? null)
+          : null,
       };
     } catch (err) {
       console.error("List invoices error:", err);
