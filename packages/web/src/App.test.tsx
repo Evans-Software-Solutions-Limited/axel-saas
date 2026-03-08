@@ -82,7 +82,7 @@ describe("App", () => {
     expect(screen.getByText(/loading/i)).toBeDefined();
   });
 
-  it("redirects authenticated user without onboarding to onboarding", () => {
+  it("redirects authenticated user without onboarding to chat (pre-onboarding state)", () => {
     vi.mocked(useAuth).mockReturnValue({
       isAuthenticated: true,
       isLoading: false,
@@ -99,7 +99,9 @@ describe("App", () => {
         <App />
       </MemoryRouter>,
     );
-    expect(screen.getByText("Let's get started")).toBeDefined();
+    // Pre-onboarding users should be redirected to /dashboard/chat
+    // The Dashboard should render with Chat tab active
+    expect(screen.getAllByText("Chat")[0]).toBeDefined();
   });
 
   it("redirects authenticated user with onboarding to dashboard", () => {

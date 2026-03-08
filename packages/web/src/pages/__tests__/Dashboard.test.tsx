@@ -1,7 +1,22 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { MemoryRouter, Routes, Route } from "react-router";
 import { Dashboard } from "../Dashboard";
+
+// Mock useAuth hook
+vi.mock("@/hooks/useAuth", () => ({
+  useAuth: vi.fn(() => ({
+    onboardingCompleted: true,
+    isAuthenticated: true,
+    isLoading: false,
+    user: { id: "1", email: "test@test.com" },
+    session: {} as never,
+    error: null,
+    signIn: vi.fn(),
+    signUp: vi.fn(),
+    signOut: vi.fn(),
+  })),
+}));
 
 function MockOutlet() {
   return <div data-testid="outlet">Office content</div>;

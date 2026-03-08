@@ -7,7 +7,6 @@ import { useAuth } from "@/hooks/useAuth";
 import Login from "./pages/Login";
 import SignUp from "./pages/SignUp";
 import Subscribe from "./pages/Subscribe";
-import Onboarding from "./pages/Onboarding";
 import Dashboard from "./pages/Dashboard";
 import { Office } from "./pages/Office";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
@@ -63,7 +62,7 @@ function App() {
                 onboardingCompleted ? (
                   <Navigate to="/dashboard" />
                 ) : (
-                  <Navigate to="/onboarding" />
+                  <Navigate to="/dashboard/chat" />
                 )
               ) : (
                 <Navigate to="/login" />
@@ -92,7 +91,7 @@ function App() {
             path="/onboarding"
             element={
               <ProtectedRoute>
-                <Onboarding />
+                <Navigate to="/dashboard/chat" />
               </ProtectedRoute>
             }
           />
