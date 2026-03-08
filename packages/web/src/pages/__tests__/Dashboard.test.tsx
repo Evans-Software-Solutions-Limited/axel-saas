@@ -26,9 +26,12 @@ function MockOutlet() {
 }
 
 // Helper to wrap component with mocked useAuth
-const renderWithMockAuth = (ui: React.ReactElement, options?: { onboardingCompleted?: boolean }) => {
+const renderWithMockAuth = (
+  ui: React.ReactElement,
+  options?: { onboardingCompleted?: boolean },
+) => {
   const mockOnboardingCompleted = options?.onboardingCompleted ?? true;
-  
+
   vi.mocked(useAuth).mockReturnValue({
     isAuthenticated: true,
     isLoading: false,
@@ -193,7 +196,7 @@ describe("Dashboard", () => {
     );
     // Click on Office button which should trigger handleLockedNavClick
     // Since onboarding is not completed, it should try to navigate to /dashboard/chat
-    const officeButton = screen.getAllByText("Office")[0]?.closest('button');
+    const officeButton = screen.getAllByText("Office")[0]?.closest("button");
     if (officeButton) {
       fireEvent.click(officeButton);
     }
@@ -208,7 +211,10 @@ describe("Dashboard", () => {
         <Routes>
           <Route path="/dashboard" element={<Dashboard />}>
             <Route path="chat" element={<MockOutlet />} />
-            <Route path="office" element={<div data-testid="office">Office</div>} />
+            <Route
+              path="office"
+              element={<div data-testid="office">Office</div>}
+            />
           </Route>
         </Routes>
       </MemoryRouter>,
@@ -217,7 +223,7 @@ describe("Dashboard", () => {
     // Click on Office nav item - should navigate since onboarding IS completed
     // Use queryAllByText and check length to avoid multiple elements error
     const officeElements = screen.getAllByText("Office");
-    const officeButton = officeElements[0]?.closest('button');
+    const officeButton = officeElements[0]?.closest("button");
     if (officeButton) {
       fireEvent.click(officeButton);
     }

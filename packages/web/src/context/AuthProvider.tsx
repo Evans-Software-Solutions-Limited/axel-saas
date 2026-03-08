@@ -110,12 +110,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         channels: [],
         morningBrief: false,
       });
-      
+
       if (error) {
         console.error("Error completing onboarding:", error);
         return { success: false, error: "Failed to complete onboarding" };
       }
-      
+
       // Update local state immediately
       setOnboardingCompleted(true);
       return { success: true };

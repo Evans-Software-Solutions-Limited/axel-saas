@@ -53,7 +53,9 @@ function App() {
 
   // For non-onboarded users, the default route is /dashboard/chat (where onboarding happens)
   // For onboarded users, the default route is /dashboard/office
-  const defaultDashboardRoute = onboardingCompleted ? "/dashboard/office" : "/dashboard/chat";
+  const defaultDashboardRoute = onboardingCompleted
+    ? "/dashboard/office"
+    : "/dashboard/chat";
 
   return (
     <QueryClientProvider client={queryClient}>

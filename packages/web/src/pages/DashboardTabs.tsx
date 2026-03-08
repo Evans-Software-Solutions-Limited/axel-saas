@@ -20,7 +20,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { IconSend, IconSearch, IconCheck, IconChevronRight } from "@tabler/icons-react";
+import {
+  IconSend,
+  IconSearch,
+  IconCheck,
+  IconChevronRight,
+} from "@tabler/icons-react";
 import { useAuth } from "@/hooks/useAuth";
 
 // ============================================================================
@@ -35,7 +40,13 @@ interface Message {
 }
 
 // Onboarding state and types
-type OnboardingStep = "welcome" | "name" | "role" | "helpWith" | "channels" | "complete";
+type OnboardingStep =
+  | "welcome"
+  | "name"
+  | "role"
+  | "helpWith"
+  | "channels"
+  | "complete";
 
 interface OnboardingState {
   step: OnboardingStep;
@@ -66,7 +77,7 @@ const INITIAL_TIMESTAMP = new Date(Date.now() - 3600000);
 export function Chat() {
   const { onboardingCompleted, completeOnboarding } = useAuth();
   const navigate = useNavigate();
-  
+
   // Onboarding state
   const [onboarding, setOnboarding] = useState<OnboardingState>({
     step: "welcome",
@@ -76,7 +87,7 @@ export function Chat() {
     channels: [],
   });
   const [isCompleting, setIsCompleting] = useState(false);
-  
+
   // Chat state
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -173,7 +184,13 @@ export function Chat() {
   };
 
   const nextStep = () => {
-    const steps: OnboardingStep[] = ["welcome", "name", "role", "helpWith", "channels"];
+    const steps: OnboardingStep[] = [
+      "welcome",
+      "name",
+      "role",
+      "helpWith",
+      "channels",
+    ];
     const currentIndex = steps.indexOf(onboarding.step);
     if (currentIndex < steps.length - 1) {
       setOnboarding((prev) => ({ ...prev, step: steps[currentIndex + 1] }));
@@ -192,7 +209,9 @@ export function Chat() {
             <Card className="border border-border">
               <CardHeader className="text-center">
                 <div className="text-4xl mb-4">👋</div>
-                <CardTitle className="text-2xl text-text">Welcome to Axel</CardTitle>
+                <CardTitle className="text-2xl text-text">
+                  Welcome to Axel
+                </CardTitle>
                 <p className="text-muted mt-2">
                   I'm your AI employee, ready to help you be more productive.
                   Let me ask a few quick questions to get set up.
@@ -203,7 +222,8 @@ export function Chat() {
                   onClick={startOnboarding}
                   className="bg-accent hover:bg-accent/90 text-white"
                 >
-                  Let's get started <IconChevronRight className="w-4 h-4 ml-2" />
+                  Let's get started{" "}
+                  <IconChevronRight className="w-4 h-4 ml-2" />
                 </Button>
               </CardContent>
             </Card>
@@ -213,15 +233,24 @@ export function Chat() {
           {onboarding.step === "name" && (
             <Card className="border border-border">
               <CardHeader>
-                <CardTitle className="text-text">What should I call you?</CardTitle>
+                <CardTitle className="text-text">
+                  What should I call you?
+                </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="onboardingName" className="text-text">Your name</Label>
+                  <Label htmlFor="onboardingName" className="text-text">
+                    Your name
+                  </Label>
                   <Input
                     id="onboardingName"
                     value={onboarding.name}
-                    onChange={(e) => setOnboarding((prev) => ({ ...prev, name: e.target.value }))}
+                    onChange={(e) =>
+                      setOnboarding((prev) => ({
+                        ...prev,
+                        name: e.target.value,
+                      }))
+                    }
                     placeholder="Enter your name"
                     className="bg-surface-raised border-border text-text"
                     autoFocus
@@ -242,16 +271,25 @@ export function Chat() {
           {onboarding.step === "role" && (
             <Card className="border border-border">
               <CardHeader>
-                <CardTitle className="text-text">What do you do, {onboarding.name}?</CardTitle>
+                <CardTitle className="text-text">
+                  What do you do, {onboarding.name}?
+                </CardTitle>
                 <p className="text-muted text-sm">What's your role or title?</p>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="onboardingRole" className="text-text">Your role</Label>
+                  <Label htmlFor="onboardingRole" className="text-text">
+                    Your role
+                  </Label>
                   <Input
                     id="onboardingRole"
                     value={onboarding.role}
-                    onChange={(e) => setOnboarding((prev) => ({ ...prev, role: e.target.value }))}
+                    onChange={(e) =>
+                      setOnboarding((prev) => ({
+                        ...prev,
+                        role: e.target.value,
+                      }))
+                    }
                     placeholder="e.g., Marketing Manager, Founder, etc."
                     className="bg-surface-raised border-border text-text"
                     autoFocus
@@ -272,7 +310,9 @@ export function Chat() {
           {onboarding.step === "helpWith" && (
             <Card className="border border-border">
               <CardHeader>
-                <CardTitle className="text-text">What should I help you with?</CardTitle>
+                <CardTitle className="text-text">
+                  What should I help you with?
+                </CardTitle>
                 <p className="text-muted text-sm">Select all that apply</p>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -288,7 +328,9 @@ export function Chat() {
                       }`}
                     >
                       <div className="flex items-center justify-between">
-                        <span className="text-text font-medium">{option.label}</span>
+                        <span className="text-text font-medium">
+                          {option.label}
+                        </span>
                         {onboarding.helpWith.includes(option.id) && (
                           <IconCheck className="w-5 h-5 text-accent" />
                         )}
@@ -311,8 +353,12 @@ export function Chat() {
           {onboarding.step === "channels" && (
             <Card className="border border-border">
               <CardHeader>
-                <CardTitle className="text-text">Where should I communicate?</CardTitle>
-                <p className="text-muted text-sm">Select your preferred channels</p>
+                <CardTitle className="text-text">
+                  Where should I communicate?
+                </CardTitle>
+                <p className="text-muted text-sm">
+                  Select your preferred channels
+                </p>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-2 gap-3">
@@ -327,7 +373,9 @@ export function Chat() {
                       }`}
                     >
                       <div className="flex items-center justify-center gap-2">
-                        <span className="text-text font-medium">{option.label}</span>
+                        <span className="text-text font-medium">
+                          {option.label}
+                        </span>
                         {onboarding.channels.includes(option.id) && (
                           <IconCheck className="w-4 h-4 text-accent" />
                         )}
@@ -358,9 +406,12 @@ export function Chat() {
           <Card className="border border-border">
             <CardHeader className="text-center">
               <div className="text-5xl mb-4">🎉</div>
-              <CardTitle className="text-2xl text-text">You're all set, {onboarding.name}!</CardTitle>
+              <CardTitle className="text-2xl text-text">
+                You're all set, {onboarding.name}!
+              </CardTitle>
               <p className="text-muted mt-2">
-                I'm ready to help you with {onboarding.helpWith.length} areas and can reach you via {onboarding.channels.join(", ")}.
+                I'm ready to help you with {onboarding.helpWith.length} areas
+                and can reach you via {onboarding.channels.join(", ")}.
               </p>
             </CardHeader>
             <CardContent className="flex justify-center">

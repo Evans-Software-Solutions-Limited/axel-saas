@@ -120,11 +120,13 @@ export function Dashboard() {
           {ALL_NAV_ITEMS.map((item) => {
             const isAvailable = !item.requiresOnboarding || onboardingCompleted;
             const isActive = currentNav?.id === item.id;
-            
+
             return (
               <button
                 key={item.id}
-                onClick={() => isAvailable ? navigate(item.path) : handleLockedNavClick(item)}
+                onClick={() =>
+                  isAvailable ? navigate(item.path) : handleLockedNavClick(item)
+                }
                 disabled={!isAvailable}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
                   isActive

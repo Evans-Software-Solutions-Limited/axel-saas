@@ -28,13 +28,17 @@ vi.mock("@/hooks/useAuth", () => ({
 import { useAuth } from "@/hooks/useAuth";
 
 // Helper to wrap component with mocked useAuth
-const renderWithMockAuth = (ui: React.ReactElement, options?: { 
-  onboardingCompleted?: boolean;
-  completeOnboarding?: () => Promise<{ success: boolean; error?: string }>;
-}) => {
+const renderWithMockAuth = (
+  ui: React.ReactElement,
+  options?: {
+    onboardingCompleted?: boolean;
+    completeOnboarding?: () => Promise<{ success: boolean; error?: string }>;
+  },
+) => {
   const mockOnboardingCompleted = options?.onboardingCompleted ?? true;
-  const mockCompleteOnboarding = options?.completeOnboarding ?? vi.fn().mockResolvedValue({ success: true });
-  
+  const mockCompleteOnboarding =
+    options?.completeOnboarding ?? vi.fn().mockResolvedValue({ success: true });
+
   vi.mocked(useAuth).mockReturnValue({
     isAuthenticated: true,
     isLoading: false,
@@ -48,11 +52,7 @@ const renderWithMockAuth = (ui: React.ReactElement, options?: {
     completeOnboarding: mockCompleteOnboarding,
   });
 
-  return render(
-    <MemoryRouter>
-      {ui}
-    </MemoryRouter>
-  );
+  return render(<MemoryRouter>{ui}</MemoryRouter>);
 };
 
 afterEach(() => {
@@ -139,16 +139,22 @@ describe("DashboardTabs", () => {
     it("can enter name in onboarding name step", () => {
       renderWithMockAuth(<Chat />, { onboardingCompleted: false });
       // Click "Let's get started" to move to name step
-      fireEvent.click(screen.getByRole("button", { name: /let's get started/i }));
+      fireEvent.click(
+        screen.getByRole("button", { name: /let's get started/i }),
+      );
       expect(screen.getByLabelText(/your name/i)).toBeDefined();
     });
 
     it("can proceed from name step with valid name", () => {
       renderWithMockAuth(<Chat />, { onboardingCompleted: false });
       // Click "Let's get started" to move to name step
-      fireEvent.click(screen.getByRole("button", { name: /let's get started/i }));
+      fireEvent.click(
+        screen.getByRole("button", { name: /let's get started/i }),
+      );
       // Enter name
-      fireEvent.change(screen.getByLabelText(/your name/i), { target: { value: "John" } });
+      fireEvent.change(screen.getByLabelText(/your name/i), {
+        target: { value: "John" },
+      });
       // Click Continue
       fireEvent.click(screen.getByRole("button", { name: /continue/i }));
       // Should show role step
@@ -158,10 +164,16 @@ describe("DashboardTabs", () => {
     it("can select help options in onboarding", () => {
       renderWithMockAuth(<Chat />, { onboardingCompleted: false });
       // Click through to help with step
-      fireEvent.click(screen.getByRole("button", { name: /let's get started/i }));
-      fireEvent.change(screen.getByLabelText(/your name/i), { target: { value: "John" } });
+      fireEvent.click(
+        screen.getByRole("button", { name: /let's get started/i }),
+      );
+      fireEvent.change(screen.getByLabelText(/your name/i), {
+        target: { value: "John" },
+      });
       fireEvent.click(screen.getByRole("button", { name: /continue/i }));
-      fireEvent.change(screen.getByLabelText(/your role/i), { target: { value: "Manager" } });
+      fireEvent.change(screen.getByLabelText(/your role/i), {
+        target: { value: "Manager" },
+      });
       fireEvent.click(screen.getByRole("button", { name: /continue/i }));
       // Should show help options
       expect(screen.getByText(/what should i help you with/i)).toBeDefined();
@@ -170,10 +182,16 @@ describe("DashboardTabs", () => {
     it("can select a help option", () => {
       renderWithMockAuth(<Chat />, { onboardingCompleted: false });
       // Click through to help with step
-      fireEvent.click(screen.getByRole("button", { name: /let's get started/i }));
-      fireEvent.change(screen.getByLabelText(/your name/i), { target: { value: "John" } });
+      fireEvent.click(
+        screen.getByRole("button", { name: /let's get started/i }),
+      );
+      fireEvent.change(screen.getByLabelText(/your name/i), {
+        target: { value: "John" },
+      });
       fireEvent.click(screen.getByRole("button", { name: /continue/i }));
-      fireEvent.change(screen.getByLabelText(/your role/i), { target: { value: "Manager" } });
+      fireEvent.change(screen.getByLabelText(/your role/i), {
+        target: { value: "Manager" },
+      });
       fireEvent.click(screen.getByRole("button", { name: /continue/i }));
       // Click on an option
       fireEvent.click(screen.getByText(/email management/i));
@@ -183,10 +201,16 @@ describe("DashboardTabs", () => {
     it("can select channels in onboarding", () => {
       renderWithMockAuth(<Chat />, { onboardingCompleted: false });
       // Click through to channels step
-      fireEvent.click(screen.getByRole("button", { name: /let's get started/i }));
-      fireEvent.change(screen.getByLabelText(/your name/i), { target: { value: "John" } });
+      fireEvent.click(
+        screen.getByRole("button", { name: /let's get started/i }),
+      );
+      fireEvent.change(screen.getByLabelText(/your name/i), {
+        target: { value: "John" },
+      });
       fireEvent.click(screen.getByRole("button", { name: /continue/i }));
-      fireEvent.change(screen.getByLabelText(/your role/i), { target: { value: "Manager" } });
+      fireEvent.change(screen.getByLabelText(/your role/i), {
+        target: { value: "Manager" },
+      });
       fireEvent.click(screen.getByRole("button", { name: /continue/i }));
       fireEvent.click(screen.getByText(/email management/i));
       fireEvent.click(screen.getByRole("button", { name: /continue/i }));
@@ -196,15 +220,21 @@ describe("DashboardTabs", () => {
 
     it("can complete onboarding flow", async () => {
       const completeOnboarding = vi.fn().mockResolvedValue({ success: true });
-      renderWithMockAuth(<Chat />, { 
+      renderWithMockAuth(<Chat />, {
         onboardingCompleted: false,
         completeOnboarding,
       });
       // Click through all steps
-      fireEvent.click(screen.getByRole("button", { name: /let's get started/i }));
-      fireEvent.change(screen.getByLabelText(/your name/i), { target: { value: "John" } });
+      fireEvent.click(
+        screen.getByRole("button", { name: /let's get started/i }),
+      );
+      fireEvent.change(screen.getByLabelText(/your name/i), {
+        target: { value: "John" },
+      });
       fireEvent.click(screen.getByRole("button", { name: /continue/i }));
-      fireEvent.change(screen.getByLabelText(/your role/i), { target: { value: "Manager" } });
+      fireEvent.change(screen.getByLabelText(/your role/i), {
+        target: { value: "Manager" },
+      });
       fireEvent.click(screen.getByRole("button", { name: /continue/i }));
       fireEvent.click(screen.getByText(/email management/i));
       fireEvent.click(screen.getByRole("button", { name: /continue/i }));
