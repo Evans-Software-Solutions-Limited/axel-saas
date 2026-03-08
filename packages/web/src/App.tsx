@@ -10,6 +10,8 @@ import Subscribe from "./pages/Subscribe";
 import Onboarding from "./pages/Onboarding";
 import Dashboard from "./pages/Dashboard";
 import { Office } from "./pages/Office";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
+import TermsOfService from "./pages/TermsOfService";
 import {
   Chat,
   Tasks,
@@ -72,6 +74,10 @@ function App() {
           {/* Auth routes */}
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<SignUp />} />
+
+          {/* Legal pages */}
+          <Route path="/privacy" element={<PrivacyPolicy />} />
+          <Route path="/terms" element={<TermsOfService />} />
 
           {/* Protected routes */}
           <Route
