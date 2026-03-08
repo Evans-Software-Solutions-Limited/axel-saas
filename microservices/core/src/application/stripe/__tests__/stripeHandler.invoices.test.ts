@@ -3,13 +3,28 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 // Set DATABASE_URL BEFORE any imports - this must happen at the very top
 process.env.DATABASE_URL = "postgres://test:test@localhost/test";
 
-// Mock the Stripe module
-const mockStripeInstance = {
-  invoices: {
-    list: vi.fn(),
-    retrieve: vi.fn(),
-  },
-};
+const { mockStripeInstance, mockUserRepository, mockSubscriptionRepository } =
+  vi.hoisted(() => ({
+    mockStripeInstance: {
+      invoices: {
+        list: vi.fn(),
+        retrieve: vi.fn(),
+      },
+    },
+    mockUserRepository: {
+      getUserBySupabaseId: vi.fn(),
+      updateOnboardingAnswers: vi.fn(),
+      updateUser: vi.fn(),
+    },
+    mockSubscriptionRepository: {
+      findByUserId: vi.fn(),
+      upsertByStripeCustomerId: vi.fn(),
+      findByStripeCustomerId: vi.fn(),
+      updateTier: vi.fn(),
+      updatePeriodEnd: vi.fn(),
+      updateStatus: vi.fn(),
+    },
+  }));
 
 vi.mock("stripe", () => ({
   default: vi.fn(() => mockStripeInstance),
@@ -30,38 +45,36 @@ vi.mock("@axel-saas/db", () => ({
   },
 }));
 
-vi.mock("@axel-saas/api-utils/jwt", () => ({
-  unpackJWT: vi.fn(() => ({
-    sub: "test-supabase-user-id",
-    aud: "authenticated",
-    exp: Math.floor(Date.now() / 1000) + 3600,
-  })),
+vi.mock("@axel-saas/api-utils/auth/supabaseAuth", () => ({
+  getAuthUser: vi.fn(() =>
+    Promise.resolve({
+      sub: "test-supabase-user-id",
+      email: "test@example.com",
+      email_verified: true,
+      iat: Math.floor(Date.now() / 1000),
+      exp: Math.floor(Date.now() / 1000) + 3600,
+    }),
+  ),
+  requireAuth: vi.fn(
+    ({ user, set }: { user: unknown; set: { status?: number } }) => {
+      if (!user) {
+        set.status = 401;
+        return { success: false, error: "Unauthorized" };
+      }
+    },
+  ),
+  getUser: vi.fn((ctx: object) => (ctx as { user: { sub: string } }).user),
 }));
 
-// Mock userRepository - needs to be mocked BEFORE importing stripeHandler
-const mockUserRepository = {
-  getUserBySupabaseId: vi.fn(),
-  updateOnboardingAnswers: vi.fn(),
-  updateUser: vi.fn(),
-};
-vi.mock("../repositories/userRepository", () => ({
+vi.mock("../../repositories/userRepository", () => ({
   userRepository: mockUserRepository,
 }));
 
-// Mock subscriptionRepository
-const mockSubscriptionRepository = {
-  findByUserId: vi.fn(),
-  upsertByStripeCustomerId: vi.fn(),
-  findByStripeCustomerId: vi.fn(),
-  updateTier: vi.fn(),
-  updatePeriodEnd: vi.fn(),
-  updateStatus: vi.fn(),
-};
-vi.mock("../repositories/subscriptionRepository", () => ({
+vi.mock("../../repositories/subscriptionRepository", () => ({
   SubscriptionRepository: vi.fn(() => mockSubscriptionRepository),
 }));
 
-vi.mock("../repositories/provisioningRepository", () => ({
+vi.mock("../../repositories/provisioningRepository", () => ({
   ProvisioningRepository: vi.fn(() => ({
     findByUserId: vi.fn(),
     create: vi.fn(),
@@ -103,6 +116,10 @@ describe("StripeHandler - Invoice Endpoints", () => {
 
   describe("GET /stripe/invoices", () => {
     it("should require authorization header", async () => {
+      const { getAuthUser } =
+        await import("@axel-saas/api-utils/auth/supabaseAuth");
+      vi.mocked(getAuthUser).mockResolvedValueOnce(null);
+
       const response = await stripeHandler.handle(
         new Request("http://localhost/stripe/invoices"),
       );
@@ -267,10 +284,46 @@ describe("StripeHandler - Invoice Endpoints", () => {
         }),
       );
     });
+
+    it("should return 400 for a negative limit", async () => {
+      mockUserRepository.getUserBySupabaseId.mockResolvedValue({
+        id: "test-user-id",
+        email: "test@example.com",
+      });
+      mockSubscriptionRepository.findByUserId.mockResolvedValue({
+        id: "sub-id",
+        userId: "test-user-id",
+        stripeCustomerId: "cus_test123",
+        stripeSubscriptionId: "sub_test123",
+        tier: "pro",
+        status: "active",
+      });
+
+      const response = await stripeHandler.handle(
+        new Request("http://localhost/stripe/invoices?limit=-5", {
+          headers: {
+            Authorization: "Bearer valid-test-token",
+          },
+        }),
+      );
+
+      expect(response.status).toBe(400);
+      const data = (await response.json()) as {
+        success: boolean;
+        error: string;
+      };
+      expect(data.success).toBe(false);
+      expect(data.error).toBe("limit must be a positive integer");
+      expect(mockStripeInstance.invoices.list).not.toHaveBeenCalled();
+    });
   });
 
   describe("GET /stripe/invoices/:id", () => {
     it("should require authorization header", async () => {
+      const { getAuthUser } =
+        await import("@axel-saas/api-utils/auth/supabaseAuth");
+      vi.mocked(getAuthUser).mockResolvedValueOnce(null);
+
       const response = await stripeHandler.handle(
         new Request("http://localhost/stripe/invoices/inv_123"),
       );

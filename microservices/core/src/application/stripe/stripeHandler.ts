@@ -1,6 +1,11 @@
 import Elysia from "elysia";
 import Stripe from "stripe";
 import { getDb, subscriptionStatusEnum } from "@axel-saas/db";
+import {
+  getAuthUser,
+  requireAuth,
+  getUser,
+} from "@axel-saas/api-utils/auth/supabaseAuth";
 import { SubscriptionRepository } from "../repositories/subscriptionRepository";
 import { ProvisioningRepository } from "../repositories/provisioningRepository";
 import { userRepository } from "../repositories/userRepository";
@@ -196,26 +201,14 @@ export const stripeHandler = new Elysia({ name: "StripeHandler" })
       return { received: false };
     }
   })
-  // Invoice endpoints - require authentication
-  .get("/stripe/invoices", async ({ headers, query, set }) => {
-    const authHeader = headers.authorization;
-    if (!authHeader?.startsWith("Bearer ")) {
-      set.status = 401;
-      return { success: false, error: "Unauthorized" };
-    }
-
-    const token = authHeader.slice(7);
-    let supabaseUserId: string;
-
-    try {
-      // Import JWT unpacking here to avoid circular deps
-      const { unpackJWT } = await import("@axel-saas/api-utils/jwt");
-      const decoded = unpackJWT(token);
-      supabaseUserId = decoded.sub as string;
-    } catch {
-      set.status = 401;
-      return { success: false, error: "Invalid token" };
-    }
+  // Invoice endpoints - require verified authentication via Supabase JWKS
+  .derive(async ({ headers }) => ({
+    user: await getAuthUser(headers.authorization),
+  }))
+  .onBeforeHandle(requireAuth)
+  .get("/stripe/invoices", async (ctx) => {
+    const { query, set } = ctx;
+    const { sub: supabaseUserId } = getUser(ctx);
 
     const stripeCustomerId = await getStripeCustomerIdForUser(supabaseUserId);
     if (!stripeCustomerId) {
@@ -223,8 +216,14 @@ export const stripeHandler = new Elysia({ name: "StripeHandler" })
       return { success: false, error: "No subscription found" };
     }
 
+    const rawLimit = parseInt(query.limit as string);
+    if (!Number.isNaN(rawLimit) && rawLimit < 1) {
+      set.status = 400;
+      return { success: false, error: "limit must be a positive integer" };
+    }
+    const limit = Number.isNaN(rawLimit) ? 10 : Math.min(rawLimit, 100);
+
     const stripe = getStripeInstance();
-    const limit = Math.min(parseInt(query.limit as string) || 10, 100);
 
     try {
       const invoices = await stripe.invoices.list({
@@ -257,24 +256,9 @@ export const stripeHandler = new Elysia({ name: "StripeHandler" })
       return { success: false, error: "Failed to fetch invoices" };
     }
   })
-  .get("/stripe/invoices/:id", async ({ headers, params, set }) => {
-    const authHeader = headers.authorization;
-    if (!authHeader?.startsWith("Bearer ")) {
-      set.status = 401;
-      return { success: false, error: "Unauthorized" };
-    }
-
-    const token = authHeader.slice(7);
-    let supabaseUserId: string;
-
-    try {
-      const { unpackJWT } = await import("@axel-saas/api-utils/jwt");
-      const decoded = unpackJWT(token);
-      supabaseUserId = decoded.sub as string;
-    } catch {
-      set.status = 401;
-      return { success: false, error: "Invalid token" };
-    }
+  .get("/stripe/invoices/:id", async (ctx) => {
+    const { params, set } = ctx;
+    const { sub: supabaseUserId } = getUser(ctx);
 
     const stripeCustomerId = await getStripeCustomerIdForUser(supabaseUserId);
     if (!stripeCustomerId) {
