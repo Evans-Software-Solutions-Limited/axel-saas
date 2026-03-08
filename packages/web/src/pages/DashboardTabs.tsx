@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { useNavigate } from "react-router";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -19,7 +20,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { IconSend, IconSearch } from "@tabler/icons-react";
+import { IconSend, IconSearch, IconCheck, IconChevronRight } from "@tabler/icons-react";
+import { useAuth } from "@/hooks/useAuth";
 
 // ============================================================================
 // CHAT TAB
@@ -32,17 +34,58 @@ interface Message {
   timestamp: Date;
 }
 
-const initialMessages: Message[] = [
-  {
-    id: "1",
-    sender: "axel",
-    content: "Hi! I'm Axel, your AI employee. How can I help you today?",
-    timestamp: new Date(Date.now() - 3600000),
-  },
+// Onboarding state and types
+type OnboardingStep = "welcome" | "name" | "role" | "helpWith" | "channels" | "complete";
+
+interface OnboardingState {
+  step: OnboardingStep;
+  name: string;
+  role: string;
+  helpWith: string[];
+  channels: string[];
+}
+
+const HELP_OPTIONS = [
+  { id: "email", label: "Email management" },
+  { id: "documents", label: "Document management" },
+  { id: "scheduling", label: "Scheduling & calendar" },
+  { id: "research", label: "Research & analysis" },
+  { id: "social", label: "Social media" },
 ];
 
+const CHANNEL_OPTIONS = [
+  { id: "email", label: "Email" },
+  { id: "slack", label: "Slack" },
+  { id: "whatsapp", label: "WhatsApp" },
+  { id: "teams", label: "Microsoft Teams" },
+];
+
+// Fixed initial timestamp for the welcome message
+const INITIAL_TIMESTAMP = new Date(Date.now() - 3600000);
+
 export function Chat() {
-  const [messages, setMessages] = useState<Message[]>(initialMessages);
+  const { onboardingCompleted, completeOnboarding } = useAuth();
+  const navigate = useNavigate();
+  
+  // Onboarding state
+  const [onboarding, setOnboarding] = useState<OnboardingState>({
+    step: "welcome",
+    name: "",
+    role: "",
+    helpWith: [],
+    channels: [],
+  });
+  const [isCompleting, setIsCompleting] = useState(false);
+  
+  // Chat state
+  const [messages, setMessages] = useState<Message[]>([
+    {
+      id: "1",
+      sender: "axel",
+      content: "Hi! I'm Axel, your AI employee. How can I help you today?",
+      timestamp: INITIAL_TIMESTAMP,
+    },
+  ]);
   const [input, setInput] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -82,6 +125,259 @@ export function Chat() {
     }
   };
 
+  // Onboarding handlers
+  const startOnboarding = () => {
+    setOnboarding((prev) => ({ ...prev, step: "name" }));
+  };
+
+  const handleOnboardingComplete = async () => {
+    setIsCompleting(true);
+    const result = await completeOnboarding();
+    if (result.success) {
+      setOnboarding((prev) => ({ ...prev, step: "complete" }));
+    }
+    setIsCompleting(false);
+  };
+
+  const toggleHelpOption = (id: string) => {
+    setOnboarding((prev) => ({
+      ...prev,
+      helpWith: prev.helpWith.includes(id)
+        ? prev.helpWith.filter((h) => h !== id)
+        : [...prev.helpWith, id],
+    }));
+  };
+
+  const toggleChannelOption = (id: string) => {
+    setOnboarding((prev) => ({
+      ...prev,
+      channels: prev.channels.includes(id)
+        ? prev.channels.filter((c) => c !== id)
+        : [...prev.channels, id],
+    }));
+  };
+
+  const canProceed = () => {
+    switch (onboarding.step) {
+      case "name":
+        return onboarding.name.trim().length > 0;
+      case "role":
+        return onboarding.role.trim().length > 0;
+      case "helpWith":
+        return onboarding.helpWith.length > 0;
+      case "channels":
+        return onboarding.channels.length > 0;
+      default:
+        return true;
+    }
+  };
+
+  const nextStep = () => {
+    const steps: OnboardingStep[] = ["welcome", "name", "role", "helpWith", "channels"];
+    const currentIndex = steps.indexOf(onboarding.step);
+    if (currentIndex < steps.length - 1) {
+      setOnboarding((prev) => ({ ...prev, step: steps[currentIndex + 1] }));
+    } else {
+      handleOnboardingComplete();
+    }
+  };
+
+  // Render onboarding UI if not completed
+  if (!onboardingCompleted && onboarding.step !== "complete") {
+    return (
+      <div className="h-full flex flex-col p-6 overflow-y-auto">
+        <div className="max-w-lg mx-auto w-full space-y-6">
+          {/* Welcome Step */}
+          {onboarding.step === "welcome" && (
+            <Card className="border border-border">
+              <CardHeader className="text-center">
+                <div className="text-4xl mb-4">👋</div>
+                <CardTitle className="text-2xl text-text">Welcome to Axel</CardTitle>
+                <p className="text-muted mt-2">
+                  I'm your AI employee, ready to help you be more productive.
+                  Let me ask a few quick questions to get set up.
+                </p>
+              </CardHeader>
+              <CardContent className="flex justify-center">
+                <Button
+                  onClick={startOnboarding}
+                  className="bg-accent hover:bg-accent/90 text-white"
+                >
+                  Let's get started <IconChevronRight className="w-4 h-4 ml-2" />
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Name Step */}
+          {onboarding.step === "name" && (
+            <Card className="border border-border">
+              <CardHeader>
+                <CardTitle className="text-text">What should I call you?</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="onboardingName" className="text-text">Your name</Label>
+                  <Input
+                    id="onboardingName"
+                    value={onboarding.name}
+                    onChange={(e) => setOnboarding((prev) => ({ ...prev, name: e.target.value }))}
+                    placeholder="Enter your name"
+                    className="bg-surface-raised border-border text-text"
+                    autoFocus
+                  />
+                </div>
+                <Button
+                  onClick={nextStep}
+                  disabled={!canProceed()}
+                  className="w-full bg-accent hover:bg-accent/90 text-white"
+                >
+                  Continue
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Role Step */}
+          {onboarding.step === "role" && (
+            <Card className="border border-border">
+              <CardHeader>
+                <CardTitle className="text-text">What do you do, {onboarding.name}?</CardTitle>
+                <p className="text-muted text-sm">What's your role or title?</p>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="onboardingRole" className="text-text">Your role</Label>
+                  <Input
+                    id="onboardingRole"
+                    value={onboarding.role}
+                    onChange={(e) => setOnboarding((prev) => ({ ...prev, role: e.target.value }))}
+                    placeholder="e.g., Marketing Manager, Founder, etc."
+                    className="bg-surface-raised border-border text-text"
+                    autoFocus
+                  />
+                </div>
+                <Button
+                  onClick={nextStep}
+                  disabled={!canProceed()}
+                  className="w-full bg-accent hover:bg-accent/90 text-white"
+                >
+                  Continue
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Help With Step */}
+          {onboarding.step === "helpWith" && (
+            <Card className="border border-border">
+              <CardHeader>
+                <CardTitle className="text-text">What should I help you with?</CardTitle>
+                <p className="text-muted text-sm">Select all that apply</p>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 gap-3">
+                  {HELP_OPTIONS.map((option) => (
+                    <button
+                      key={option.id}
+                      onClick={() => toggleHelpOption(option.id)}
+                      className={`p-4 rounded-lg border-2 text-left transition-all ${
+                        onboarding.helpWith.includes(option.id)
+                          ? "border-accent bg-surface-elevated"
+                          : "border-border hover:border-border/60"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-text font-medium">{option.label}</span>
+                        {onboarding.helpWith.includes(option.id) && (
+                          <IconCheck className="w-5 h-5 text-accent" />
+                        )}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+                <Button
+                  onClick={nextStep}
+                  disabled={!canProceed()}
+                  className="w-full bg-accent hover:bg-accent/90 text-white"
+                >
+                  Continue
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Channels Step */}
+          {onboarding.step === "channels" && (
+            <Card className="border border-border">
+              <CardHeader>
+                <CardTitle className="text-text">Where should I communicate?</CardTitle>
+                <p className="text-muted text-sm">Select your preferred channels</p>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-2 gap-3">
+                  {CHANNEL_OPTIONS.map((option) => (
+                    <button
+                      key={option.id}
+                      onClick={() => toggleChannelOption(option.id)}
+                      className={`p-4 rounded-lg border-2 text-center transition-all ${
+                        onboarding.channels.includes(option.id)
+                          ? "border-accent bg-surface-elevated"
+                          : "border-border hover:border-border/60"
+                      }`}
+                    >
+                      <div className="flex items-center justify-center gap-2">
+                        <span className="text-text font-medium">{option.label}</span>
+                        {onboarding.channels.includes(option.id) && (
+                          <IconCheck className="w-4 h-4 text-accent" />
+                        )}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+                <Button
+                  onClick={nextStep}
+                  disabled={!canProceed() || isCompleting}
+                  className="w-full bg-accent hover:bg-accent/90 text-white"
+                >
+                  {isCompleting ? "Setting up..." : "Complete Setup"}
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // Show completion message after onboarding
+  if (!onboardingCompleted && onboarding.step === "complete") {
+    return (
+      <div className="h-full flex flex-col p-6 overflow-y-auto">
+        <div className="max-w-lg mx-auto w-full">
+          <Card className="border border-border">
+            <CardHeader className="text-center">
+              <div className="text-5xl mb-4">🎉</div>
+              <CardTitle className="text-2xl text-text">You're all set, {onboarding.name}!</CardTitle>
+              <p className="text-muted mt-2">
+                I'm ready to help you with {onboarding.helpWith.length} areas and can reach you via {onboarding.channels.join(", ")}.
+              </p>
+            </CardHeader>
+            <CardContent className="flex justify-center">
+              <Button
+                onClick={() => navigate("/dashboard/office")}
+                className="bg-accent hover:bg-accent/90 text-white"
+              >
+                Enter Dashboard <IconChevronRight className="w-4 h-4 ml-2" />
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
+  // Normal chat view (after onboarding)
   return (
     <div className="h-full flex flex-col p-6">
       {/* Messages */}

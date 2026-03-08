@@ -51,6 +51,10 @@ function App() {
     );
   }
 
+  // For non-onboarded users, the default route is /dashboard/chat (where onboarding happens)
+  // For onboarded users, the default route is /dashboard/office
+  const defaultDashboardRoute = onboardingCompleted ? "/dashboard/office" : "/dashboard/chat";
+
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
@@ -63,7 +67,8 @@ function App() {
                 onboardingCompleted ? (
                   <Navigate to="/dashboard" />
                 ) : (
-                  <Navigate to="/onboarding" />
+                  // Pre-onboarding: go to chat where onboarding happens
+                  <Navigate to="/dashboard/chat" />
                 )
               ) : (
                 <Navigate to="/login" />
@@ -88,6 +93,11 @@ function App() {
               </ProtectedRoute>
             }
           />
+          {/* 
+            NOTE: /onboarding route is kept for backward compatibility but is 
+            no longer the default. Users are redirected to /dashboard/chat instead.
+            This route can be deprecated in a future release.
+          */}
           <Route
             path="/onboarding"
             element={
@@ -106,7 +116,7 @@ function App() {
               </ProtectedRoute>
             }
           >
-            <Route index element={<Navigate to="/dashboard/office" />} />
+            <Route index element={<Navigate to={defaultDashboardRoute} />} />
             <Route path="office" element={<Office />} />
             <Route path="chat" element={<Chat />} />
             <Route path="tasks" element={<Tasks />} />

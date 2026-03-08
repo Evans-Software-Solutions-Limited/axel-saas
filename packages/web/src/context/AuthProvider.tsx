@@ -101,6 +101,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const completeOnboarding = async () => {
+    try {
+      // Call the onboarding endpoint to persist completion
+      const { error } = await api.core.users.onboarding.post({
+        name: "",
+        helpWith: [],
+        channels: [],
+        morningBrief: false,
+      });
+      
+      if (error) {
+        console.error("Error completing onboarding:", error);
+        return { success: false, error: "Failed to complete onboarding" };
+      }
+      
+      // Update local state immediately
+      setOnboardingCompleted(true);
+      return { success: true };
+    } catch (err) {
+      console.error("Error completing onboarding:", err);
+      return { success: false, error: "Failed to complete onboarding" };
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -113,6 +137,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         signUp,
         signIn,
         signOut,
+        completeOnboarding,
       }}
     >
       {children}

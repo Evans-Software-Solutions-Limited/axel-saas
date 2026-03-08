@@ -19,6 +19,7 @@ const mockAuth = (overrides: Partial<ReturnType<typeof useAuth>> = {}) => ({
   signIn: vi.fn().mockResolvedValue({ success: true }),
   signUp: vi.fn().mockResolvedValue({ success: true }),
   signOut: vi.fn().mockResolvedValue({ success: true }),
+  completeOnboarding: vi.fn().mockResolvedValue({ success: true }),
   ...overrides,
 });
 

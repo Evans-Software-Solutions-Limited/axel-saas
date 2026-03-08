@@ -25,6 +25,7 @@ export interface AuthContextValue extends AuthState {
     password: string,
   ) => Promise<{ success: boolean; error?: string }>;
   signOut: () => Promise<{ success: boolean; error?: string }>;
+  completeOnboarding: () => Promise<{ success: boolean; error?: string }>;
 }
 
 export const AuthContext = createContext<AuthContextValue | null>(null);

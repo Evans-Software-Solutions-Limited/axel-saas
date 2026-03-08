@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import {
   render,
   screen,
@@ -6,7 +6,54 @@ import {
   act,
   cleanup,
 } from "@testing-library/react";
+import { MemoryRouter } from "react-router";
 import { Chat, Tasks, Crons, Integrations, Settings } from "../DashboardTabs";
+
+// Mock the useAuth hook completely - no AuthProvider needed
+vi.mock("@/hooks/useAuth", () => ({
+  useAuth: vi.fn(() => ({
+    isAuthenticated: true,
+    isLoading: false,
+    onboardingCompleted: true,
+    user: { id: "1", email: "test@example.com" },
+    session: {} as never,
+    error: null,
+    signIn: vi.fn(),
+    signUp: vi.fn(),
+    signOut: vi.fn().mockResolvedValue({ success: true }),
+    completeOnboarding: vi.fn().mockResolvedValue({ success: true }),
+  })),
+}));
+
+import { useAuth } from "@/hooks/useAuth";
+
+// Helper to wrap component with mocked useAuth
+const renderWithMockAuth = (ui: React.ReactElement, options?: { 
+  onboardingCompleted?: boolean;
+  completeOnboarding?: () => Promise<{ success: boolean; error?: string }>;
+}) => {
+  const mockOnboardingCompleted = options?.onboardingCompleted ?? true;
+  const mockCompleteOnboarding = options?.completeOnboarding ?? vi.fn().mockResolvedValue({ success: true });
+  
+  vi.mocked(useAuth).mockReturnValue({
+    isAuthenticated: true,
+    isLoading: false,
+    onboardingCompleted: mockOnboardingCompleted,
+    user: { id: "1", email: "test@example.com" },
+    session: {} as never,
+    error: null,
+    signIn: vi.fn(),
+    signUp: vi.fn(),
+    signOut: vi.fn().mockResolvedValue({ success: true }),
+    completeOnboarding: mockCompleteOnboarding,
+  });
+
+  return render(
+    <MemoryRouter>
+      {ui}
+    </MemoryRouter>
+  );
+};
 
 afterEach(() => {
   cleanup();
@@ -15,13 +62,28 @@ afterEach(() => {
 
 describe("DashboardTabs", () => {
   describe("Chat", () => {
+    beforeEach(() => {
+      vi.mocked(useAuth).mockReturnValue({
+        isAuthenticated: true,
+        isLoading: false,
+        onboardingCompleted: true,
+        user: { id: "1", email: "test@example.com" },
+        session: {} as never,
+        error: null,
+        signIn: vi.fn(),
+        signUp: vi.fn(),
+        signOut: vi.fn(),
+        completeOnboarding: vi.fn(),
+      });
+    });
+
     it("renders initial message from Axel", () => {
-      render(<Chat />);
+      renderWithMockAuth(<Chat />);
       expect(screen.getByText(/how can i help you today/i)).toBeDefined();
     });
 
     it("sends message when user types and submits", () => {
-      render(<Chat />);
+      renderWithMockAuth(<Chat />);
       const input = screen.getByPlaceholderText(/tell axel/i);
       fireEvent.change(input, { target: { value: "Hello" } });
       const sendButton = screen.getByRole("button");
@@ -30,7 +92,7 @@ describe("DashboardTabs", () => {
     });
 
     it("sends message when user presses Enter", () => {
-      render(<Chat />);
+      renderWithMockAuth(<Chat />);
       const input = screen.getByPlaceholderText(/tell axel/i);
       fireEvent.change(input, { target: { value: "Enter test" } });
       fireEvent.keyPress(input, { key: "Enter", code: "Enter", charCode: 13 });
@@ -38,7 +100,7 @@ describe("DashboardTabs", () => {
     });
 
     it("does not send when input is empty", () => {
-      render(<Chat />);
+      renderWithMockAuth(<Chat />);
       const initialCount = screen.getAllByText(
         /how can i help you today/i,
       ).length;
@@ -51,7 +113,7 @@ describe("DashboardTabs", () => {
 
     it("shows Axel processing message after send", async () => {
       vi.useFakeTimers();
-      render(<Chat />);
+      renderWithMockAuth(<Chat />);
       const input = screen.getByPlaceholderText(/tell axel/i);
       fireEvent.change(input, { target: { value: "Help me" } });
       fireEvent.click(screen.getByRole("button"));
@@ -62,6 +124,94 @@ describe("DashboardTabs", () => {
       // Unmount before restoring real timers so the pending setTimeout callback
       // cannot fire against the jsdom window after it is torn down.
       cleanup();
+    });
+
+    it("shows onboarding flow when onboarding is not completed", () => {
+      renderWithMockAuth(<Chat />, { onboardingCompleted: false });
+      expect(screen.getByText(/welcome to axel/i)).toBeDefined();
+    });
+
+    it("shows welcome step when onboarding starts", () => {
+      renderWithMockAuth(<Chat />, { onboardingCompleted: false });
+      expect(screen.getByText(/let's get started/i)).toBeDefined();
+    });
+
+    it("can enter name in onboarding name step", () => {
+      renderWithMockAuth(<Chat />, { onboardingCompleted: false });
+      // Click "Let's get started" to move to name step
+      fireEvent.click(screen.getByRole("button", { name: /let's get started/i }));
+      expect(screen.getByLabelText(/your name/i)).toBeDefined();
+    });
+
+    it("can proceed from name step with valid name", () => {
+      renderWithMockAuth(<Chat />, { onboardingCompleted: false });
+      // Click "Let's get started" to move to name step
+      fireEvent.click(screen.getByRole("button", { name: /let's get started/i }));
+      // Enter name
+      fireEvent.change(screen.getByLabelText(/your name/i), { target: { value: "John" } });
+      // Click Continue
+      fireEvent.click(screen.getByRole("button", { name: /continue/i }));
+      // Should show role step
+      expect(screen.getByText(/what do you do/i)).toBeDefined();
+    });
+
+    it("can select help options in onboarding", () => {
+      renderWithMockAuth(<Chat />, { onboardingCompleted: false });
+      // Click through to help with step
+      fireEvent.click(screen.getByRole("button", { name: /let's get started/i }));
+      fireEvent.change(screen.getByLabelText(/your name/i), { target: { value: "John" } });
+      fireEvent.click(screen.getByRole("button", { name: /continue/i }));
+      fireEvent.change(screen.getByLabelText(/your role/i), { target: { value: "Manager" } });
+      fireEvent.click(screen.getByRole("button", { name: /continue/i }));
+      // Should show help options
+      expect(screen.getByText(/what should i help you with/i)).toBeDefined();
+    });
+
+    it("can select a help option", () => {
+      renderWithMockAuth(<Chat />, { onboardingCompleted: false });
+      // Click through to help with step
+      fireEvent.click(screen.getByRole("button", { name: /let's get started/i }));
+      fireEvent.change(screen.getByLabelText(/your name/i), { target: { value: "John" } });
+      fireEvent.click(screen.getByRole("button", { name: /continue/i }));
+      fireEvent.change(screen.getByLabelText(/your role/i), { target: { value: "Manager" } });
+      fireEvent.click(screen.getByRole("button", { name: /continue/i }));
+      // Click on an option
+      fireEvent.click(screen.getByText(/email management/i));
+      // Should show check icon or selected state
+    });
+
+    it("can select channels in onboarding", () => {
+      renderWithMockAuth(<Chat />, { onboardingCompleted: false });
+      // Click through to channels step
+      fireEvent.click(screen.getByRole("button", { name: /let's get started/i }));
+      fireEvent.change(screen.getByLabelText(/your name/i), { target: { value: "John" } });
+      fireEvent.click(screen.getByRole("button", { name: /continue/i }));
+      fireEvent.change(screen.getByLabelText(/your role/i), { target: { value: "Manager" } });
+      fireEvent.click(screen.getByRole("button", { name: /continue/i }));
+      fireEvent.click(screen.getByText(/email management/i));
+      fireEvent.click(screen.getByRole("button", { name: /continue/i }));
+      // Should show channel options
+      expect(screen.getByText(/where should i communicate/i)).toBeDefined();
+    });
+
+    it("can complete onboarding flow", async () => {
+      const completeOnboarding = vi.fn().mockResolvedValue({ success: true });
+      renderWithMockAuth(<Chat />, { 
+        onboardingCompleted: false,
+        completeOnboarding,
+      });
+      // Click through all steps
+      fireEvent.click(screen.getByRole("button", { name: /let's get started/i }));
+      fireEvent.change(screen.getByLabelText(/your name/i), { target: { value: "John" } });
+      fireEvent.click(screen.getByRole("button", { name: /continue/i }));
+      fireEvent.change(screen.getByLabelText(/your role/i), { target: { value: "Manager" } });
+      fireEvent.click(screen.getByRole("button", { name: /continue/i }));
+      fireEvent.click(screen.getByText(/email management/i));
+      fireEvent.click(screen.getByRole("button", { name: /continue/i }));
+      fireEvent.click(screen.getByText(/email/i));
+      fireEvent.click(screen.getByRole("button", { name: /complete setup/i }));
+      // Should call completeOnboarding
+      expect(completeOnboarding).toHaveBeenCalled();
     });
   });
 

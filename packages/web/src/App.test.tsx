@@ -19,6 +19,7 @@ describe("App", () => {
       signIn: vi.fn().mockResolvedValue({ success: true }),
       signUp: vi.fn().mockResolvedValue({ success: true }),
       signOut: vi.fn().mockResolvedValue({ success: true }),
+      completeOnboarding: vi.fn().mockResolvedValue({ success: true }),
     });
   });
 
@@ -33,6 +34,7 @@ describe("App", () => {
       signIn: vi.fn(),
       signUp: vi.fn(),
       signOut: vi.fn(),
+      completeOnboarding: vi.fn(),
     });
     render(
       <MemoryRouter initialEntries={["/"]}>
@@ -53,6 +55,7 @@ describe("App", () => {
       signIn: vi.fn(),
       signUp: vi.fn(),
       signOut: vi.fn(),
+      completeOnboarding: vi.fn(),
     });
     render(
       <MemoryRouter initialEntries={["/subscribe"]}>
@@ -73,6 +76,7 @@ describe("App", () => {
       signIn: vi.fn(),
       signUp: vi.fn(),
       signOut: vi.fn(),
+      completeOnboarding: vi.fn(),
     });
     render(
       <MemoryRouter initialEntries={["/"]}>
@@ -82,7 +86,7 @@ describe("App", () => {
     expect(screen.getByText(/loading/i)).toBeDefined();
   });
 
-  it("redirects authenticated user without onboarding to onboarding", () => {
+  it("redirects authenticated user without onboarding to chat (onboarding)", () => {
     vi.mocked(useAuth).mockReturnValue({
       isAuthenticated: true,
       isLoading: false,
@@ -93,13 +97,15 @@ describe("App", () => {
       signIn: vi.fn(),
       signUp: vi.fn(),
       signOut: vi.fn(),
+      completeOnboarding: vi.fn(),
     });
     render(
       <MemoryRouter initialEntries={["/"]}>
         <App />
       </MemoryRouter>,
     );
-    expect(screen.getByText("Let's get started")).toBeDefined();
+    // Should redirect to /dashboard/chat where onboarding happens
+    expect(screen.getByText(/welcome to axel/i)).toBeDefined();
   });
 
   it("redirects authenticated user with onboarding to dashboard", () => {
@@ -113,6 +119,7 @@ describe("App", () => {
       signIn: vi.fn(),
       signUp: vi.fn(),
       signOut: vi.fn(),
+      completeOnboarding: vi.fn(),
     });
     render(
       <MemoryRouter initialEntries={["/"]}>
@@ -120,5 +127,30 @@ describe("App", () => {
       </MemoryRouter>,
     );
     expect(screen.getAllByText("Office")[0]).toBeDefined();
+  });
+
+  it("allows authenticated user to access protected route /subscribe", () => {
+    vi.mocked(useAuth).mockReturnValue({
+      isAuthenticated: true,
+      isLoading: false,
+      onboardingCompleted: true,
+      user: { id: "1", email: "a@b.com" },
+      session: {} as never,
+      error: null,
+      signIn: vi.fn(),
+      signUp: vi.fn(),
+      signOut: vi.fn(),
+      completeOnboarding: vi.fn(),
+    });
+    render(
+      <MemoryRouter initialEntries={["/subscribe"]}>
+        <App />
+      </MemoryRouter>,
+    );
+    // Protected route should work for authenticated user - should not redirect to login
+    // Instead of checking for specific text, just verify the page loaded without redirect
+    // The ProtectedRoute should render its children (Subscribe) not redirect
+    const html = document.body.innerHTML;
+    expect(html).toContain("Choose"); // Subscribe page has "Choose your plan"
   });
 });
