@@ -99,7 +99,11 @@ describe("Dashboard", () => {
     // Sidebar is expanded by default, should show Privacy and Terms links
     expect(screen.getByRole("link", { name: /privacy/i })).toBeDefined();
     expect(screen.getByRole("link", { name: /terms/i })).toBeDefined();
-    expect(screen.getByRole("link", { name: /privacy/i }).getAttribute("href")).toBe("/privacy");
-    expect(screen.getByRole("link", { name: /terms/i }).getAttribute("href")).toBe("/terms");
+    expect(
+      screen.getByRole("link", { name: /privacy/i }).getAttribute("href"),
+    ).toBe("/privacy");
+    expect(
+      screen.getByRole("link", { name: /terms/i }).getAttribute("href"),
+    ).toBe("/terms");
   });
 });

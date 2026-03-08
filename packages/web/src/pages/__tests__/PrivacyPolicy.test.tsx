@@ -10,7 +10,9 @@ describe("PrivacyPolicy", () => {
         <PrivacyPolicy />
       </MemoryRouter>,
     );
-    expect(screen.getByRole("heading", { name: /privacy policy/i })).toBeDefined();
+    expect(
+      screen.getByRole("heading", { name: /privacy policy/i }),
+    ).toBeDefined();
   });
 
   it("renders the Axel branding link", () => {
@@ -37,7 +39,9 @@ describe("PrivacyPolicy", () => {
         <PrivacyPolicy />
       </MemoryRouter>,
     );
-    expect(screen.getByRole("link", { name: /terms of service/i })).toBeDefined();
+    expect(
+      screen.getByRole("link", { name: /terms of service/i }),
+    ).toBeDefined();
   });
 
   it("renders privacy policy link in footer (current page)", () => {
@@ -47,7 +51,9 @@ describe("PrivacyPolicy", () => {
       </MemoryRouter>,
     );
     // Should have a link to privacy (could be the current page or a link)
-    const privacyLinks = screen.getAllByRole("link", { name: /privacy policy/i });
+    const privacyLinks = screen.getAllByRole("link", {
+      name: /privacy policy/i,
+    });
     expect(privacyLinks.length).toBeGreaterThanOrEqual(1);
   });
 
@@ -58,8 +64,12 @@ describe("PrivacyPolicy", () => {
       </MemoryRouter>,
     );
     // Use getAllByText since text can appear in both headings and paragraphs
-    expect(screen.getAllByText(/information we collect/i).length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/how we use your information/i).length).toBeGreaterThan(0);
+    expect(
+      screen.getAllByText(/information we collect/i).length,
+    ).toBeGreaterThan(0);
+    expect(
+      screen.getAllByText(/how we use your information/i).length,
+    ).toBeGreaterThan(0);
     // The actual heading is "Data Storage and Security"
     expect(screen.getAllByText(/data storage/i).length).toBeGreaterThan(0);
   });

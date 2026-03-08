@@ -10,7 +10,9 @@ describe("TermsOfService", () => {
         <TermsOfService />
       </MemoryRouter>,
     );
-    expect(screen.getByRole("heading", { name: /terms of service/i })).toBeDefined();
+    expect(
+      screen.getByRole("heading", { name: /terms of service/i }),
+    ).toBeDefined();
   });
 
   it("renders the Axel branding link", () => {
@@ -47,7 +49,9 @@ describe("TermsOfService", () => {
       </MemoryRouter>,
     );
     // Should have a link to terms (could be the current page or a link)
-    const termsLinks = screen.getAllByRole("link", { name: /terms of service/i });
+    const termsLinks = screen.getAllByRole("link", {
+      name: /terms of service/i,
+    });
     expect(termsLinks.length).toBeGreaterThanOrEqual(1);
   });
 
@@ -58,9 +62,13 @@ describe("TermsOfService", () => {
       </MemoryRouter>,
     );
     // Use getAllByText since text can appear in both headings and paragraphs
-    expect(screen.getAllByText(/acceptance of terms/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/acceptance of terms/i).length).toBeGreaterThan(
+      0,
+    );
     expect(screen.getAllByText(/user accounts/i).length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/payment and subscription/i).length).toBeGreaterThan(0);
+    expect(
+      screen.getAllByText(/payment and subscription/i).length,
+    ).toBeGreaterThan(0);
     expect(screen.getAllByText(/termination/i).length).toBeGreaterThan(0);
   });
 
