@@ -115,7 +115,7 @@ describe("Pre-onboarding routing and tab locking", () => {
       // Check that Office tab shows lock icon
       const officeButtons = screen.getAllByText("Office");
       expect(officeButtons[0]).toBeDefined();
-      
+
       // Check that lock icon is present (rendered alongside Office label)
       const lockIcons = document.querySelectorAll(".tabler-icon-lock");
       expect(lockIcons.length).toBeGreaterThan(0);
@@ -204,9 +204,9 @@ describe("Pre-onboarding routing and tab locking", () => {
 
       // Chat should be fully rendered with input (check for placeholder)
       expect(screen.getByPlaceholderText(/axel/i)).toBeDefined();
-      
+
       // Check for send button with specific icon
-      const sendButton = document.querySelector('.tabler-icon-send');
+      const sendButton = document.querySelector(".tabler-icon-send");
       expect(sendButton).toBeDefined();
     });
   });
