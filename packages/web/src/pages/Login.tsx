@@ -128,6 +128,18 @@ export function Login() {
                 Create one
               </Link>
             </p>
+
+            {/* Legal Links */}
+            <p className="text-center text-xs text-muted mt-4">
+              By signing in, you agree to our{" "}
+              <Link to="/terms" className="text-accent hover:underline">
+                Terms of Service
+              </Link>{" "}
+              and{" "}
+              <Link to="/privacy" className="text-accent hover:underline">
+                Privacy Policy
+              </Link>
+            </p>
           </CardContent>
         </Card>
       </div>

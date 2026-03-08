@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Outlet, useNavigate, useLocation } from "react-router";
+import { Outlet, useNavigate, useLocation, Link } from "react-router";
 import {
   IconChartBar,
   IconMessageCircle,
@@ -9,6 +9,8 @@ import {
   IconLogout,
   IconMenu2,
   IconX,
+  IconFileText,
+  IconShield,
 } from "@tabler/icons-react";
 
 interface NavItem {
@@ -110,8 +112,28 @@ export function Dashboard() {
           })}
         </nav>
 
-        {/* Footer */}
-        <div className="border-t border-border p-4 space-y-2">
+        {/* Footer with logout and legal links */}
+        <div className="border-t border-border p-4 space-y-3">
+          {/* Legal Links */}
+          {sidebarOpen && (
+            <div className="flex gap-4 text-xs text-muted px-4">
+              <Link
+                to="/privacy"
+                className="hover:text-accent transition-colors flex items-center gap-1"
+              >
+                <IconShield className="w-3 h-3" />
+                Privacy
+              </Link>
+              <Link
+                to="/terms"
+                className="hover:text-accent transition-colors flex items-center gap-1"
+              >
+                <IconFileText className="w-3 h-3" />
+                Terms
+              </Link>
+            </div>
+          )}
+          {/* Logout button */}
           <button
             onClick={handleLogout}
             className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-text hover:bg-surface-elevated transition-colors"
