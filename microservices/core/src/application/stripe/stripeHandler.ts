@@ -3,6 +3,7 @@ import Stripe from "stripe";
 import { getDb, subscriptionStatusEnum } from "@axel-saas/db";
 import { SubscriptionRepository } from "../repositories/subscriptionRepository";
 import { ProvisioningRepository } from "../repositories/provisioningRepository";
+import { userRepository } from "../repositories/userRepository";
 
 function getStripeInstance() {
   const secretKey = process.env.STRIPE_SECRET_KEY;
@@ -22,6 +23,24 @@ function getWebhookSecret() {
     );
   }
   return secret;
+}
+
+/**
+ * Get the Stripe customer ID for an authenticated user
+ * Returns null if user has no subscription or no Stripe customer
+ */
+async function getStripeCustomerIdForUser(
+  supabaseUserId: string,
+): Promise<string | null> {
+  const db = getDb();
+  const dbUser = await userRepository.getUserBySupabaseId(supabaseUserId);
+  if (!dbUser) {
+    return null;
+  }
+
+  const subRepo = new SubscriptionRepository(db);
+  const subscription = await subRepo.findByUserId(dbUser.id);
+  return subscription?.stripeCustomerId || null;
 }
 
 export const stripeHandler = new Elysia({ name: "StripeHandler" })
@@ -175,5 +194,152 @@ export const stripeHandler = new Elysia({ name: "StripeHandler" })
       console.error("Webhook processing error:", err);
       set.status = 500;
       return { received: false };
+    }
+  })
+  // Invoice endpoints - require authentication
+  .get("/stripe/invoices", async ({ headers, query, set }) => {
+    const authHeader = headers.authorization;
+    if (!authHeader?.startsWith("Bearer ")) {
+      set.status = 401;
+      return { success: false, error: "Unauthorized" };
+    }
+
+    const token = authHeader.slice(7);
+    let supabaseUserId: string;
+
+    try {
+      // Import JWT unpacking here to avoid circular deps
+      const { unpackJWT } = await import("@axel-saas/api-utils/jwt");
+      const decoded = unpackJWT(token);
+      supabaseUserId = decoded.sub as string;
+    } catch {
+      set.status = 401;
+      return { success: false, error: "Invalid token" };
+    }
+
+    const stripeCustomerId = await getStripeCustomerIdForUser(supabaseUserId);
+    if (!stripeCustomerId) {
+      set.status = 404;
+      return { success: false, error: "No subscription found" };
+    }
+
+    const stripe = getStripeInstance();
+    const limit = Math.min(parseInt(query.limit as string) || 10, 100);
+
+    try {
+      const invoices = await stripe.invoices.list({
+        customer: stripeCustomerId,
+        limit,
+        expand: ["data.payment_intent"],
+      });
+
+      return {
+        success: true,
+        invoices: invoices.data.map((inv) => ({
+          id: inv.id,
+          number: inv.number,
+          status: inv.status,
+          amountDue: inv.amount_due,
+          amountPaid: inv.amount_paid,
+          currency: inv.currency,
+          created: inv.created,
+          dueDate: inv.due_date,
+          invoicePdf: inv.invoice_pdf,
+          hostedInvoiceUrl: inv.hosted_invoice_url,
+          periodStart: inv.period_start,
+          periodEnd: inv.period_end,
+        })),
+        hasMore: invoices.has_more,
+      };
+    } catch (err) {
+      console.error("List invoices error:", err);
+      set.status = 500;
+      return { success: false, error: "Failed to fetch invoices" };
+    }
+  })
+  .get("/stripe/invoices/:id", async ({ headers, params, set }) => {
+    const authHeader = headers.authorization;
+    if (!authHeader?.startsWith("Bearer ")) {
+      set.status = 401;
+      return { success: false, error: "Unauthorized" };
+    }
+
+    const token = authHeader.slice(7);
+    let supabaseUserId: string;
+
+    try {
+      const { unpackJWT } = await import("@axel-saas/api-utils/jwt");
+      const decoded = unpackJWT(token);
+      supabaseUserId = decoded.sub as string;
+    } catch {
+      set.status = 401;
+      return { success: false, error: "Invalid token" };
+    }
+
+    const stripeCustomerId = await getStripeCustomerIdForUser(supabaseUserId);
+    if (!stripeCustomerId) {
+      set.status = 404;
+      return { success: false, error: "No subscription found" };
+    }
+
+    const stripe = getStripeInstance();
+
+    try {
+      const invoice = await stripe.invoices.retrieve(params.id, {
+        expand: ["payment_intent", "lines"],
+      });
+
+      // Verify the invoice belongs to this customer
+      if (invoice.customer !== stripeCustomerId) {
+        set.status = 403;
+        return {
+          success: false,
+          error: "Invoice does not belong to this user",
+        };
+      }
+
+      return {
+        success: true,
+        invoice: {
+          id: invoice.id,
+          number: invoice.number,
+          status: invoice.status,
+          amountDue: invoice.amount_due,
+          amountPaid: invoice.amount_paid,
+          amountRemaining: invoice.amount_remaining,
+          currency: invoice.currency,
+          created: invoice.created,
+          dueDate: invoice.due_date,
+          invoicePdf: invoice.invoice_pdf,
+          hostedInvoiceUrl: invoice.hosted_invoice_url,
+          periodStart: invoice.period_start,
+          periodEnd: invoice.period_end,
+          customer: invoice.customer,
+          subscription: invoice.subscription,
+          lines: invoice.lines?.data.map((line) => ({
+            id: line.id,
+            description: line.description,
+            amount: line.amount,
+            quantity: line.quantity,
+            unitAmount: (
+              line as Stripe.InvoiceLineItem & { unit_amount?: number }
+            ).unit_amount,
+            period: {
+              start: line.period?.start,
+              end: line.period?.end,
+            },
+          })),
+        },
+      };
+    } catch (err) {
+      console.error("Get invoice error:", err);
+      if (
+        (err as Stripe.errors.StripeError).type === "StripeInvalidRequestError"
+      ) {
+        set.status = 404;
+        return { success: false, error: "Invoice not found" };
+      }
+      set.status = 500;
+      return { success: false, error: "Failed to fetch invoice" };
     }
   });
