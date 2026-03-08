@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
-import { MemoryRouter, Routes, Route, Navigate } from "react-router";
+import { render, screen } from "@testing-library/react";
+import { MemoryRouter, Routes, Route } from "react-router";
 import App from "../../App";
 import { Dashboard } from "../Dashboard";
 import { Chat } from "../DashboardTabs";
