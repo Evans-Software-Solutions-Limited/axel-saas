@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Outlet, useNavigate, useLocation, Link } from "react-router";
+import { useAuth } from "@/hooks/useAuth";
 import {
   IconChartBar,
   IconMessageCircle,
@@ -11,6 +12,7 @@ import {
   IconX,
   IconFileText,
   IconShield,
+  IconLock,
 } from "@tabler/icons-react";
 
 interface NavItem {
@@ -63,6 +65,14 @@ export function Dashboard() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const navigate = useNavigate();
   const location = useLocation();
+  const { onboardingCompleted } = useAuth();
+
+  // Pre-onboarding users are locked to Chat tab only
+  useEffect(() => {
+    if (!onboardingCompleted && location.pathname !== "/dashboard/chat") {
+      navigate("/dashboard/chat", { replace: true });
+    }
+  }, [onboardingCompleted, location.pathname, navigate]);
 
   const handleLogout = () => {
     // In a real app, this would call the auth logout
@@ -92,20 +102,41 @@ export function Dashboard() {
         <nav className="flex-1 overflow-y-auto p-4 space-y-2">
           {NAV_ITEMS.map((item) => {
             const isActive = currentNav?.id === item.id;
+            const isChat = item.id === "chat";
+            const isLocked = !onboardingCompleted && !isChat;
+
             return (
               <button
                 key={item.id}
-                onClick={() => navigate(item.path)}
+                onClick={() => {
+                  if (isLocked) {
+                    navigate("/dashboard/chat");
+                  } else {
+                    navigate(item.path);
+                  }
+                }}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
                   isActive
                     ? "bg-accent text-white"
-                    : "text-text hover:bg-surface-elevated"
+                    : isLocked
+                      ? "text-muted/50 cursor-not-allowed"
+                      : "text-text hover:bg-surface-elevated"
                 }`}
-                title={!sidebarOpen ? item.label : undefined}
+                title={
+                  !sidebarOpen
+                    ? isLocked
+                      ? `${item.label} (locked)`
+                      : item.label
+                    : undefined
+                }
+                disabled={isLocked}
               >
                 {item.icon}
                 {sidebarOpen && (
-                  <span className="font-medium">{item.label}</span>
+                  <span className="font-medium flex items-center gap-2">
+                    {item.label}
+                    {isLocked && <IconLock className="w-3 h-3" />}
+                  </span>
                 )}
               </button>
             );
@@ -114,6 +145,12 @@ export function Dashboard() {
 
         {/* Footer with logout and legal links */}
         <div className="border-t border-border p-4 space-y-3">
+          {/* Onboarding notice for pre-onboarding users */}
+          {!onboardingCompleted && sidebarOpen && (
+            <div className="px-4 py-2 bg-accent/10 border border-accent/20 rounded text-xs text-accent">
+              Complete onboarding to unlock all features
+            </div>
+          )}
           {/* Legal Links */}
           {sidebarOpen && (
             <div className="flex gap-4 text-xs text-muted px-4">
