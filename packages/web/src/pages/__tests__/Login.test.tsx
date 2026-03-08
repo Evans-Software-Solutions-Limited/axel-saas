@@ -13,6 +13,7 @@ const mockAuth = (overrides: Partial<ReturnType<typeof useAuth>> = {}) => ({
   isAuthenticated: false,
   isLoading: false,
   onboardingCompleted: false,
+  refreshOnboardingStatus: vi.fn().mockResolvedValue(undefined),
   user: null,
   session: null,
   error: null,

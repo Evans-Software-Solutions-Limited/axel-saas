@@ -7,6 +7,7 @@ import { Dashboard } from "../Dashboard";
 vi.mock("@/hooks/useAuth", () => ({
   useAuth: vi.fn(() => ({
     onboardingCompleted: true,
+    refreshOnboardingStatus: vi.fn().mockResolvedValue(undefined),
     isAuthenticated: true,
     isLoading: false,
     user: { id: "1", email: "test@test.com" },

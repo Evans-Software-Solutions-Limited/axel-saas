@@ -26,7 +26,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const refreshOnboardingStatus = async () => {
+    await fetchOnboardingStatus();
+  };
+
   useEffect(() => {
+    // Skip auth if supabase is not initialized (test environment or missing credentials)
+    if (!supabase) {
+      setIsLoading(false);
+      return;
+    }
+
     // Initial session check — drives isLoading and the first /users/me call.
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
@@ -37,6 +47,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setIsLoading(false);
       }
     });
+
+    // Skip auth listener if supabase is not initialized
+    if (!supabase) {
+      return;
+    }
 
     // Only re-fetch /users/me on an explicit SIGNED_IN event, not on every
     // TOKEN_REFRESHED or INITIAL_SESSION (which is already handled above).
@@ -60,6 +75,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signUp = async (email: string, password: string) => {
     setError(null);
+    if (!supabase) {
+      return { success: false, error: "Supabase not initialized" };
+    }
     try {
       const { error } = await supabase.auth.signUp({ email, password });
       if (error) throw error;
@@ -73,6 +91,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signIn = async (email: string, password: string) => {
     setError(null);
+    if (!supabase) {
+      return { success: false, error: "Supabase not initialized" };
+    }
     try {
       const { error } = await supabase.auth.signInWithPassword({
         email,
@@ -89,6 +110,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = async () => {
     setError(null);
+    if (!supabase) {
+      return { success: false, error: "Supabase not initialized" };
+    }
     try {
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
@@ -110,6 +134,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         error,
         onboardingCompleted,
         isAuthenticated: !!user,
+        refreshOnboardingStatus,
         signUp,
         signIn,
         signOut,

@@ -16,6 +16,7 @@ export interface AuthState {
 }
 
 export interface AuthContextValue extends AuthState {
+  refreshOnboardingStatus: () => Promise<void>;
   signUp: (
     email: string,
     password: string,

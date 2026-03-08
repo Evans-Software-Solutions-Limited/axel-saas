@@ -5,6 +5,7 @@ import { supabase } from "@/lib/supabase";
 export const api = {
   core: treaty<CoreApi>(import.meta.env.VITE_CORE_API_URL, {
     headers: async () => {
+      if (!supabase) return {};
       const {
         data: { session },
       } = await supabase.auth.getSession();

@@ -9,6 +9,21 @@ vi.mock("@/hooks/useAuth", () => ({ useAuth: vi.fn() }));
 
 import { useAuth } from "@/hooks/useAuth";
 
+// Shared mock function to reduce repetition
+const mockUseAuth = (overrides = {}) => ({
+  isAuthenticated: true,
+  isLoading: false,
+  onboardingCompleted: false,
+  refreshOnboardingStatus: vi.fn().mockResolvedValue(undefined),
+  user: { id: "1", email: "a@b.com" },
+  session: {} as never,
+  error: null,
+  signIn: vi.fn(),
+  signUp: vi.fn(),
+  signOut: vi.fn(),
+  ...overrides,
+});
+
 describe("Pre-onboarding routing and tab locking", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -16,17 +31,7 @@ describe("Pre-onboarding routing and tab locking", () => {
 
   describe("Root redirect for pre-onboarding users", () => {
     it("redirects authenticated user without onboarding to /dashboard/chat", () => {
-      vi.mocked(useAuth).mockReturnValue({
-        isAuthenticated: true,
-        isLoading: false,
-        onboardingCompleted: false,
-        user: { id: "1", email: "a@b.com" },
-        session: {} as never,
-        error: null,
-        signIn: vi.fn(),
-        signUp: vi.fn(),
-        signOut: vi.fn(),
-      });
+      vi.mocked(useAuth).mockReturnValue(mockUseAuth({ onboardingCompleted: false }));
 
       render(
         <MemoryRouter initialEntries={["/"]}>
@@ -39,17 +44,7 @@ describe("Pre-onboarding routing and tab locking", () => {
     });
 
     it("redirects authenticated user with onboarding to /dashboard", () => {
-      vi.mocked(useAuth).mockReturnValue({
-        isAuthenticated: true,
-        isLoading: false,
-        onboardingCompleted: true,
-        user: { id: "1", email: "a@b.com" },
-        session: {} as never,
-        error: null,
-        signIn: vi.fn(),
-        signUp: vi.fn(),
-        signOut: vi.fn(),
-      });
+      vi.mocked(useAuth).mockReturnValue(mockUseAuth({ onboardingCompleted: true }));
 
       render(
         <MemoryRouter initialEntries={["/"]}>
@@ -64,17 +59,7 @@ describe("Pre-onboarding routing and tab locking", () => {
 
   describe("/onboarding route redirect", () => {
     it("redirects /onboarding to /dashboard/chat for authenticated users", () => {
-      vi.mocked(useAuth).mockReturnValue({
-        isAuthenticated: true,
-        isLoading: false,
-        onboardingCompleted: false,
-        user: { id: "1", email: "a@b.com" },
-        session: {} as never,
-        error: null,
-        signIn: vi.fn(),
-        signUp: vi.fn(),
-        signOut: vi.fn(),
-      });
+      vi.mocked(useAuth).mockReturnValue(mockUseAuth({ onboardingCompleted: false }));
 
       render(
         <MemoryRouter initialEntries={["/onboarding"]}>
@@ -89,17 +74,7 @@ describe("Pre-onboarding routing and tab locking", () => {
 
   describe("Dashboard tab locking for pre-onboarding users", () => {
     it("shows lock icon on non-chat tabs when onboarding is not completed", () => {
-      vi.mocked(useAuth).mockReturnValue({
-        isAuthenticated: true,
-        isLoading: false,
-        onboardingCompleted: false,
-        user: { id: "1", email: "a@b.com" },
-        session: {} as never,
-        error: null,
-        signIn: vi.fn(),
-        signUp: vi.fn(),
-        signOut: vi.fn(),
-      });
+      vi.mocked(useAuth).mockReturnValue(mockUseAuth({ onboardingCompleted: false }));
 
       render(
         <MemoryRouter initialEntries={["/dashboard/chat"]}>
@@ -122,17 +97,7 @@ describe("Pre-onboarding routing and tab locking", () => {
     });
 
     it("does not show lock icon when onboarding is completed", () => {
-      vi.mocked(useAuth).mockReturnValue({
-        isAuthenticated: true,
-        isLoading: false,
-        onboardingCompleted: true,
-        user: { id: "1", email: "a@b.com" },
-        session: {} as never,
-        error: null,
-        signIn: vi.fn(),
-        signUp: vi.fn(),
-        signOut: vi.fn(),
-      });
+      vi.mocked(useAuth).mockReturnValue(mockUseAuth({ onboardingCompleted: true }));
 
       render(
         <MemoryRouter initialEntries={["/dashboard/office"]}>
@@ -151,17 +116,7 @@ describe("Pre-onboarding routing and tab locking", () => {
     });
 
     it("shows notice about completing onboarding when not completed", () => {
-      vi.mocked(useAuth).mockReturnValue({
-        isAuthenticated: true,
-        isLoading: false,
-        onboardingCompleted: false,
-        user: { id: "1", email: "a@b.com" },
-        session: {} as never,
-        error: null,
-        signIn: vi.fn(),
-        signUp: vi.fn(),
-        signOut: vi.fn(),
-      });
+      vi.mocked(useAuth).mockReturnValue(mockUseAuth({ onboardingCompleted: false }));
 
       render(
         <MemoryRouter initialEntries={["/dashboard/chat"]}>
@@ -180,17 +135,7 @@ describe("Pre-onboarding routing and tab locking", () => {
 
   describe("Chat UI remains intact", () => {
     it("renders chat UI normally for pre-onboarding users", () => {
-      vi.mocked(useAuth).mockReturnValue({
-        isAuthenticated: true,
-        isLoading: false,
-        onboardingCompleted: false,
-        user: { id: "1", email: "a@b.com" },
-        session: {} as never,
-        error: null,
-        signIn: vi.fn(),
-        signUp: vi.fn(),
-        signOut: vi.fn(),
-      });
+      vi.mocked(useAuth).mockReturnValue(mockUseAuth({ onboardingCompleted: false }));
 
       render(
         <MemoryRouter initialEntries={["/dashboard/chat"]}>

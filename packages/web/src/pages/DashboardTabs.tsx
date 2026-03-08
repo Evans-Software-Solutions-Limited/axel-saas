@@ -20,6 +20,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { IconSend, IconSearch } from "@tabler/icons-react";
+import { useAuth } from "@/hooks/useAuth";
+import { api } from "@/lib/eden";
 
 // ============================================================================
 // CHAT TAB
@@ -32,19 +34,104 @@ interface Message {
   timestamp: Date;
 }
 
-const initialMessages: Message[] = [
+// Onboarding question structure
+interface OnboardingQuestion {
+  id: string;
+  question: string;
+  key: keyof OnboardingAnswers;
+  placeholder?: string;
+  options?: { value: string; label: string }[];
+  multiSelect?: boolean;
+}
+
+interface OnboardingAnswers {
+  name: string;
+  role: string;
+  helpWith: string[];
+  typicalDay: string;
+  channels: string[];
+  morningBrief: boolean;
+  briefTime: string;
+}
+
+const ONBOARDING_QUESTIONS: OnboardingQuestion[] = [
   {
-    id: "1",
-    sender: "axel",
-    content: "Hi! I'm Axel, your AI employee. How can I help you today?",
-    timestamp: new Date(Date.now() - 3600000),
+    id: "name",
+    question: "Hi! I'm Axel, your AI employee. To get started, what's your name?",
+    key: "name",
+    placeholder: "Your name",
+  },
+  {
+    id: "role",
+    question: "Great! And what is your role or title?",
+    key: "role",
+    placeholder: "e.g. Founder, Manager, etc.",
+  },
+  {
+    id: "helpWith",
+    question: "What would you like me to help you with?",
+    key: "helpWith",
+    options: [
+      { value: "email", label: "Email management" },
+      { value: "scheduling", label: "Scheduling & calendar" },
+      { value: "tasks", label: "Task management" },
+      { value: "research", label: "Research & information" },
+      { value: "documents", label: "Document handling" },
+      { value: "communication", label: "Team communication" },
+    ],
+    multiSelect: true,
+  },
+  {
+    id: "typicalDay",
+    question: "Can you describe a typical day or week for me? What are your priorities?",
+    key: "typicalDay",
+    placeholder: "Tell me about your typical week...",
+  },
+  {
+    id: "channels",
+    question: "Which channels should I monitor for your communications?",
+    key: "channels",
+    options: [
+      { value: "email", label: "Email" },
+      { value: "slack", label: "Slack" },
+      { value: "whatsapp", label: "WhatsApp" },
+      { value: "teams", label: "Microsoft Teams" },
+    ],
+    multiSelect: true,
+  },
+  {
+    id: "morningBrief",
+    question: "Would you like me to send you a morning brief with your priorities for the day?",
+    key: "morningBrief",
+    options: [
+      { value: "true", label: "Yes, please!" },
+      { value: "false", label: "Not right now" },
+    ],
   },
 ];
 
 export function Chat() {
-  const [messages, setMessages] = useState<Message[]>(initialMessages);
+  const { onboardingCompleted, refreshOnboardingStatus } = useAuth();
+  const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  
+  // Onboarding state
+  const [isOnboarding, setIsOnboarding] = useState(!onboardingCompleted);
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const [onboardingAnswers, setOnboardingAnswers] = useState<OnboardingAnswers>({
+    name: "",
+    role: "",
+    helpWith: [],
+    typicalDay: "",
+    channels: [],
+    morningBrief: false,
+    briefTime: "",
+  });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isComplete, setIsComplete] = useState(false);
+
+  const currentQuestion = ONBOARDING_QUESTIONS[currentQuestionIndex];
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -54,36 +141,207 @@ export function Chat() {
     scrollToBottom();
   }, [messages]);
 
-  const handleSend = () => {
-    if (input.trim()) {
+  // Initialize chat based on onboarding status
+  
+  useEffect(() => {
+    if (!onboardingCompleted && messages.length === 0) {
+      // Start onboarding
+      setIsOnboarding(true);
       setMessages([
-        ...messages,
         {
-          id: Date.now().toString(),
-          sender: "user",
-          content: input,
+          id: "welcome",
+          sender: "axel",
+          content: currentQuestion.question,
           timestamp: new Date(),
         },
       ]);
+    } else if (onboardingCompleted && messages.length === 0) {
+      // Normal chat for completed users
+      setIsOnboarding(false);
+      setMessages([
+        {
+          id: "welcome",
+          sender: "axel",
+          content: "Hi! I'm Axel, your AI employee. How can I help you today?",
+          timestamp: new Date(),
+        },
+      ]);
+    }
+  }, [onboardingCompleted, currentQuestion, messages.length]);
+
+  // Update onboarding state when prop changes
+  useEffect(() => {
+    setIsOnboarding(!onboardingCompleted);
+  }, [onboardingCompleted, currentQuestion, messages.length]);
+
+  const addMessage = (content: string, sender: "user" | "axel") => {
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: Date.now().toString(),
+        sender,
+        content,
+        timestamp: new Date(),
+      },
+    ]);
+  };
+
+  const handleOnboardingResponse = async () => {
+    if (!input.trim() || isSubmitting) return;
+
+    const userResponse = input.trim();
+    addMessage(userResponse, "user");
+    setInput("");
+
+    // Process the answer
+    const answerKey = currentQuestion.key;
+    
+    if (currentQuestion.multiSelect) {
+      // For multi-select, toggle the selected option
+      // User types the option or number
+      const selectedOptions = [...(onboardingAnswers[answerKey] as string[])];
+      
+      // Handle comma-separated values or single values
+      const responses = userResponse.split(/[,;]/).map(s => s.trim().toLowerCase());
+      
+      for (const resp of responses) {
+        const option = currentQuestion.options?.find(
+          o => o.label.toLowerCase().includes(resp) || o.value.toLowerCase() === resp
+        );
+        if (option) {
+          if (selectedOptions.includes(option.value)) {
+            selectedOptions.splice(selectedOptions.indexOf(option.value), 1);
+          } else {
+            selectedOptions.push(option.value);
+          }
+        }
+      }
+      
+      setOnboardingAnswers((prev) => ({
+        ...prev,
+        [answerKey]: selectedOptions,
+      }));
+    } else if (answerKey === "morningBrief") {
+      // Boolean handling
+      const isYes = userResponse.toLowerCase().startsWith("y") || 
+                    userResponse.toLowerCase().includes("yes") ||
+                    userResponse.toLowerCase().includes("sure") ||
+                    userResponse.toLowerCase().includes("please");
+      setOnboardingAnswers((prev) => ({
+        ...prev,
+        morningBrief: isYes,
+      }));
+    } else {
+      // Regular string answer
+      setOnboardingAnswers((prev) => ({
+        ...prev,
+        [answerKey]: userResponse,
+      }));
+    }
+
+    // Move to next question or complete
+    if (currentQuestionIndex < ONBOARDING_QUESTIONS.length - 1) {
+      // Show typing indicator then next question
+      setTimeout(() => {
+        const nextIndex = currentQuestionIndex + 1;
+        setCurrentQuestionIndex(nextIndex);
+        addMessage(ONBOARDING_QUESTIONS[nextIndex].question, "axel");
+      }, 800);
+    } else {
+      // Onboarding complete - submit to backend
+      setIsSubmitting(true);
+      setTimeout(() => {
+        addMessage("Perfect! Let me save your answers and get set up for you...", "axel");
+      }, 500);
+
+      try {
+        await api.core.users.onboarding.post({
+          name: onboardingAnswers.name || userResponse,
+          role: onboardingAnswers.role,
+          helpWith: onboardingAnswers.helpWith,
+          typicalDay: onboardingAnswers.typicalDay,
+          channels: onboardingAnswers.channels,
+          morningBrief: onboardingAnswers.morningBrief,
+          briefTime: onboardingAnswers.briefTime,
+        });
+
+        await refreshOnboardingStatus();
+        setIsComplete(true);
+        
+        setTimeout(() => {
+          addMessage(
+            "You're all set! I've saved your preferences. You can now access all features of the dashboard. Is there anything specific you'd like me to help you with?",
+            "axel"
+          );
+        }, 1000);
+      } catch (error) {
+        console.error("Failed to complete onboarding:", error);
+        setTimeout(() => {
+          addMessage(
+            "I had trouble saving your answers. You can continue chatting with me, and your preferences have been noted. Is there anything else you'd like to discuss?",
+            "axel"
+          );
+        }, 1000);
+      } finally {
+        setIsSubmitting(false);
+      }
+    }
+  };
+
+  const handleNormalChat = () => {
+    if (input.trim()) {
+      addMessage(input, "user");
       setInput("");
 
       // Simulate Axel response
       setTimeout(() => {
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: (Date.now() + 1).toString(),
-            sender: "axel",
-            content: "I'm processing your request...",
-            timestamp: new Date(),
-          },
-        ]);
+        addMessage("I'm processing your request...", "axel");
       }, 1000);
     }
   };
 
+  const handleSend = () => {
+    if (isOnboarding && !isComplete) {
+      handleOnboardingResponse();
+    } else {
+      handleNormalChat();
+    }
+  };
+
+  // Render options for current question if available
+  const renderQuestionOptions = () => {
+    if (!currentQuestion?.options || isComplete) return null;
+    
+    const optionsText = currentQuestion.options
+      .map((opt, idx) => `${idx + 1}. ${opt.label}`)
+      .join("\n");
+    
+    return (
+      <div className="mt-2 text-sm text-muted">
+        <pre className="font-sans whitespace-pre-wrap">{optionsText}</pre>
+      </div>
+    );
+  };
+
   return (
     <div className="h-full flex flex-col p-6">
+      {/* Onboarding header */}
+      {isOnboarding && !isComplete && (
+        <div className="mb-4 px-4 py-2 bg-accent/10 border border-accent/20 rounded-lg">
+          <p className="text-sm text-accent">
+            ⚡ Welcome! Complete this quick onboarding to unlock all features ({currentQuestionIndex + 1}/{ONBOARDING_QUESTIONS.length})
+          </p>
+        </div>
+      )}
+      
+      {isComplete && (
+        <div className="mb-4 px-4 py-2 bg-success/10 border border-success/20 rounded-lg">
+          <p className="text-sm text-success">
+            ✓ Onboarding complete! You now have full access to Axel.
+          </p>
+        </div>
+      )}
+
       {/* Messages */}
       <div className="flex-1 overflow-y-auto mb-4 space-y-4">
         {messages.map((msg) => (
@@ -98,7 +356,10 @@ export function Chat() {
                   : "bg-surface-raised text-text rounded-bl-none"
               }`}
             >
-              <p className="text-sm">{msg.content}</p>
+              <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+              {msg.sender === "axel" && currentQuestion?.options && !isComplete && (
+                renderQuestionOptions()
+              )}
               <p className="text-xs mt-1 opacity-70">
                 {msg.timestamp.toLocaleTimeString([], {
                   hour: "2-digit",
@@ -116,12 +377,18 @@ export function Chat() {
         <Input
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          onKeyPress={(e) => e.key === "Enter" && handleSend()}
-          placeholder="Tell Axel what to do..."
+          onKeyPress={(e) => e.key === "Enter" && !isSubmitting && handleSend()}
+          placeholder={
+            isOnboarding && !isComplete
+              ? currentQuestion?.placeholder || "Type your answer..."
+              : "Tell Axel what to do..."
+          }
+          disabled={isSubmitting}
           className="bg-surface-raised border-border text-text"
         />
         <Button
           onClick={handleSend}
+          disabled={isSubmitting || (!input.trim() && !isComplete)}
           className="bg-accent hover:bg-accent/90 text-white px-4"
         >
           <IconSend className="w-4 h-4" />
@@ -130,7 +397,6 @@ export function Chat() {
     </div>
   );
 }
-
 // ============================================================================
 // TASKS TAB
 // ============================================================================
