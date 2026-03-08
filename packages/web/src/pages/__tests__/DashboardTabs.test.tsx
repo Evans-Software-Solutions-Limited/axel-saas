@@ -1,6 +1,17 @@
-import { describe, it, expect, vi } from "vitest";
-import { render, screen, fireEvent, act } from "@testing-library/react";
+import { describe, it, expect, vi, afterEach } from "vitest";
+import {
+  render,
+  screen,
+  fireEvent,
+  act,
+  cleanup,
+} from "@testing-library/react";
 import { Chat, Tasks, Crons, Integrations, Settings } from "../DashboardTabs";
+
+afterEach(() => {
+  cleanup();
+  vi.useRealTimers();
+});
 
 describe("DashboardTabs", () => {
   describe("Chat", () => {
@@ -48,7 +59,9 @@ describe("DashboardTabs", () => {
         await vi.advanceTimersByTimeAsync(1000);
       });
       expect(screen.getByText("I'm processing your request...")).toBeDefined();
-      vi.useRealTimers();
+      // Unmount before restoring real timers so the pending setTimeout callback
+      // cannot fire against the jsdom window after it is torn down.
+      cleanup();
     });
   });
 
