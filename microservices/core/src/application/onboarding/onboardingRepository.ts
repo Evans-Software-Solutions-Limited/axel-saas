@@ -13,14 +13,15 @@ import {
 export const REQUIRED_QUESTIONS = ["name", "helpWith", "channels"] as const;
 
 // All questions (required + optional) in order
-// Ordered for conversational flow: name → context → anchor (whatToTeach) → needs → support → logistics
+// Ordered for conversational flow: name → context → day-to-day → needs → patterns → support → logistics
+// Anchor: typicalDay (concrete job discovery) instead of abstract "teach me"
 export const ALL_QUESTIONS = [
   "name",
   "role",
-  "whatToTeach",
+  "typicalDay",
   "helpWith",
   "painPoints",
-  "typicalDay",
+  "proactiveAreas",
   "tonePreference",
   "channels",
   "morningBrief",
@@ -30,21 +31,22 @@ export const ALL_QUESTIONS = [
 export type QuestionKey = (typeof ALL_QUESTIONS)[number];
 
 // Question prompts - what the assistant asks
-// These are designed to feel conversational, warm, and discovery-led — like getting to know
-// someone over a meal for the first time. They invite the user to share, rather than interrogate.
+// These are designed to surface: what kind of work they do, what repeatedly takes their time,
+// what they want off their plate, what good support looks like, and where they need proactive monitoring.
+// Goal: help Axel infer the job, then understand how to proactively help day-to-day.
 export const QUESTION_PROMPTS: Record<QuestionKey, string> = {
   name: "Before I can be useful, what should I call you?",
   role: "Tell me a bit about you — what do you do, and what kind of world am I stepping into?",
-  whatToTeach:
-    "What do you want to teach me about how you work? Any routines, preferences, or things that matter to you?",
+  typicalDay:
+    "Walk me through a typical week. What kind of work takes up most of your time? (e.g. coding, architecture, compliance checks, Jira work, formal emails, reporting, etc.)",
   helpWith:
     "What brought you here? What's something you'd like me to take off your plate or help you think through?",
   painPoints:
-    "Where do you lose time or patience? What's something that could use a little less of your attention?",
-  typicalDay:
-    "Walk me through what a typical day looks like for you. What's on your plate?",
+    "What gets repetitive or drains your time? Which recurring tasks would you love to offload or delegate? (e.g. monthly reports, weekly summaries, email follow-ups, compliance audits)",
+  proactiveAreas:
+    "Are there areas where you need someone watching your back? Things like deadlines, compliance requirements, follow-ups, or things that could slip through the cracks?",
   tonePreference:
-    "How do you like people to talk to you? Casual and direct, or more formal?",
+    "What does good support look like for you? Do you prefer someone who's direct and casual, or more formal and structured?",
   channels:
     "How do you prefer to stay connected? Slack, email, text, or something else?",
   morningBrief:
@@ -62,15 +64,16 @@ export type OnboardingStateWithMessages = {
 
 // Initial outstanding questions for new users
 function getInitialOutstandingQuestions(): QuestionKey[] {
-  // Return in conversational order: name → context → anchor (whatToTeach) → needs → support → logistics
+  // Return in conversational order: name → context → day-to-day (anchor) → needs → patterns → support → logistics
   // Required: name, helpWith, channels
+  // Anchor question is typicalDay (concrete job discovery, not abstract "teach me")
   return [
     "name",
     "role",
-    "whatToTeach",
+    "typicalDay",
     "helpWith",
     "painPoints",
-    "typicalDay",
+    "proactiveAreas",
     "tonePreference",
     "channels",
     "morningBrief",

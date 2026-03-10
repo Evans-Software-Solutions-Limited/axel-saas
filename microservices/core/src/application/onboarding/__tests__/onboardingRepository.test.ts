@@ -88,7 +88,7 @@ describe("OnboardingRepository Constants", () => {
       expect(QUESTION_PROMPTS.role).toBeDefined();
       expect(QUESTION_PROMPTS.typicalDay).toBeDefined();
       expect(QUESTION_PROMPTS.painPoints).toBeDefined();
-      expect(QUESTION_PROMPTS.whatToTeach).toBeDefined();
+      expect(QUESTION_PROMPTS.proactiveAreas).toBeDefined();
       expect(QUESTION_PROMPTS.tonePreference).toBeDefined();
       expect(QUESTION_PROMPTS.morningBrief).toBeDefined();
       expect(QUESTION_PROMPTS.briefTime).toBeDefined();
@@ -108,8 +108,10 @@ describe("OnboardingRepository Constants", () => {
       expect(QUESTION_PROMPTS.role.toLowerCase()).toContain("world");
     });
 
-    it("should have whatToTeach prompt about teaching the assistant", () => {
-      expect(QUESTION_PROMPTS.whatToTeach.toLowerCase()).toContain("teach");
+    it("should have proactiveAreas prompt about monitoring and support", () => {
+      expect(QUESTION_PROMPTS.proactiveAreas.toLowerCase()).toContain(
+        "watching",
+      );
     });
 
     it("should have helpWith prompt about what to take off their plate", () => {
@@ -132,21 +134,21 @@ describe("OnboardingRepository Constants", () => {
       expect(ALL_QUESTIONS.length).toBe(10);
     });
 
-    it("should have whatToTeach as anchor question appearing early (position 3)", () => {
-      const whatToTeachIndex = ALL_QUESTIONS.indexOf("whatToTeach");
-      expect(whatToTeachIndex).toBe(2); // 0-indexed, so position 3
+    it("should have typicalDay as anchor question appearing early (position 3)", () => {
+      const typicalDayIndex = ALL_QUESTIONS.indexOf("typicalDay");
+      expect(typicalDayIndex).toBe(2); // 0-indexed, so position 3
     });
 
-    it("should start with name, then role, then whatToTeach", () => {
+    it("should start with name, then role, then typicalDay", () => {
       expect(ALL_QUESTIONS[0]).toBe("name");
       expect(ALL_QUESTIONS[1]).toBe("role");
-      expect(ALL_QUESTIONS[2]).toBe("whatToTeach");
+      expect(ALL_QUESTIONS[2]).toBe("typicalDay");
     });
 
-    it("should have helpWith after whatToTeach", () => {
-      const whatToTeachIndex = ALL_QUESTIONS.indexOf("whatToTeach");
-      const helpWithIndex = ALL_QUESTIONS.indexOf("helpWith");
-      expect(helpWithIndex).toBeGreaterThan(whatToTeachIndex);
+    it("should have proactiveAreas appearing after painPoints for job-discovery flow", () => {
+      const painPointsIndex = ALL_QUESTIONS.indexOf("painPoints");
+      const proactiveIndex = ALL_QUESTIONS.indexOf("proactiveAreas");
+      expect(proactiveIndex).toBe(painPointsIndex + 1);
     });
   });
 });
