@@ -13,45 +13,42 @@ import {
 export const REQUIRED_QUESTIONS = ["name", "helpWith", "channels"] as const;
 
 // All questions (required + optional) in order
-// Ordered for conversational flow: name → context → day-to-day → needs → patterns → support → logistics
-// Anchor: typicalDay (concrete job discovery) instead of abstract "teach me"
+// Ordered for conversational flow: name → context → day-to-day → integrated discovery → support → logistics
+// Anchor: typicalDay (concrete job discovery)
+// Consolidated: helpWith now covers both immediate needs and repetitive/drain tasks
+// Consolidated: briefing now combines setup + timing preference
 export const ALL_QUESTIONS = [
   "name",
   "role",
   "typicalDay",
   "helpWith",
-  "painPoints",
   "proactiveAreas",
   "tonePreference",
   "channels",
-  "morningBrief",
-  "briefTime",
+  "briefing",
 ] as const;
 
 export type QuestionKey = (typeof ALL_QUESTIONS)[number];
 
 // Question prompts - what the assistant asks
-// These are designed to surface: what kind of work they do, what repeatedly takes their time,
-// what they want off their plate, what good support looks like, and where they need proactive monitoring.
+// These are designed to surface: what kind of work they do, what they need help with,
+// what good support looks like, and where they need proactive monitoring.
 // Goal: help Axel infer the job, then understand how to proactively help day-to-day.
 export const QUESTION_PROMPTS: Record<QuestionKey, string> = {
   name: "Before I can be useful, what should I call you?",
-  role: "Tell me a bit about you — what do you do, and what kind of world am I stepping into?",
+  role: "Tell me a bit about you — what's your world like? What do you do, and what matters to you in your work?",
   typicalDay:
     "Walk me through a typical week. What kind of work takes up most of your time? (e.g. coding, architecture, compliance checks, Jira work, formal emails, reporting, etc.)",
   helpWith:
-    "What brought you here? What's something you'd like me to take off your plate or help you think through?",
-  painPoints:
-    "What gets repetitive or drains your time? Which recurring tasks would you love to offload or delegate? (e.g. monthly reports, weekly summaries, email follow-ups, compliance audits)",
+    "What brought you here? What would you like me to help with — things you want off your plate, recurring tasks that drain your time, or areas where you'd like a second brain?",
   proactiveAreas:
     "Are there areas where you need someone watching your back? Things like deadlines, compliance requirements, follow-ups, or things that could slip through the cracks?",
   tonePreference:
     "What does good support look like for you? Do you prefer someone who's direct and casual, or more formal and structured?",
   channels:
-    "How do you prefer to stay connected? Slack, email, text, or something else?",
-  morningBrief:
-    "Would a daily briefing be useful for you? Something practical to kick off your day with?",
-  briefTime: "What time in the morning works best for you?",
+    "I can reach you via Slack, email, or direct messages. How do you prefer to stay connected?",
+  briefing:
+    "Many people find a daily briefing useful — practical stuff to kick off your day with. Would that be helpful? (We can set it up for mornings, or as a weekly digest later.)",
 };
 
 // Questions that require multiple values (arrays)
@@ -64,20 +61,18 @@ export type OnboardingStateWithMessages = {
 
 // Initial outstanding questions for new users
 function getInitialOutstandingQuestions(): QuestionKey[] {
-  // Return in conversational order: name → context → day-to-day (anchor) → needs → patterns → support → logistics
+  // Return in conversational order: name → context → day-to-day (anchor) → integrated discovery → support → logistics
   // Required: name, helpWith, channels
-  // Anchor question is typicalDay (concrete job discovery, not abstract "teach me")
+  // Consolidated: painPoints merged into helpWith, morningBrief/briefTime merged into briefing
   return [
     "name",
     "role",
     "typicalDay",
     "helpWith",
-    "painPoints",
     "proactiveAreas",
     "tonePreference",
     "channels",
-    "morningBrief",
-    "briefTime",
+    "briefing",
   ];
 }
 

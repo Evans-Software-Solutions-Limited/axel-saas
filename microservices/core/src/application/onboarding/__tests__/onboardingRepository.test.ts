@@ -87,11 +87,9 @@ describe("OnboardingRepository Constants", () => {
     it("should have prompts for optional questions", () => {
       expect(QUESTION_PROMPTS.role).toBeDefined();
       expect(QUESTION_PROMPTS.typicalDay).toBeDefined();
-      expect(QUESTION_PROMPTS.painPoints).toBeDefined();
       expect(QUESTION_PROMPTS.proactiveAreas).toBeDefined();
       expect(QUESTION_PROMPTS.tonePreference).toBeDefined();
-      expect(QUESTION_PROMPTS.morningBrief).toBeDefined();
-      expect(QUESTION_PROMPTS.briefTime).toBeDefined();
+      expect(QUESTION_PROMPTS.briefing).toBeDefined();
     });
 
     it("should have non-empty prompts", () => {
@@ -114,12 +112,18 @@ describe("OnboardingRepository Constants", () => {
       );
     });
 
-    it("should have helpWith prompt about what to take off their plate", () => {
+    it("should have helpWith prompt consolidating needs and repetitive tasks", () => {
       expect(QUESTION_PROMPTS.helpWith.toLowerCase()).toContain("plate");
+      expect(QUESTION_PROMPTS.helpWith.toLowerCase()).toContain("drain");
     });
 
-    it("should have channels prompt about communication channels", () => {
-      expect(QUESTION_PROMPTS.channels.toLowerCase()).toContain("connected");
+    it("should have channels prompt about communication channels with examples", () => {
+      expect(QUESTION_PROMPTS.channels.toLowerCase()).toContain("slack");
+    });
+
+    it("should have briefing prompt that implies optional setup and timing flexibility", () => {
+      expect(QUESTION_PROMPTS.briefing.toLowerCase()).toContain("daily");
+      expect(QUESTION_PROMPTS.briefing.toLowerCase()).toContain("weekly");
     });
   });
 
@@ -130,8 +134,8 @@ describe("OnboardingRepository Constants", () => {
       });
     });
 
-    it("should have 10 total questions", () => {
-      expect(ALL_QUESTIONS.length).toBe(10);
+    it("should have 8 total questions", () => {
+      expect(ALL_QUESTIONS.length).toBe(8);
     });
 
     it("should have typicalDay as anchor question appearing early (position 3)", () => {
@@ -145,10 +149,20 @@ describe("OnboardingRepository Constants", () => {
       expect(ALL_QUESTIONS[2]).toBe("typicalDay");
     });
 
-    it("should have proactiveAreas appearing after painPoints for job-discovery flow", () => {
-      const painPointsIndex = ALL_QUESTIONS.indexOf("painPoints");
-      const proactiveIndex = ALL_QUESTIONS.indexOf("proactiveAreas");
-      expect(proactiveIndex).toBe(painPointsIndex + 1);
+    it("should have helpWith immediately after typicalDay", () => {
+      const typicalDayIndex = ALL_QUESTIONS.indexOf("typicalDay");
+      const helpWithIndex = ALL_QUESTIONS.indexOf("helpWith");
+      expect(helpWithIndex).toBe(typicalDayIndex + 1);
+    });
+
+    it("should end with briefing (consolidated from morningBrief and briefTime)", () => {
+      expect(ALL_QUESTIONS[ALL_QUESTIONS.length - 1]).toBe("briefing");
+    });
+
+    it("should not contain painPoints, morningBrief, or briefTime (consolidated)", () => {
+      expect(ALL_QUESTIONS).not.toContain("painPoints");
+      expect(ALL_QUESTIONS).not.toContain("morningBrief");
+      expect(ALL_QUESTIONS).not.toContain("briefTime");
     });
   });
 });
@@ -163,7 +177,16 @@ describe("OnboardingRepository Methods", () => {
     id: "state-1",
     userId,
     status: "not_started" as const,
-    outstandingQuestions: ["name", "helpWith", "channels"],
+    outstandingQuestions: [
+      "name",
+      "role",
+      "typicalDay",
+      "helpWith",
+      "proactiveAreas",
+      "tonePreference",
+      "channels",
+      "briefing",
+    ],
     collectedAnswers: {},
     requiredFieldsCompleted: {
       name: false,
@@ -212,8 +235,12 @@ describe("OnboardingRepository Methods", () => {
       const result = await repo.getOrCreateState(userId);
       expect(mockDb.insert).toHaveBeenCalled();
       expect(result.outstandingQuestions).toContain("name");
+      expect(result.outstandingQuestions).toContain("role");
+      expect(result.outstandingQuestions).toContain("typicalDay");
       expect(result.outstandingQuestions).toContain("helpWith");
-      expect(result.outstandingQuestions).toContain("channels");
+      expect(result.outstandingQuestions).toContain("briefing");
+      expect(result.outstandingQuestions).not.toContain("painPoints");
+      expect(result.outstandingQuestions).not.toContain("morningBrief");
     });
   });
 
@@ -313,7 +340,15 @@ describe("OnboardingRepository Methods", () => {
           helpWith: false,
           channels: false,
         },
-        outstandingQuestions: ["helpWith", "channels"],
+        outstandingQuestions: [
+          "role",
+          "typicalDay",
+          "helpWith",
+          "proactiveAreas",
+          "tonePreference",
+          "channels",
+          "briefing",
+        ],
       };
 
       (mockDb.select as ReturnType<typeof vi.fn>)
@@ -440,7 +475,7 @@ describe("OnboardingRepository Methods", () => {
       } as any;
       const response = repo.generateAssistantResponse(state, "John");
       expect(response).toBe(
-        "What brought you here? What's something you'd like me to take off your plate or help you think through?",
+        "What brought you here? What would you like me to help with — things you want off your plate, recurring tasks that drain your time, or areas where you'd like a second brain?",
       );
     });
 
@@ -500,7 +535,14 @@ describe("OnboardingRepository Methods", () => {
           helpWith: true,
           channels: false,
         },
-        outstandingQuestions: ["channels", "role", "typicalDay"],
+        outstandingQuestions: [
+          "role",
+          "typicalDay",
+          "proactiveAreas",
+          "tonePreference",
+          "channels",
+          "briefing",
+        ],
       };
 
       // State after answering all required questions (but before marking complete)
@@ -516,7 +558,13 @@ describe("OnboardingRepository Methods", () => {
           helpWith: true,
           channels: true,
         },
-        outstandingQuestions: ["role", "typicalDay"],
+        outstandingQuestions: [
+          "role",
+          "typicalDay",
+          "proactiveAreas",
+          "tonePreference",
+          "briefing",
+        ],
       };
 
       // Final state after markCompleted
