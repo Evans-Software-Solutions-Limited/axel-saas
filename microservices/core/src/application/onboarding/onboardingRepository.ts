@@ -38,11 +38,11 @@ export const QUESTION_PROMPTS: Record<QuestionKey, string> = {
   name: "Before I can be useful, what should I call you?",
   role: "Tell me a bit about you — what's your world like? What do you do, and what matters to you in your work?",
   typicalDay:
-    "Walk me through a typical week. What kind of work takes up most of your time? (e.g. coding, architecture, compliance checks, Jira work, formal emails, reporting, etc.)",
+    "Walk me through a typical week. What kind of work takes up most of your time? (e.g. coding, emails, documentation, Jira work, meetings, reporting, etc.)",
   helpWith:
     "What brought you here? What would you like me to help with — things you want off your plate, recurring tasks that drain your time, or areas where you'd like a second brain?",
   proactiveAreas:
-    "Are there areas where you need someone watching your back? Things like deadlines, compliance requirements, follow-ups, or things that could slip through the cracks?",
+    "Are there areas where you need someone watching your back? Things like deadlines, monthly reporting, follow-ups, or things that could slip through the cracks?",
   tonePreference:
     "What does good support look like for you? Do you prefer someone who's direct and casual, or more formal and structured?",
   channels:
