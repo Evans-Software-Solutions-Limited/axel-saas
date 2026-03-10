@@ -12,9 +12,9 @@ export default tseslint.config(
         tsconfigRootDir: import.meta.dirname,
       },
     },
+  },
+  {
     files: ["**/*.test.ts", "**/*.tests.ts"],
-    rules: {
-      "@typescript-eslint/no-explicit-any": "off",
-    },
+    rules: { "@typescript-eslint/no-explicit-any": "off" },
   },
 );
