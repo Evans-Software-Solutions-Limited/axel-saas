@@ -3,11 +3,11 @@ import { render, screen } from "@testing-library/react";
 import { MemoryRouter, Routes, Route } from "react-router";
 import App from "../../App";
 import { Dashboard } from "../Dashboard";
-import { Chat } from "../DashboardTabs";
 
 vi.mock("@/hooks/useAuth", () => ({ useAuth: vi.fn() }));
 
 import { useAuth } from "@/hooks/useAuth";
+import { Chat } from "../Chat";
 
 describe("Pre-onboarding routing and tab locking", () => {
   beforeEach(() => {
