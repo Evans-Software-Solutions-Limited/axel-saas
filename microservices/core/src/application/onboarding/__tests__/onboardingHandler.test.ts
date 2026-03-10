@@ -72,7 +72,11 @@ describe("OnboardingHandler Endpoints", () => {
           status: "not_started",
           outstandingQuestions: ["name", "helpWith", "channels"],
           collectedAnswers: {},
-          requiredFieldsCompleted: { name: false, helpWith: false, channels: false },
+          requiredFieldsCompleted: {
+            name: false,
+            helpWith: false,
+            channels: false,
+          },
           completedAt: null,
           lastMessageAt: null,
           createdAt: new Date(),
@@ -132,22 +136,40 @@ describe("OnboardingHandler Endpoints", () => {
           status: "in_progress" as const,
           outstandingQuestions: ["helpWith", "channels"],
           collectedAnswers: { name: "John" },
-          requiredFieldsCompleted: { name: true, helpWith: false, channels: false },
+          requiredFieldsCompleted: {
+            name: true,
+            helpWith: false,
+            channels: false,
+          },
           completedAt: null,
           lastMessageAt: new Date(),
           createdAt: new Date(),
           updatedAt: new Date(),
         },
         messages: [
-          { id: "msg-1", userId: "db-user-123", role: "user", content: "I'm John", createdAt: new Date() },
-          { id: "msg-2", userId: "db-user-123", role: "assistant", content: "What do you do for work?", createdAt: new Date() },
+          {
+            id: "msg-1",
+            userId: "db-user-123",
+            role: "user",
+            content: "I'm John",
+            createdAt: new Date(),
+          },
+          {
+            id: "msg-2",
+            userId: "db-user-123",
+            role: "assistant",
+            content: "What do you do for work?",
+            createdAt: new Date(),
+          },
         ],
         assistantResponse: "What do you do for work?",
         isComplete: false,
       };
 
       vi.mocked(userRepository.getUserBySupabaseId).mockResolvedValue(mockUser);
-      vi.mocked(onboardingRepository.processMessage).mockResolvedValue(mockResult);
+      vi.mocked(onboardingRepository.processMessage).mockResolvedValue(
+        mockResult,
+      );
 
       const result = await onboardingRepository.processMessage(
         "db-user-123",
@@ -201,7 +223,11 @@ describe("Onboarding state flow integration", () => {
       status: "not_started",
       outstandingQuestions: ["name", "helpWith", "channels"],
       collectedAnswers: {},
-      requiredFieldsCompleted: { name: false, helpWith: false, channels: false },
+      requiredFieldsCompleted: {
+        name: false,
+        helpWith: false,
+        channels: false,
+      },
     };
 
     // Simulate answering name
@@ -209,8 +235,13 @@ describe("Onboarding state flow integration", () => {
       ...currentState,
       status: "in_progress",
       collectedAnswers: { ...currentState.collectedAnswers, name: "John" },
-      requiredFieldsCompleted: { ...currentState.requiredFieldsCompleted, name: true },
-      outstandingQuestions: currentState.outstandingQuestions.filter(q => q !== "name"),
+      requiredFieldsCompleted: {
+        ...currentState.requiredFieldsCompleted,
+        name: true,
+      },
+      outstandingQuestions: currentState.outstandingQuestions.filter(
+        (q) => q !== "name",
+      ),
     };
 
     expect(currentState.collectedAnswers.name).toBe("John");
@@ -219,9 +250,17 @@ describe("Onboarding state flow integration", () => {
     // Step 2: Answer helpWith
     currentState = {
       ...currentState,
-      collectedAnswers: { ...currentState.collectedAnswers, helpWith: "email and calendar" },
-      requiredFieldsCompleted: { ...currentState.requiredFieldsCompleted, helpWith: true },
-      outstandingQuestions: currentState.outstandingQuestions.filter(q => q !== "helpWith"),
+      collectedAnswers: {
+        ...currentState.collectedAnswers,
+        helpWith: "email and calendar",
+      },
+      requiredFieldsCompleted: {
+        ...currentState.requiredFieldsCompleted,
+        helpWith: true,
+      },
+      outstandingQuestions: currentState.outstandingQuestions.filter(
+        (q) => q !== "helpWith",
+      ),
     };
 
     expect(currentState.collectedAnswers.helpWith).toBe("email and calendar");
@@ -229,9 +268,17 @@ describe("Onboarding state flow integration", () => {
     // Step 3: Answer channels (last required)
     currentState = {
       ...currentState,
-      collectedAnswers: { ...currentState.collectedAnswers, channels: "telegram" },
-      requiredFieldsCompleted: { ...currentState.requiredFieldsCompleted, channels: true },
-      outstandingQuestions: currentState.outstandingQuestions.filter(q => q !== "channels"),
+      collectedAnswers: {
+        ...currentState.collectedAnswers,
+        channels: "telegram",
+      },
+      requiredFieldsCompleted: {
+        ...currentState.requiredFieldsCompleted,
+        channels: true,
+      },
+      outstandingQuestions: currentState.outstandingQuestions.filter(
+        (q) => q !== "channels",
+      ),
     };
 
     // Check completion
