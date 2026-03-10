@@ -11,17 +11,15 @@ import Dashboard from "./pages/Dashboard";
 import { Office } from "./pages/Office";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import TermsOfService from "./pages/TermsOfService";
-import {
-  Chat,
-  Tasks,
-  Crons,
-  Integrations,
-  Settings,
-} from "./pages/DashboardTabs";
+import { Settings } from "./pages/Settings";
+import { Chat } from "./pages/Chat";
+import { Crons } from "./pages/Crons";
+import { Tasks } from "./pages/Tasks";
+import { Integrations } from "./pages/Integrations";
 
 const queryClient = new QueryClient();
 
-function ProtectedRoute({ children }: { children: React.ReactNode }) {
+function ProtectedRoute({ children }: Readonly<{ children: React.ReactNode }>) {
   const { isAuthenticated, isLoading } = useAuth();
 
   if (isLoading) {
@@ -39,6 +37,15 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+/** Redirects to homepage if user is already authenticated (for login/signup). */
+function GuestOnlyRoute({ children }: Readonly<{ children: React.ReactNode }>) {
+  const { isAuthenticated } = useAuth();
+  if (isAuthenticated) {
+    return <Navigate to="/" replace />;
+  }
+  return <>{children}</>;
+}
+
 function App() {
   const { isAuthenticated, isLoading, onboardingCompleted } = useAuth();
 
@@ -50,29 +57,37 @@ function App() {
     );
   }
 
+  let rootRedirectTo: string;
+  if (isAuthenticated) {
+    rootRedirectTo = onboardingCompleted ? "/dashboard" : "/dashboard/chat";
+  } else {
+    rootRedirectTo = "/login";
+  }
+
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
         <Routes>
           {/* Root redirect */}
+          <Route path="/" element={<Navigate to={rootRedirectTo} replace />} />
+
+          {/* Auth routes — redirect to homepage if already logged in */}
           <Route
-            path="/"
+            path="/login"
             element={
-              isAuthenticated ? (
-                onboardingCompleted ? (
-                  <Navigate to="/dashboard" />
-                ) : (
-                  <Navigate to="/dashboard/chat" />
-                )
-              ) : (
-                <Navigate to="/login" />
-              )
+              <GuestOnlyRoute>
+                <Login />
+              </GuestOnlyRoute>
             }
           />
-
-          {/* Auth routes */}
-          <Route path="/login" element={<Login />} />
-          <Route path="/signup" element={<SignUp />} />
+          <Route
+            path="/signup"
+            element={
+              <GuestOnlyRoute>
+                <SignUp />
+              </GuestOnlyRoute>
+            }
+          />
 
           {/* Legal pages */}
           <Route path="/privacy" element={<PrivacyPolicy />} />
@@ -105,7 +120,16 @@ function App() {
               </ProtectedRoute>
             }
           >
-            <Route index element={<Navigate to="/dashboard/office" />} />
+            <Route
+              index
+              element={
+                onboardingCompleted ? (
+                  <Navigate to="/dashboard/office" replace />
+                ) : (
+                  <Navigate to="/dashboard/chat" replace />
+                )
+              }
+            />
             <Route path="office" element={<Office />} />
             <Route path="chat" element={<Chat />} />
             <Route path="tasks" element={<Tasks />} />
