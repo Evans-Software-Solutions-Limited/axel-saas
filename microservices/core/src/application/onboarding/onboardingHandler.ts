@@ -157,21 +157,12 @@ export const onboardingHandler = new Elysia({ name: "OnboardingHandler" })
           return { success: false, error: "User not found" };
         }
 
-        // If already completed, just return success
+        // If already completed, return 409 Conflict - cannot add more messages
         if (dbUser.onboardingCompleted) {
+          set.status = 409;
           return {
-            success: true,
-            state: {
-              id: dbUser.id,
-              status: "completed" as const,
-              outstandingQuestions: [],
-              collectedAnswers: {},
-              completedAt: dbUser.updatedAt.toISOString(),
-              lastMessageAt: null,
-            },
-            messages: [],
-            assistantResponse: "You're all set!",
-            isComplete: true,
+            success: false,
+            error: "Onboarding already completed for this user",
           };
         }
 

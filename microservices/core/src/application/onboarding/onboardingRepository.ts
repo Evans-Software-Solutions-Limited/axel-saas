@@ -13,13 +13,14 @@ import {
 export const REQUIRED_QUESTIONS = ["name", "helpWith", "channels"] as const;
 
 // All questions (required + optional) in order
+// Ordered for conversational flow: name → context → anchor (whatToTeach) → needs → support → logistics
 export const ALL_QUESTIONS = [
   "name",
   "role",
-  "helpWith",
-  "typicalDay",
-  "painPoints",
   "whatToTeach",
+  "helpWith",
+  "painPoints",
+  "typicalDay",
   "tonePreference",
   "channels",
   "morningBrief",
@@ -29,20 +30,26 @@ export const ALL_QUESTIONS = [
 export type QuestionKey = (typeof ALL_QUESTIONS)[number];
 
 // Question prompts - what the assistant asks
+// These are designed to feel conversational, warm, and discovery-led — like getting to know
+// someone over a meal for the first time. They invite the user to share, rather than interrogate.
 export const QUESTION_PROMPTS: Record<QuestionKey, string> = {
-  name: "What should I call you?",
-  role: "What do you do for work?",
-  helpWith: "What would you like me to help you with?",
-  typicalDay: "What does a typical day look like for you?",
-  painPoints:
-    "What's frustrating you most right now? What takes up too much of your time?",
+  name: "Before I can be useful, what should I call you?",
+  role: "Tell me a bit about you — what do you do, and what kind of world am I stepping into?",
   whatToTeach:
-    "What do you want to teach me? Any policies, preferences, or things I should know?",
+    "What do you want to teach me about how you work? Any routines, preferences, or things that matter to you?",
+  helpWith:
+    "What brought you here? What's something you'd like me to take off your plate or help you think through?",
+  painPoints:
+    "Where do you lose time or patience? What's something that could use a little less of your attention?",
+  typicalDay:
+    "Walk me through what a typical day looks like for you. What's on your plate?",
   tonePreference:
-    "How do you like to communicate? Casual, formal, or somewhere in between?",
-  channels: "Which channels would you like to use to reach me?",
-  morningBrief: "Would you like me to send you a morning brief?",
-  briefTime: "What time works best for your morning brief?",
+    "How do you like people to talk to you? Casual and direct, or more formal?",
+  channels:
+    "How do you prefer to stay connected? Slack, email, text, or something else?",
+  morningBrief:
+    "Would a daily briefing be useful for you? Something practical to kick off your day with?",
+  briefTime: "What time in the morning works best for you?",
 };
 
 // Questions that require multiple values (arrays)
@@ -55,14 +62,17 @@ export type OnboardingStateWithMessages = {
 
 // Initial outstanding questions for new users
 function getInitialOutstandingQuestions(): QuestionKey[] {
-  // Return required questions first, then optional
+  // Return in conversational order: name → context → anchor (whatToTeach) → needs → support → logistics
+  // Required: name, helpWith, channels
   return [
-    ...REQUIRED_QUESTIONS,
+    "name",
     "role",
-    "typicalDay",
-    "painPoints",
     "whatToTeach",
+    "helpWith",
+    "painPoints",
+    "typicalDay",
     "tonePreference",
+    "channels",
     "morningBrief",
     "briefTime",
   ];
@@ -307,6 +317,7 @@ export class OnboardingRepository {
 
   /**
    * Process a user onboarding message - the main entry point
+   * @throws Error if onboarding is already completed
    */
   async processMessage(
     userId: string,
@@ -320,19 +331,15 @@ export class OnboardingRepository {
     // Get or create state
     const state = await this.getOrCreateState(userId);
 
+    // Reject if onboarding is already completed
+    if (state.status === "completed") {
+      throw new Error(
+        "Onboarding already completed for this user. No further messages can be added.",
+      );
+    }
+
     // Add user message
     await this.addMessage(userId, "user", userMessage);
-
-    // If already completed, just return current state
-    if (state.status === "completed") {
-      return {
-        state,
-        messages: await this.getMessages(userId),
-        assistantResponse:
-          "You're all set! Let me know if there's anything else.",
-        isComplete: true,
-      };
-    }
 
     // Determine which question this answer addresses
     // Simple heuristic: look for keywords or use the current outstanding question

@@ -101,15 +101,23 @@ describe("OnboardingRepository Constants", () => {
     });
 
     it("should have name prompt asking for name", () => {
-      expect(QUESTION_PROMPTS.name.toLowerCase()).toContain("call");
+      expect(QUESTION_PROMPTS.name.toLowerCase()).toContain("call you");
     });
 
-    it("should have helpWith prompt about helping", () => {
-      expect(QUESTION_PROMPTS.helpWith.toLowerCase()).toContain("help");
+    it("should have role prompt about their world and context", () => {
+      expect(QUESTION_PROMPTS.role.toLowerCase()).toContain("world");
     });
 
-    it("should have channels prompt about channels", () => {
-      expect(QUESTION_PROMPTS.channels.toLowerCase()).toContain("channel");
+    it("should have whatToTeach prompt about teaching the assistant", () => {
+      expect(QUESTION_PROMPTS.whatToTeach.toLowerCase()).toContain("teach");
+    });
+
+    it("should have helpWith prompt about what to take off their plate", () => {
+      expect(QUESTION_PROMPTS.helpWith.toLowerCase()).toContain("plate");
+    });
+
+    it("should have channels prompt about communication channels", () => {
+      expect(QUESTION_PROMPTS.channels.toLowerCase()).toContain("connected");
     });
   });
 
@@ -122,6 +130,23 @@ describe("OnboardingRepository Constants", () => {
 
     it("should have 10 total questions", () => {
       expect(ALL_QUESTIONS.length).toBe(10);
+    });
+
+    it("should have whatToTeach as anchor question appearing early (position 3)", () => {
+      const whatToTeachIndex = ALL_QUESTIONS.indexOf("whatToTeach");
+      expect(whatToTeachIndex).toBe(2); // 0-indexed, so position 3
+    });
+
+    it("should start with name, then role, then whatToTeach", () => {
+      expect(ALL_QUESTIONS[0]).toBe("name");
+      expect(ALL_QUESTIONS[1]).toBe("role");
+      expect(ALL_QUESTIONS[2]).toBe("whatToTeach");
+    });
+
+    it("should have helpWith after whatToTeach", () => {
+      const whatToTeachIndex = ALL_QUESTIONS.indexOf("whatToTeach");
+      const helpWithIndex = ALL_QUESTIONS.indexOf("helpWith");
+      expect(helpWithIndex).toBeGreaterThan(whatToTeachIndex);
     });
   });
 });
@@ -401,7 +426,9 @@ describe("OnboardingRepository Methods", () => {
       } as any;
       const response = repo.generateAssistantResponse(state, "");
       expect(response.toLowerCase()).toContain("set up");
-      expect(response).toContain("What should I call you?");
+      expect(response).toContain(
+        "Before I can be useful, what should I call you?",
+      );
     });
 
     it("should ask next outstanding question", () => {
@@ -410,7 +437,9 @@ describe("OnboardingRepository Methods", () => {
         outstandingQuestions: ["helpWith"],
       } as any;
       const response = repo.generateAssistantResponse(state, "John");
-      expect(response).toBe(QUESTION_PROMPTS.helpWith);
+      expect(response).toBe(
+        "What brought you here? What's something you'd like me to take off your plate or help you think through?",
+      );
     });
 
     it("should return completion message when no questions left", () => {
@@ -517,7 +546,7 @@ describe("OnboardingRepository Methods", () => {
       expect(result.state.status).toBe("completed");
     });
 
-    it("should not reprocess already completed onboarding", async () => {
+    it("should reject POST message when onboarding already completed", async () => {
       const completedState = {
         ...mockState,
         status: "completed" as const,
@@ -525,16 +554,13 @@ describe("OnboardingRepository Methods", () => {
         completedAt: NOW,
       };
 
-      (mockDb.select as ReturnType<typeof vi.fn>)
-        .mockReturnValueOnce(mockChain([completedState])) // getOrCreateState
-        .mockReturnValueOnce(mockChain([mockMessage])); // getMessages
-      (mockDb.insert as ReturnType<typeof vi.fn>).mockReturnValue(
-        mockChain([mockMessage]),
-      );
+      (mockDb.select as ReturnType<typeof vi.fn>).mockReturnValueOnce(
+        mockChain([completedState]),
+      ); // getOrCreateState
 
-      const result = await repo.processMessage(userId, "New message");
-      expect(result.isComplete).toBe(true);
-      expect(result.assistantResponse).toContain("all set");
+      await expect(repo.processMessage(userId, "New message")).rejects.toThrow(
+        "Onboarding already completed for this user",
+      );
     });
   });
 });
