@@ -7,6 +7,7 @@ import {
   uuid,
   jsonb,
   uniqueIndex,
+  index,
 } from "drizzle-orm/pg-core";
 
 // ─── Enums ────────────────────────────────────────────────────────────────────
@@ -155,3 +156,78 @@ export const onboardingAnswers = pgTable(
 
 export type OnboardingAnswers = typeof onboardingAnswers.$inferSelect;
 export type NewOnboardingAnswers = typeof onboardingAnswers.$inferInsert;
+
+// ─── Onboarding State ──────────────────────────────────────────────────────────
+
+export const onboardingStatusEnum = pgEnum("onboarding_status", [
+  "not_started",
+  "in_progress",
+  "completed",
+]);
+
+export const onboardingMessages = pgTable(
+  "onboarding_messages",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    role: text("role").notNull(), // "user" or "assistant"
+    content: text("content").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => ({
+    userIdIdx: index("onboarding_messages_user_id_idx").on(table.userId),
+    createdAtIdx: index("onboarding_messages_created_at_idx").on(
+      table.createdAt,
+    ),
+  }),
+);
+
+export type OnboardingMessage = typeof onboardingMessages.$inferSelect;
+export type NewOnboardingMessage = typeof onboardingMessages.$inferInsert;
+
+export const onboardingState = pgTable(
+  "onboarding_state",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .unique()
+      .references(() => users.id, { onDelete: "cascade" }),
+    status: onboardingStatusEnum("status").notNull().default("not_started"),
+    // Ordered questions the backend wants answered - stored as JSON array
+    outstandingQuestions: jsonb("outstanding_questions")
+      .$type<string[]>()
+      .notNull()
+      .default([]),
+    // Collected answers keyed by question
+    collectedAnswers: jsonb("collected_answers")
+      .$type<Record<string, string>>()
+      .notNull()
+      .default({}),
+    // Track which required fields are complete
+    requiredFieldsCompleted: jsonb("required_fields_completed")
+      .$type<Record<string, boolean>>()
+      .notNull()
+      .default({}),
+    // Timestamp when onboarding was completed
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    // Last message timestamp for consistency
+    lastMessageAt: timestamp("last_message_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => ({
+    userIdIdx: uniqueIndex("onboarding_state_user_id_idx").on(table.userId),
+  }),
+);
+
+export type OnboardingState = typeof onboardingState.$inferSelect;
+export type NewOnboardingState = typeof onboardingState.$inferInsert;

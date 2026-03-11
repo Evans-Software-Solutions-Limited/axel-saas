@@ -21,6 +21,7 @@ export default defineConfig({
         // but their logic is tested through repository and utility tests
         "**/userHandler.ts",
         "**/stripeHandler.ts",
+        "**/onboardingHandler.ts",
       ],
       // Target 90% minimum coverage threshold
       thresholds: {
