@@ -60,6 +60,11 @@ jobs:
       - name: Unit tests
         run: bun run test:unit
 
+      - name: Apply DB migrations
+        run: bun run --filter @axel-saas/db db:migrate
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
