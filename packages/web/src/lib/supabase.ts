@@ -1,11 +1,10 @@
 import { createClient } from "@supabase/supabase-js";
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || "";
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || "";
-
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.warn("Missing Supabase credentials. Auth will not work properly.");
-}
+const fallbackSupabaseUrl = "https://example.supabase.co";
+const fallbackSupabaseAnonKey = "test-anon-key";
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || fallbackSupabaseUrl;
+const supabaseAnonKey =
+  import.meta.env.VITE_SUPABASE_ANON_KEY || fallbackSupabaseAnonKey;
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 

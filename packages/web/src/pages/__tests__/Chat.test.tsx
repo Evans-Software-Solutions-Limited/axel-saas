@@ -1,63 +1,393 @@
-import { describe, it, expect, vi, afterEach } from "vitest";
-import {
-  render,
-  screen,
-  fireEvent,
-  act,
-  cleanup,
-} from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { MemoryRouter } from "react-router";
 import { Chat } from "../Chat";
+import {
+  getOnboardingState,
+  postOnboardingMessage,
+  OnboardingAlreadyCompleteError,
+} from "../chat/onboardingApi";
+import { useAuth } from "@/hooks/useAuth";
 
-afterEach(() => {
-  cleanup();
-  vi.useRealTimers();
+const navigateMock = vi.fn();
+
+vi.mock("react-router", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("react-router")>();
+  return {
+    ...actual,
+    useNavigate: () => navigateMock,
+  };
 });
 
-describe("Chat", () => {
-  it("renders initial message from Axel", () => {
-    render(<Chat />);
-    expect(screen.getByText(/how can i help you today/i)).toBeDefined();
-  });
+vi.mock("@/hooks/useAuth", () => ({
+  useAuth: vi.fn(),
+}));
 
-  it("sends message when user types and submits", () => {
-    render(<Chat />);
-    const input = screen.getByPlaceholderText(/tell axel/i);
-    fireEvent.change(input, { target: { value: "Hello" } });
-    const sendButton = screen.getByRole("button");
-    fireEvent.click(sendButton);
-    expect(screen.getByText("Hello")).toBeDefined();
-  });
+vi.mock("../chat/onboardingApi", () => ({
+  getOnboardingState: vi.fn(),
+  postOnboardingMessage: vi.fn(),
+  OnboardingAlreadyCompleteError: class OnboardingAlreadyCompleteError extends Error {},
+}));
 
-  it("sends message when user presses Enter", () => {
-    render(<Chat />);
-    const input = screen.getByPlaceholderText(/tell axel/i);
-    fireEvent.change(input, { target: { value: "Enter test" } });
-    fireEvent.keyPress(input, { key: "Enter", code: "Enter", charCode: 13 });
-    expect(screen.getByText("Enter test")).toBeDefined();
-  });
+describe("Chat onboarding integration", () => {
+  const setOnboardingCompleted = vi.fn();
+  const refreshOnboardingStatus = vi.fn().mockResolvedValue(undefined);
 
-  it("does not send when input is empty", () => {
-    render(<Chat />);
-    const initialCount = screen.getAllByText(
-      /how can i help you today/i,
-    ).length;
-    const sendButton = screen.getByRole("button");
-    fireEvent.click(sendButton);
-    expect(screen.getAllByText(/how can i help you today/i).length).toBe(
-      initialCount,
-    );
-  });
-
-  it("shows Axel processing message after send", async () => {
-    vi.useFakeTimers();
-    render(<Chat />);
-    const input = screen.getByPlaceholderText(/tell axel/i);
-    fireEvent.change(input, { target: { value: "Help me" } });
-    fireEvent.click(screen.getByRole("button"));
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(1000);
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(useAuth).mockReturnValue({
+      isAuthenticated: true,
+      isLoading: false,
+      onboardingCompleted: false,
+      setOnboardingCompleted,
+      refreshOnboardingStatus,
+      user: { id: "user-1", email: "test@example.com" },
+      session: {} as never,
+      error: null,
+      signIn: vi.fn(),
+      signUp: vi.fn(),
+      signOut: vi.fn(),
     });
-    expect(screen.getByText("I'm processing your request...")).toBeDefined();
-    cleanup();
+  });
+
+  it("loads incomplete onboarding state on first render", async () => {
+    vi.mocked(getOnboardingState).mockResolvedValue({
+      state: {
+        id: "state-1",
+        status: "in_progress",
+        outstandingQuestions: ["role"],
+        collectedAnswers: { name: "Bradley" },
+        completedAt: null,
+        lastMessageAt: "2026-03-11T10:00:00.000Z",
+      },
+      messages: [],
+      nextQuestion: "What do you do for work?",
+    });
+
+    render(
+      <MemoryRouter>
+        <Chat />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText("Onboarding mode")).toBeDefined();
+    expect(await screen.findByText("What do you do for work?")).toBeDefined();
+    expect(screen.getByPlaceholderText(/tell axel what to do/i)).toBeDefined();
+  });
+
+  it("restores persisted onboarding transcript after refresh", async () => {
+    vi.mocked(getOnboardingState).mockResolvedValue({
+      state: {
+        id: "state-1",
+        status: "in_progress",
+        outstandingQuestions: ["channels"],
+        collectedAnswers: { name: "Bradley", role: "Founder" },
+        completedAt: null,
+        lastMessageAt: "2026-03-11T10:00:00.000Z",
+      },
+      messages: [
+        {
+          id: "m1",
+          role: "assistant",
+          content: "What should I call you?",
+          createdAt: "2026-03-11T09:55:00.000Z",
+        },
+        {
+          id: "m2",
+          role: "user",
+          content: "Bradley",
+          createdAt: "2026-03-11T09:56:00.000Z",
+        },
+      ],
+      nextQuestion: "Which channels would you like to use?",
+    });
+
+    const firstRender = render(
+      <MemoryRouter>
+        <Chat />
+      </MemoryRouter>,
+    );
+    expect(await screen.findByText("What should I call you?")).toBeDefined();
+    expect(screen.getByText("Bradley")).toBeDefined();
+
+    firstRender.unmount();
+
+    render(
+      <MemoryRouter>
+        <Chat />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText("What should I call you?")).toBeDefined();
+    expect(screen.getByText("Bradley")).toBeDefined();
+    expect(getOnboardingState).toHaveBeenCalledTimes(2);
+  });
+
+  it("posts onboarding message and renders backend response transcript", async () => {
+    vi.mocked(getOnboardingState).mockResolvedValue({
+      state: {
+        id: "state-1",
+        status: "in_progress",
+        outstandingQuestions: ["role"],
+        collectedAnswers: {},
+        completedAt: null,
+        lastMessageAt: null,
+      },
+      messages: [],
+      nextQuestion: "What should I call you?",
+    });
+
+    vi.mocked(postOnboardingMessage).mockResolvedValue({
+      state: {
+        id: "state-1",
+        status: "in_progress",
+        outstandingQuestions: ["channels"],
+        collectedAnswers: { name: "Bradley", role: "Founder" },
+        completedAt: null,
+        lastMessageAt: "2026-03-11T10:05:00.000Z",
+      },
+      messages: [
+        {
+          id: "m1",
+          role: "assistant",
+          content: "What should I call you?",
+          createdAt: "2026-03-11T10:04:00.000Z",
+        },
+        {
+          id: "m2",
+          role: "user",
+          content: "Bradley",
+          createdAt: "2026-03-11T10:04:30.000Z",
+        },
+        {
+          id: "m3",
+          role: "assistant",
+          content: "What do you do for work?",
+          createdAt: "2026-03-11T10:05:00.000Z",
+        },
+      ],
+      assistantResponse: "What do you do for work?",
+      isComplete: false,
+    });
+
+    render(
+      <MemoryRouter>
+        <Chat />
+      </MemoryRouter>,
+    );
+
+    await screen.findByText("What should I call you?");
+
+    fireEvent.change(screen.getByPlaceholderText(/tell axel what to do/i), {
+      target: { value: "Bradley" },
+    });
+    fireEvent.keyDown(screen.getByPlaceholderText(/tell axel what to do/i), {
+      key: "Enter",
+    });
+
+    await waitFor(() => {
+      expect(postOnboardingMessage).toHaveBeenCalledWith("Bradley");
+    });
+    expect(await screen.findByText("What do you do for work?")).toBeDefined();
+  });
+
+  it("handles initial completed onboarding state by unlocking and redirecting", async () => {
+    vi.mocked(getOnboardingState).mockResolvedValue({
+      state: {
+        id: "state-1",
+        status: "completed",
+        outstandingQuestions: [],
+        collectedAnswers: {},
+        completedAt: "2026-03-11T10:10:00.000Z",
+        lastMessageAt: "2026-03-11T10:10:00.000Z",
+      },
+      messages: [],
+      nextQuestion: null,
+    });
+
+    render(
+      <MemoryRouter>
+        <Chat />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(setOnboardingCompleted).toHaveBeenCalledWith(true);
+      expect(refreshOnboardingStatus).toHaveBeenCalled();
+      expect(navigateMock).toHaveBeenCalledWith("/dashboard/office", {
+        replace: true,
+      });
+    });
+  });
+
+  it("shows onboarding load error when state fetch fails", async () => {
+    vi.mocked(getOnboardingState).mockRejectedValue(new Error("State failed"));
+
+    render(
+      <MemoryRouter>
+        <Chat />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText("State failed")).toBeDefined();
+  });
+
+  it("renders empty transcript when backend has no messages and no next question", async () => {
+    vi.mocked(getOnboardingState).mockResolvedValue({
+      state: {
+        id: "state-1",
+        status: "in_progress",
+        outstandingQuestions: ["name"],
+        collectedAnswers: {},
+        completedAt: null,
+        lastMessageAt: null,
+      },
+      messages: [],
+      nextQuestion: null,
+    });
+
+    render(
+      <MemoryRouter>
+        <Chat />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText("Onboarding mode")).toBeDefined();
+    expect(screen.queryByText("What should I call you?")).toBeNull();
+  });
+
+  it("unlocks app and redirects when backend marks onboarding complete", async () => {
+    vi.mocked(getOnboardingState).mockResolvedValue({
+      state: {
+        id: "state-1",
+        status: "in_progress",
+        outstandingQuestions: ["channels"],
+        collectedAnswers: { name: "Bradley", role: "Founder" },
+        completedAt: null,
+        lastMessageAt: "2026-03-11T10:00:00.000Z",
+      },
+      messages: [],
+      nextQuestion: "Which channels do you want?",
+    });
+
+    vi.mocked(postOnboardingMessage).mockResolvedValue({
+      state: {
+        id: "state-1",
+        status: "completed",
+        outstandingQuestions: [],
+        collectedAnswers: {
+          name: "Bradley",
+          role: "Founder",
+          channels: "Telegram",
+        },
+        completedAt: "2026-03-11T10:10:00.000Z",
+        lastMessageAt: "2026-03-11T10:10:00.000Z",
+      },
+      messages: [
+        {
+          id: "m1",
+          role: "assistant",
+          content: "All set. You're onboarded.",
+          createdAt: "2026-03-11T10:10:00.000Z",
+        },
+      ],
+      assistantResponse: "All set. You're onboarded.",
+      isComplete: true,
+    });
+
+    render(
+      <MemoryRouter>
+        <Chat />
+      </MemoryRouter>,
+    );
+
+    await screen.findByText("Which channels do you want?");
+
+    fireEvent.change(screen.getByPlaceholderText(/tell axel what to do/i), {
+      target: { value: "Telegram" },
+    });
+    fireEvent.click(screen.getByRole("button"));
+
+    await waitFor(() => {
+      expect(setOnboardingCompleted).toHaveBeenCalledWith(true);
+      expect(refreshOnboardingStatus).toHaveBeenCalled();
+      expect(navigateMock).toHaveBeenCalledWith("/dashboard/office", {
+        replace: true,
+      });
+    });
+  });
+
+  it("handles 409 completed-state conflict by unlocking and redirecting", async () => {
+    vi.mocked(getOnboardingState).mockResolvedValue({
+      state: {
+        id: "state-1",
+        status: "in_progress",
+        outstandingQuestions: ["channels"],
+        collectedAnswers: { name: "Bradley", role: "Founder" },
+        completedAt: null,
+        lastMessageAt: "2026-03-11T10:00:00.000Z",
+      },
+      messages: [],
+      nextQuestion: "Which channels do you want?",
+    });
+
+    vi.mocked(postOnboardingMessage).mockRejectedValue(
+      new OnboardingAlreadyCompleteError(),
+    );
+
+    render(
+      <MemoryRouter>
+        <Chat />
+      </MemoryRouter>,
+    );
+
+    await screen.findByText("Which channels do you want?");
+
+    fireEvent.change(screen.getByPlaceholderText(/tell axel what to do/i), {
+      target: { value: "Telegram" },
+    });
+    fireEvent.click(screen.getByRole("button"));
+
+    await waitFor(() => {
+      expect(setOnboardingCompleted).toHaveBeenCalledWith(true);
+      expect(refreshOnboardingStatus).toHaveBeenCalled();
+      expect(navigateMock).toHaveBeenCalledWith("/dashboard/office", {
+        replace: true,
+      });
+    });
+  });
+
+  it("falls back to default send error message for non-Error failures", async () => {
+    vi.mocked(getOnboardingState).mockResolvedValue({
+      state: {
+        id: "state-1",
+        status: "in_progress",
+        outstandingQuestions: ["channels"],
+        collectedAnswers: { name: "Bradley", role: "Founder" },
+        completedAt: null,
+        lastMessageAt: "2026-03-11T10:00:00.000Z",
+      },
+      messages: [],
+      nextQuestion: "Which channels do you want?",
+    });
+
+    vi.mocked(postOnboardingMessage).mockRejectedValue("unexpected failure");
+
+    render(
+      <MemoryRouter>
+        <Chat />
+      </MemoryRouter>,
+    );
+
+    await screen.findByText("Which channels do you want?");
+
+    fireEvent.change(screen.getByPlaceholderText(/tell axel what to do/i), {
+      target: { value: "Telegram" },
+    });
+    fireEvent.click(screen.getByRole("button"));
+
+    expect(
+      await screen.findByText("Failed to send onboarding message"),
+    ).toBeDefined();
   });
 });

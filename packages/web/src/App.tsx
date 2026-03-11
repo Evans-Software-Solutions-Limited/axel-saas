@@ -20,15 +20,7 @@ import { Integrations } from "./pages/Integrations";
 const queryClient = new QueryClient();
 
 function ProtectedRoute({ children }: Readonly<{ children: React.ReactNode }>) {
-  const { isAuthenticated, isLoading } = useAuth();
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-[#0f0f0f] dark flex items-center justify-center text-white">
-        Loading...
-      </div>
-    );
-  }
+  const { isAuthenticated } = useAuth();
 
   if (!isAuthenticated) {
     return <Navigate to="/login" />;

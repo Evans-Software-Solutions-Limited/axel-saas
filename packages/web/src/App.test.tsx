@@ -123,4 +123,24 @@ describe("App", () => {
     );
     expect(screen.getAllByText("Office")[0]).toBeDefined();
   });
+
+  it("redirects authenticated users away from /login", () => {
+    vi.mocked(useAuth).mockReturnValue({
+      isAuthenticated: true,
+      isLoading: false,
+      onboardingCompleted: true,
+      user: { id: "1", email: "a@b.com" },
+      session: {} as never,
+      error: null,
+      signIn: vi.fn(),
+      signUp: vi.fn(),
+      signOut: vi.fn(),
+    });
+    render(
+      <MemoryRouter initialEntries={["/login"]}>
+        <App />
+      </MemoryRouter>,
+    );
+    expect(screen.getAllByText("Office")[0]).toBeDefined();
+  });
 });

@@ -109,6 +109,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isLoading,
         error,
         onboardingCompleted,
+        setOnboardingCompleted,
+        refreshOnboardingStatus: fetchOnboardingStatus,
         isAuthenticated: !!user,
         signUp,
         signIn,
