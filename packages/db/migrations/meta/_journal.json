@@ -5,15 +5,22 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1772106618000,
+      "when": 1773246027349,
       "tag": "0000_initial",
       "breakpoints": true
     },
     {
       "idx": 1,
       "version": "7",
-      "when": 1772120839000,
+      "when": 1773246028008,
       "tag": "0001_auth_user_trigger",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1773246028713,
+      "tag": "0002_onboarding_state",
       "breakpoints": true
     }
   ]

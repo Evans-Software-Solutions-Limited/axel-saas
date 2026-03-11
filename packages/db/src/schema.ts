@@ -41,8 +41,8 @@ export const users = pgTable(
   "users",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    supabaseUserId: text("supabase_user_id").notNull().unique(),
-    email: text("email").notNull().unique(),
+    supabaseUserId: text("supabase_user_id").notNull(),
+    email: text("email").notNull(),
     fullName: text("full_name"),
     onboardingCompleted: boolean("onboarding_completed")
       .notNull()
@@ -74,8 +74,8 @@ export const subscriptions = pgTable(
     userId: uuid("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
-    stripeCustomerId: text("stripe_customer_id").unique(),
-    stripeSubscriptionId: text("stripe_subscription_id").unique(),
+    stripeCustomerId: text("stripe_customer_id"),
+    stripeSubscriptionId: text("stripe_subscription_id"),
     tier: subscriptionTierEnum("tier").notNull(),
     status: subscriptionStatusEnum("status").notNull().default("incomplete"),
     currentPeriodEnd: timestamp("current_period_end", { withTimezone: true }),
@@ -91,6 +91,9 @@ export const subscriptions = pgTable(
     stripeCustomerIdIdx: uniqueIndex("subscriptions_stripe_customer_id_idx").on(
       table.stripeCustomerId,
     ),
+    stripeSubscriptionIdIdx: uniqueIndex(
+      "subscriptions_stripe_subscription_id_idx",
+    ).on(table.stripeSubscriptionId),
   }),
 );
 
@@ -105,7 +108,6 @@ export const provisioningState = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     userId: uuid("user_id")
       .notNull()
-      .unique()
       .references(() => users.id, { onDelete: "cascade" }),
     status: provisioningStatusEnum("status").notNull().default("pending"),
     ecsTaskArn: text("ecs_task_arn"),
@@ -135,7 +137,6 @@ export const onboardingAnswers = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     userId: uuid("user_id")
       .notNull()
-      .unique()
       .references(() => users.id, { onDelete: "cascade" }),
     answers: jsonb("answers")
       .$type<Record<string, unknown>>()
@@ -195,7 +196,6 @@ export const onboardingState = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     userId: uuid("user_id")
       .notNull()
-      .unique()
       .references(() => users.id, { onDelete: "cascade" }),
     status: onboardingStatusEnum("status").notNull().default("not_started"),
     // Ordered questions the backend wants answered - stored as JSON array
