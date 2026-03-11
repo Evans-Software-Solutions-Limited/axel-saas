@@ -7,6 +7,7 @@ import {
   uuid,
   jsonb,
   uniqueIndex,
+  index,
 } from "drizzle-orm/pg-core";
 
 // ─── Enums ────────────────────────────────────────────────────────────────────
@@ -178,8 +179,8 @@ export const onboardingMessages = pgTable(
       .defaultNow(),
   },
   (table) => ({
-    userIdIdx: uniqueIndex("onboarding_messages_user_id_idx").on(table.userId),
-    createdAtIdx: uniqueIndex("onboarding_messages_created_at_idx").on(
+    userIdIdx: index("onboarding_messages_user_id_idx").on(table.userId),
+    createdAtIdx: index("onboarding_messages_created_at_idx").on(
       table.createdAt,
     ),
   }),

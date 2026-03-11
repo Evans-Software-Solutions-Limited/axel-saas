@@ -100,18 +100,24 @@ export class OnboardingRepository {
     }
 
     // Create new onboarding state
-    const [created] = await this.db.insert(onboardingState).values({
-      userId,
-      status: "not_started",
-      outstandingQuestions: getInitialOutstandingQuestions(),
-      collectedAnswers: {},
-      requiredFieldsCompleted: {
-        name: false,
-        helpWith: false,
-        channels: false,
-      },
-    });
+    const [created] = await this.db
+      .insert(onboardingState)
+      .values({
+        userId,
+        status: "not_started",
+        outstandingQuestions: getInitialOutstandingQuestions(),
+        collectedAnswers: {},
+        requiredFieldsCompleted: {
+          name: false,
+          helpWith: false,
+          channels: false,
+        },
+      })
+      .returning();
 
+    if (!created) {
+      throw new Error("Failed to create onboarding state — no row returned");
+    }
     return created;
   }
 
@@ -161,11 +167,14 @@ export class OnboardingRepository {
     role: "user" | "assistant",
     content: string,
   ): Promise<OnboardingMessage> {
-    const [message] = await this.db.insert(onboardingMessages).values({
-      userId,
-      role,
-      content,
-    });
+    const [message] = await this.db
+      .insert(onboardingMessages)
+      .values({
+        userId,
+        role,
+        content,
+      })
+      .returning();
 
     // Update lastMessageAt on state
     await this.db
@@ -173,6 +182,9 @@ export class OnboardingRepository {
       .set({ lastMessageAt: new Date(), updatedAt: new Date() })
       .where(eq(onboardingState.userId, userId));
 
+    if (!message) {
+      throw new Error("Failed to insert onboarding message — no row returned");
+    }
     return message;
   }
 

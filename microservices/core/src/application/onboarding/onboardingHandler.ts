@@ -67,10 +67,11 @@ export const onboardingHandler = new Elysia({ name: "OnboardingHandler" })
 
         // If onboarding already completed, return simple response
         if (dbUser.onboardingCompleted) {
+          const state = await onboardingRepository.getOrCreateState(dbUser.id);
           return {
             success: true,
             state: {
-              id: dbUser.id,
+              id: state.id,
               status: "completed" as const,
               outstandingQuestions: [],
               collectedAnswers: {},
