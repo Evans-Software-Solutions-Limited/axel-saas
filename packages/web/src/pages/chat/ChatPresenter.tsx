@@ -35,6 +35,13 @@ export function ChatPresenter({
 
   const canSend = input.trim().length > 0 && !isLoadingState && !isSending;
 
+  // Only show nextQuestion if it's not already in the messages (to avoid duplicates)
+  const showNextQuestion =
+    nextQuestion &&
+    !messages.some(
+      (msg) => msg.content === nextQuestion && msg.role === "assistant",
+    );
+
   return (
     <div className="h-full flex flex-col p-6">
       <div className="mb-4">
@@ -50,7 +57,7 @@ export function ChatPresenter({
 
         {error && <p className="text-sm text-red-400">{error}</p>}
 
-        {nextQuestion && (
+        {showNextQuestion && (
           <div className="bg-surface-raised border border-border rounded-lg p-4">
             <p className="text-xs uppercase tracking-wide text-muted mb-2">
               Next question

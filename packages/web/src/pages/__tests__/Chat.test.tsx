@@ -11,8 +11,8 @@ import { useAuth } from "@/hooks/useAuth";
 
 const navigateMock = vi.fn();
 
-vi.mock("react-router", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("react-router")>();
+vi.mock("react-router", async () => {
+  const actual = await import("react-router");
   return {
     ...actual,
     useNavigate: () => navigateMock,
