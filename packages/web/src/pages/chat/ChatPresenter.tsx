@@ -48,9 +48,12 @@ export function ChatPresenter({
       if (msgContent === questionLower) return true;
       // Check if question appears as a distinct segment (word-bounded)
       // This handles cases like "Next question: What do you do for work?"
-      const segments = msgContent.split(/[.?!\n]/).map((s) => s.trim().toLowerCase());
+      const segments = msgContent
+        .split(/[.?!\n]/)
+        .map((s) => s.trim().toLowerCase());
       return segments.some(
-        (segment) => segment === questionLower || segment.includes(questionLower),
+        (segment) =>
+          segment === questionLower || segment.includes(questionLower),
       );
     });
 
