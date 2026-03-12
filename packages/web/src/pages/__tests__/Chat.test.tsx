@@ -366,9 +366,75 @@ describe("Chat onboarding integration", () => {
       key: "Enter",
     });
 
-    // After response: the new question should appear as a banner
-    // (not duplicated since it now appears in the transcript with greeting wrapping)
-    expect(await screen.findByText("What do you do for work?")).toBeDefined();
+    // After response: the new question appears in transcript (not banner)
+    // Banner is suppressed because transcript already contains the question
+    // Use waitFor to wait for state update to complete
+    await waitFor(() => {
+      expect(screen.getAllByText("What should I call you?").length).toBe(1);
+    });
+    // Use regex to match the question which is wrapped in greeting text
+    expect(await screen.findByText(/What do you do for work\?/)).toBeDefined();
+
+    // Verify there's no duplicate banner (only one occurrence of the question)
+    const allQuestions = screen.getAllByText(/what do you do for work?/i);
+    expect(allQuestions.length).toBe(1);
+  });
+
+  it("does not show duplicate banner when transcript has greeting-wrapped question with different intro", async () => {
+    // This is the bug reported by Bradley:
+    // - API returns assistant message: "Hey there! I've just been set up for you... what should I call you?"
+    // - nextQuestion: "Before I can be useful, what should I call you?"
+    // - UI was showing both the transcript AND a separate banner (duplicate)
+    // The fix extracts the core question and checks if it appears in transcript
+    vi.mocked(getOnboardingState).mockResolvedValue({
+      state: {
+        id: "state-1",
+        status: "in_progress",
+        outstandingQuestions: ["name"],
+        collectedAnswers: {},
+        completedAt: null,
+        lastMessageAt: null,
+      },
+      messages: [
+        {
+          id: "m0",
+          role: "assistant",
+          content:
+            "Hey there! I've just been set up for you... what should I call you?",
+          createdAt: "2026-03-11T10:03:30.000Z",
+        },
+      ],
+      // nextQuestion has different introductory phrase but same core question
+      nextQuestion: "Before I can be useful, what should I call you?",
+    });
+
+    render(
+      <MemoryRouter>
+        <Chat />
+      </MemoryRouter>,
+    );
+
+    // Transcript shows the greeting + question
+    expect(
+      await screen.findByText(
+        "Hey there! I've just been set up for you... what should I call you?",
+      ),
+    ).toBeDefined();
+
+    // Banner should NOT show because the core question is already in transcript
+    // If bug existed, we'd see "Before I can be useful, what should I call you?" twice
+    const nextQuestionBanners = screen.queryAllByText((_content, element) => {
+      return (
+        element?.textContent ===
+          "Before I can be useful, what should I call you?" &&
+        element.closest(".bg-surface-raised") !== null
+      );
+    });
+    expect(nextQuestionBanners.length).toBe(0);
+
+    // Verify the core question appears in transcript (not banner)
+    const allQuestionTexts = screen.getAllByText(/what should i call you?/i);
+    expect(allQuestionTexts.length).toBe(1);
   });
 
   it("handles initial completed onboarding state by unlocking and redirecting", async () => {

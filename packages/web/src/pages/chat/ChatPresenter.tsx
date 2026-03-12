@@ -35,26 +35,31 @@ export function ChatPresenter({
 
   const canSend = input.trim().length > 0 && !isLoadingState && !isSending;
 
-  // Only show nextQuestion if it's not already in the messages (to avoid duplicates)
-  // Use smarter matching: exact match OR the question appears as a standalone segment
-  // (not just wrapped in other text like greeting + question)
+  // Only show nextQuestion banner if the same question isn't already in the transcript.
+  // Extract the core question from nextQuestion to handle cases where the transcript wraps
+  // the question in greeting text (e.g., transcript has "what should I call you?" but
+  // nextQuestion has "Before I can be useful, what should I call you?").
+  const getCoreQuestion = (question: string): string => {
+    // Split by common delimiters and find the last non-empty meaningful part
+    // Handles: "Before I can be useful, what should I call you?" -> "what should I call you?"
+    const parts = question
+      .split(/[,?]/)
+      .map((p) => p.trim())
+      .filter(Boolean);
+    return parts[parts.length - 1] || question;
+  };
+
+  const coreNextQuestion = nextQuestion
+    ? getCoreQuestion(nextQuestion).toLowerCase()
+    : "";
+
   const showNextQuestion =
     nextQuestion &&
     !messages.some((msg) => {
       if (msg.role !== "assistant") return false;
       const msgContent = msg.content.toLowerCase();
-      const questionLower = nextQuestion.toLowerCase();
-      // Exact match or question appears as standalone substring
-      if (msgContent === questionLower) return true;
-      // Check if question appears as a distinct segment (word-bounded)
-      // This handles cases like "Next question: What do you do for work?"
-      const segments = msgContent
-        .split(/[.?!\n]/)
-        .map((s) => s.trim().toLowerCase());
-      return segments.some(
-        (segment) =>
-          segment === questionLower || segment.includes(questionLower),
-      );
+      // Check if the core question appears anywhere in the transcript message
+      return msgContent.includes(coreNextQuestion);
     });
 
   return (
