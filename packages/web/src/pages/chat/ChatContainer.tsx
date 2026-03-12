@@ -77,12 +77,8 @@ export function ChatContainer() {
     try {
       const result = await postOnboardingMessage(trimmed);
       setMessages(result.messages);
-      // Update nextQuestion from the state's outstanding questions
-      const nextQ =
-        result.state.outstandingQuestions.length > 0
-          ? result.state.outstandingQuestions[0]
-          : null;
-      setNextQuestion(nextQ);
+      // Update nextQuestion from the backend response
+      setNextQuestion(result.nextQuestion);
       if (result.isComplete || result.state.status === "completed") {
         await completeOnboarding();
       }

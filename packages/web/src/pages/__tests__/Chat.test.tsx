@@ -182,6 +182,7 @@ describe("Chat onboarding integration", () => {
       ],
       assistantResponse: "What do you do for work?",
       isComplete: false,
+      nextQuestion: "What do you do for work?",
     });
 
     render(
@@ -261,6 +262,7 @@ describe("Chat onboarding integration", () => {
       ],
       assistantResponse: "What do you do for work?",
       isComplete: false,
+      nextQuestion: "What do you do for work?",
     });
 
     render(
@@ -344,6 +346,7 @@ describe("Chat onboarding integration", () => {
       assistantResponse:
         "Thanks Bradley! Your next question is: What do you do for work?",
       isComplete: false,
+      nextQuestion: "What do you do for work?",
     });
 
     render(
@@ -508,6 +511,7 @@ describe("Chat onboarding integration", () => {
       ],
       assistantResponse: "All set. You're onboarded.",
       isComplete: true,
+      nextQuestion: null,
     });
 
     render(

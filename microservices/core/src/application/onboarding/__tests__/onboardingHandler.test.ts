@@ -165,6 +165,7 @@ describe("OnboardingHandler Endpoints", () => {
         ],
         assistantResponse: "What do you do for work?",
         isComplete: false,
+        nextQuestion: "What do you do for work?",
       };
 
       vi.mocked(userRepository.getUserBySupabaseId).mockResolvedValue(mockUser);

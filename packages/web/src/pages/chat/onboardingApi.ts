@@ -27,6 +27,7 @@ export interface PostOnboardingMessageResult {
   messages: OnboardingMessage[];
   assistantResponse: string;
   isComplete: boolean;
+  nextQuestion: string | null;
 }
 
 interface GetStateSuccessPayload {
@@ -42,6 +43,7 @@ interface PostMessageSuccessPayload {
   messages: OnboardingMessage[];
   assistantResponse: string;
   isComplete: boolean;
+  nextQuestion: string | null;
 }
 
 interface ApiErrorLike {
@@ -124,7 +126,8 @@ export async function postOnboardingMessage(
       "state" in data &&
       "messages" in data &&
       "assistantResponse" in data &&
-      "isComplete" in data
+      "isComplete" in data &&
+      "nextQuestion" in data
     ) {
       const successData = data as PostMessageSuccessPayload;
       return {
@@ -132,6 +135,7 @@ export async function postOnboardingMessage(
         messages: successData.messages,
         assistantResponse: successData.assistantResponse,
         isComplete: successData.isComplete,
+        nextQuestion: successData.nextQuestion,
       };
     }
 

@@ -205,6 +205,7 @@ export const onboardingHandler = new Elysia({ name: "OnboardingHandler" })
           })),
           assistantResponse: result.assistantResponse,
           isComplete: result.isComplete,
+          nextQuestion: result.nextQuestion,
         };
       } catch (error) {
         console.error("Onboarding message error:", error);
