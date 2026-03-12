@@ -150,6 +150,21 @@ export class UserRepository {
       });
     }
   }
+
+  /**
+   * Get onboarding answers for a user
+   */
+  async getOnboardingAnswers(
+    userId: string,
+  ): Promise<Record<string, unknown> | null> {
+    const [row] = await this.db
+      .select()
+      .from(onboardingAnswers)
+      .where(eq(onboardingAnswers.userId, userId))
+      .limit(1);
+
+    return row?.answers ?? null;
+  }
 }
 
 export const userRepository = new UserRepository();
