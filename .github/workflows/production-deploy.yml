@@ -75,3 +75,12 @@ jobs:
           SUPABASE_URL: ${{ vars.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ vars.SUPABASE_ANON_KEY }}
           VITE_WEB_URL: ${{ vars.VITE_WEB_URL }}
+
+      - name: Run Database Migrations
+        run: |
+          echo "Running migrations for production..."
+          cd packages/db
+          bun run db:migrate
+        env:
+          DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
+        continue-on-error: true
