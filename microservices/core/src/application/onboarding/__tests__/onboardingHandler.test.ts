@@ -18,6 +18,7 @@ vi.mock("../onboardingRepository", () => {
     onboardingRepository: {
       getStateWithMessages: vi.fn(),
       getOrCreateState: vi.fn(),
+      ensureTranscript: vi.fn(),
       processMessage: vi.fn(),
     },
     QUESTION_PROMPTS: {
@@ -164,6 +165,7 @@ describe("OnboardingHandler Endpoints", () => {
         ],
         assistantResponse: "What do you do for work?",
         isComplete: false,
+        nextQuestion: "What do you do for work?",
       };
 
       vi.mocked(userRepository.getUserBySupabaseId).mockResolvedValue(mockUser);

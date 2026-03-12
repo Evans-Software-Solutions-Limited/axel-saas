@@ -103,4 +103,14 @@ describe("ThemeProvider", () => {
     expect(localStorage.setItem).toHaveBeenCalledWith("vite-ui-theme", "light");
     expect(screen.getByTestId("theme").textContent).toBe("light");
   });
+
+  it("throws when useTheme is used outside ThemeProvider", () => {
+    function BadConsumer() {
+      useTheme(); // should throw
+      return null;
+    }
+    expect(() => render(<BadConsumer />)).toThrow(
+      "useTheme must be used within a ThemeProvider",
+    );
+  });
 });

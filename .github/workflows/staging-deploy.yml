@@ -58,7 +58,7 @@ jobs:
       - name: Apply DB migrations
         run: bun run --filter @axel-saas/db db:migrate
         env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4

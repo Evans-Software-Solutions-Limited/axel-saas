@@ -301,6 +301,46 @@ describe("OnboardingRepository Methods", () => {
     });
   });
 
+  describe("ensureTranscript", () => {
+    it("should return existing messages without inserting a prompt", async () => {
+      (mockDb.select as ReturnType<typeof vi.fn>).mockReturnValue(
+        mockChain([mockMessage]),
+      );
+
+      const result = await repo.ensureTranscript(userId, mockState);
+
+      expect(result).toEqual([mockMessage]);
+      expect(mockDb.insert).not.toHaveBeenCalled();
+    });
+
+    it("should persist the current assistant prompt when messages are empty", async () => {
+      const assistantMessage = {
+        ...mockMessage,
+        id: "msg-2",
+        role: "assistant" as const,
+        content:
+          "Hey there! I've just been set up for you. Before I can be useful, I need to get to know you a bit. Before I can be useful, what should I call you?",
+      };
+
+      const selectMock = vi.fn();
+      (mockDb.select as ReturnType<typeof vi.fn>) = selectMock;
+      selectMock
+        .mockReturnValueOnce(mockChain([]))
+        .mockReturnValueOnce(mockChain([assistantMessage]));
+      (mockDb.insert as ReturnType<typeof vi.fn>).mockReturnValue(
+        mockChain([assistantMessage]),
+      );
+      (mockDb.update as ReturnType<typeof vi.fn>).mockReturnValue(
+        mockChain([]),
+      );
+
+      const result = await repo.ensureTranscript(userId, mockState);
+
+      expect(mockDb.insert).toHaveBeenCalled();
+      expect(result).toEqual([assistantMessage]);
+    });
+  });
+
   describe("addMessage", () => {
     it("should add user message and update state timestamp", async () => {
       (mockDb.insert as ReturnType<typeof vi.fn>).mockReturnValue(

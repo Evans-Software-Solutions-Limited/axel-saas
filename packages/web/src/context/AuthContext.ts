@@ -1,5 +1,5 @@
 import { createContext } from "react";
-import type { Session } from "@/lib/supabase";
+import type { Session } from "@supabase/supabase-js";
 
 export interface AuthUser {
   id: string;
@@ -16,6 +16,8 @@ export interface AuthState {
 }
 
 export interface AuthContextValue extends AuthState {
+  setOnboardingCompleted: (completed: boolean) => void;
+  refreshOnboardingStatus: () => Promise<void>;
   signUp: (
     email: string,
     password: string,

@@ -83,13 +83,17 @@ export const onboardingHandler = new Elysia({ name: "OnboardingHandler" })
           };
         }
 
-        const { state, messages } =
+        const { state, messages: existingMessages } =
           await onboardingRepository.getStateWithMessages(dbUser.id);
 
         if (!state) {
           // Create initial state if doesn't exist
           const newState = await onboardingRepository.getOrCreateState(
             dbUser.id,
+          );
+          const messages = await onboardingRepository.ensureTranscript(
+            dbUser.id,
+            newState,
           );
           const nextQuestion = onboardingRepository.getNextQuestion(newState);
 
@@ -103,13 +107,24 @@ export const onboardingHandler = new Elysia({ name: "OnboardingHandler" })
               completedAt: null,
               lastMessageAt: newState.lastMessageAt?.toISOString() ?? null,
             },
-            messages: [],
+            messages: messages.map((m) => ({
+              id: m.id,
+              role: m.role as "user" | "assistant",
+              content: m.content,
+              createdAt: m.createdAt.toISOString(),
+            })),
             nextQuestion: nextQuestion
               ? QUESTION_PROMPTS[nextQuestion as QuestionKey]
               : null,
           };
         }
 
+        // Use existing messages from getStateWithMessages; only call ensureTranscript
+        // if we have no messages yet (to add the initial assistant prompt).
+        const messages =
+          existingMessages.length > 0
+            ? existingMessages
+            : await onboardingRepository.ensureTranscript(dbUser.id, state);
         const nextQuestion = onboardingRepository.getNextQuestion(state);
 
         return {
@@ -190,6 +205,7 @@ export const onboardingHandler = new Elysia({ name: "OnboardingHandler" })
           })),
           assistantResponse: result.assistantResponse,
           isComplete: result.isComplete,
+          nextQuestion: result.nextQuestion,
         };
       } catch (error) {
         console.error("Onboarding message error:", error);

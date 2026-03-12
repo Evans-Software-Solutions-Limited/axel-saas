@@ -160,6 +160,29 @@ export class OnboardingRepository {
   }
 
   /**
+   * Ensure the transcript has a persisted assistant prompt.
+   * This prevents the frontend from relying on synthetic messages that vanish
+   * on the next server round-trip.
+   */
+  async ensureTranscript(
+    userId: string,
+    state: OnboardingState,
+  ): Promise<OnboardingMessage[]> {
+    const messages = await this.getMessages(userId);
+    if (messages.length > 0 || state.status === "completed") {
+      return messages;
+    }
+
+    await this.addMessage(
+      userId,
+      "assistant",
+      this.generateAssistantResponse(state, ""),
+    );
+
+    return this.getMessages(userId);
+  }
+
+  /**
    * Add a message to the onboarding conversation
    */
   async addMessage(
@@ -337,6 +360,7 @@ export class OnboardingRepository {
     messages: OnboardingMessage[];
     assistantResponse: string;
     isComplete: boolean;
+    nextQuestion: string | null;
   }> {
     // Get or create state
     const state = await this.getOrCreateState(userId);
@@ -389,11 +413,16 @@ export class OnboardingRepository {
       // Add assistant message
       await this.addMessage(userId, "assistant", assistantResponse);
 
+      // Get the next question for the response
+      const nextQ = this.getNextQuestion(finalState);
+      const nextQuestion = nextQ ? QUESTION_PROMPTS[nextQ] : null;
+
       return {
         state: finalState,
         messages: await this.getMessages(userId),
         assistantResponse,
         isComplete: false,
+        nextQuestion,
       };
     }
 
@@ -402,6 +431,7 @@ export class OnboardingRepository {
       messages: await this.getMessages(userId),
       assistantResponse: "I've got everything I need. You're all set!",
       isComplete: true,
+      nextQuestion: null,
     };
   }
 }

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import { supabase, type Session } from "@/lib/supabase";
 import { api } from "@/lib/eden";
@@ -12,7 +12,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [onboardingCompleted, setOnboardingCompleted] = useState(false);
   const navigate = useNavigate();
 
-  const fetchOnboardingStatus = async () => {
+  const fetchOnboardingStatus = useCallback(async () => {
     try {
       const { data } = await api.core.users.me.get();
       if (data && "user" in data && data.user) {
@@ -24,7 +24,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.error("Error fetching onboarding status:", err);
       setOnboardingCompleted(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     // Initial session check — drives isLoading and the first /users/me call.
@@ -56,7 +56,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [fetchOnboardingStatus]);
 
   const signUp = async (email: string, password: string) => {
     setError(null);
@@ -109,6 +109,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isLoading,
         error,
         onboardingCompleted,
+        setOnboardingCompleted,
+        refreshOnboardingStatus: fetchOnboardingStatus,
         isAuthenticated: !!user,
         signUp,
         signIn,
