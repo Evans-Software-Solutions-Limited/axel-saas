@@ -7,6 +7,7 @@ import {
   postOnboardingMessage,
   OnboardingAlreadyCompleteError,
 } from "../chat/onboardingApi";
+import { getAgentStatus } from "../chat/chatApi";
 import { useAuth } from "@/hooks/useAuth";
 
 const navigateMock = vi.fn();
@@ -29,12 +30,28 @@ vi.mock("../chat/onboardingApi", () => ({
   OnboardingAlreadyCompleteError: class OnboardingAlreadyCompleteError extends Error {},
 }));
 
+vi.mock("../chat/chatApi", () => ({
+  getAgentStatus: vi.fn(),
+  postChatMessage: vi.fn(),
+}));
+
 describe("Chat onboarding integration", () => {
   const setOnboardingCompleted = vi.fn();
   const refreshOnboardingStatus = vi.fn().mockResolvedValue(undefined);
 
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.restoreAllMocks();
+    // Default: no active agent - will fall through to onboarding
+    vi.mocked(getAgentStatus).mockResolvedValue({
+      success: true,
+      status: "not_found",
+    });
+    // Mock fetch for onboarding complete endpoint
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ success: true }),
+    }) as unknown as typeof fetch;
     vi.mocked(useAuth).mockReturnValue({
       isAuthenticated: true,
       isLoading: false,
@@ -79,7 +96,9 @@ describe("Chat onboarding integration", () => {
 
     expect(await screen.findByText("Onboarding mode")).toBeDefined();
     expect(await screen.findByText("What do you do for work?")).toBeDefined();
-    expect(screen.getByPlaceholderText(/tell axel what to do/i)).toBeDefined();
+    expect(
+      screen.getByPlaceholderText(/answer axel's question/i),
+    ).toBeDefined();
   });
 
   it("restores persisted onboarding transcript after refresh", async () => {
@@ -193,10 +212,10 @@ describe("Chat onboarding integration", () => {
 
     await screen.findByText("What should I call you?");
 
-    fireEvent.change(screen.getByPlaceholderText(/tell axel what to do/i), {
+    fireEvent.change(screen.getByPlaceholderText(/answer axel's question/i), {
       target: { value: "Bradley" },
     });
-    fireEvent.keyDown(screen.getByPlaceholderText(/tell axel what to do/i), {
+    fireEvent.keyDown(screen.getByPlaceholderText(/answer axel's question/i), {
       key: "Enter",
     });
 
@@ -275,10 +294,10 @@ describe("Chat onboarding integration", () => {
     expect(await screen.findByText("What should I call you?")).toBeDefined();
 
     // Send response
-    fireEvent.change(screen.getByPlaceholderText(/tell axel what to do/i), {
+    fireEvent.change(screen.getByPlaceholderText(/answer axel's question/i), {
       target: { value: "Bradley" },
     });
-    fireEvent.keyDown(screen.getByPlaceholderText(/tell axel what to do/i), {
+    fireEvent.keyDown(screen.getByPlaceholderText(/answer axel's question/i), {
       key: "Enter",
     });
 
@@ -359,10 +378,10 @@ describe("Chat onboarding integration", () => {
     expect(await screen.findByText("What should I call you?")).toBeDefined();
 
     // Send response
-    fireEvent.change(screen.getByPlaceholderText(/tell axel what to do/i), {
+    fireEvent.change(screen.getByPlaceholderText(/answer axel's question/i), {
       target: { value: "Bradley" },
     });
-    fireEvent.keyDown(screen.getByPlaceholderText(/tell axel what to do/i), {
+    fireEvent.keyDown(screen.getByPlaceholderText(/answer axel's question/i), {
       key: "Enter",
     });
 
@@ -437,7 +456,7 @@ describe("Chat onboarding integration", () => {
     expect(allQuestionTexts.length).toBe(1);
   });
 
-  it("handles initial completed onboarding state by unlocking and redirecting", async () => {
+  it("handles initial completed onboarding state by switching to live mode", async () => {
     vi.mocked(getOnboardingState).mockResolvedValue({
       state: {
         id: "state-1",
@@ -458,18 +477,24 @@ describe("Chat onboarding integration", () => {
       nextQuestion: null,
     });
 
+    // Mock the POST /users/onboarding/complete endpoint
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ success: true }),
+    } as unknown as Response);
+
     render(
       <MemoryRouter>
         <Chat />
       </MemoryRouter>,
     );
 
+    // Should complete onboarding and switch to live mode instead of navigating
     await waitFor(() => {
       expect(setOnboardingCompleted).toHaveBeenCalledWith(true);
       expect(refreshOnboardingStatus).toHaveBeenCalled();
-      expect(navigateMock).toHaveBeenCalledWith("/dashboard/office", {
-        replace: true,
-      });
+      // No longer navigating to /dashboard/office
+      expect(navigateMock).not.toHaveBeenCalled();
     });
   });
 
@@ -494,9 +519,7 @@ describe("Chat onboarding integration", () => {
       </MemoryRouter>,
     );
 
-    expect(
-      await screen.findByText("Failed to load onboarding state"),
-    ).toBeDefined();
+    expect(await screen.findByText("Failed to load state")).toBeDefined();
   });
 
   it("renders empty transcript when backend has no messages and no next question", async () => {
@@ -530,7 +553,7 @@ describe("Chat onboarding integration", () => {
     expect(screen.queryByText("What should I call you?")).toBeNull();
   });
 
-  it("unlocks app and redirects when backend marks onboarding complete", async () => {
+  it("completes onboarding and switches to live mode when backend marks onboarding complete", async () => {
     vi.mocked(getOnboardingState).mockResolvedValue({
       state: {
         id: "state-1",
@@ -577,6 +600,12 @@ describe("Chat onboarding integration", () => {
       nextQuestion: null,
     });
 
+    // Mock the POST /users/onboarding/complete endpoint
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ success: true }),
+    } as unknown as Response);
+
     render(
       <MemoryRouter>
         <Chat />
@@ -585,7 +614,7 @@ describe("Chat onboarding integration", () => {
 
     await screen.findByText("Which channels do you want?");
 
-    fireEvent.change(screen.getByPlaceholderText(/tell axel what to do/i), {
+    fireEvent.change(screen.getByPlaceholderText(/answer axel's question/i), {
       target: { value: "Telegram" },
     });
     fireEvent.click(screen.getByRole("button"));
@@ -593,13 +622,12 @@ describe("Chat onboarding integration", () => {
     await waitFor(() => {
       expect(setOnboardingCompleted).toHaveBeenCalledWith(true);
       expect(refreshOnboardingStatus).toHaveBeenCalled();
-      expect(navigateMock).toHaveBeenCalledWith("/dashboard/office", {
-        replace: true,
-      });
+      // No longer navigating to /dashboard/office - stays in chat
+      expect(navigateMock).not.toHaveBeenCalled();
     });
   });
 
-  it("handles 409 completed-state conflict by unlocking and redirecting", async () => {
+  it("handles 409 completed-state conflict by switching to live mode", async () => {
     vi.mocked(getOnboardingState).mockResolvedValue({
       state: {
         id: "state-1",
@@ -624,6 +652,12 @@ describe("Chat onboarding integration", () => {
       new OnboardingAlreadyCompleteError(),
     );
 
+    // Mock the POST /users/onboarding/complete endpoint
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ success: true }),
+    } as unknown as Response);
+
     render(
       <MemoryRouter>
         <Chat />
@@ -632,7 +666,7 @@ describe("Chat onboarding integration", () => {
 
     await screen.findByText("Which channels do you want?");
 
-    fireEvent.change(screen.getByPlaceholderText(/tell axel what to do/i), {
+    fireEvent.change(screen.getByPlaceholderText(/answer axel's question/i), {
       target: { value: "Telegram" },
     });
     fireEvent.click(screen.getByRole("button"));
@@ -640,9 +674,8 @@ describe("Chat onboarding integration", () => {
     await waitFor(() => {
       expect(setOnboardingCompleted).toHaveBeenCalledWith(true);
       expect(refreshOnboardingStatus).toHaveBeenCalled();
-      expect(navigateMock).toHaveBeenCalledWith("/dashboard/office", {
-        replace: true,
-      });
+      // No longer navigating to /dashboard/office - stays in chat
+      expect(navigateMock).not.toHaveBeenCalled();
     });
   });
 
@@ -677,14 +710,12 @@ describe("Chat onboarding integration", () => {
 
     await screen.findByText("Which channels do you want?");
 
-    fireEvent.change(screen.getByPlaceholderText(/tell axel what to do/i), {
+    fireEvent.change(screen.getByPlaceholderText(/answer axel's question/i), {
       target: { value: "Telegram" },
     });
     fireEvent.click(screen.getByRole("button"));
 
-    expect(
-      await screen.findByText("Failed to send onboarding message"),
-    ).toBeDefined();
+    expect(await screen.findByText("Failed to send message")).toBeDefined();
   });
 
   it("does not send message when input is empty", async () => {
@@ -762,13 +793,13 @@ describe("Chat onboarding integration", () => {
     await screen.findByText("Which channels do you want?");
 
     // Start first message
-    fireEvent.change(screen.getByPlaceholderText(/tell axel what to do/i), {
+    fireEvent.change(screen.getByPlaceholderText(/answer axel's question/i), {
       target: { value: "Telegram" },
     });
     fireEvent.click(screen.getByRole("button"));
 
     // Now try to send another message while first is still pending
-    fireEvent.change(screen.getByPlaceholderText(/tell axel what to do/i), {
+    fireEvent.change(screen.getByPlaceholderText(/answer axel's question/i), {
       target: { value: "Email" },
     });
     fireEvent.click(screen.getByRole("button"));
