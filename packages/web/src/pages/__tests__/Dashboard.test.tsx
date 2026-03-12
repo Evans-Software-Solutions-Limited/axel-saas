@@ -1,21 +1,23 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { MemoryRouter, Routes, Route } from "react-router";
 import { Dashboard } from "../Dashboard";
 
 // Mock useAuth hook
+const mockUseAuth = vi.fn(() => ({
+  onboardingCompleted: true,
+  isAuthenticated: true,
+  isLoading: false,
+  user: { id: "1", email: "test@test.com" },
+  session: {} as never,
+  error: null,
+  signIn: vi.fn(),
+  signUp: vi.fn(),
+  signOut: vi.fn(),
+}));
+
 vi.mock("@/hooks/useAuth", () => ({
-  useAuth: vi.fn(() => ({
-    onboardingCompleted: true,
-    isAuthenticated: true,
-    isLoading: false,
-    user: { id: "1", email: "test@test.com" },
-    session: {} as never,
-    error: null,
-    signIn: vi.fn(),
-    signUp: vi.fn(),
-    signOut: vi.fn(),
-  })),
+  useAuth: () => mockUseAuth(),
 }));
 
 function MockOutlet() {
@@ -23,6 +25,20 @@ function MockOutlet() {
 }
 
 describe("Dashboard", () => {
+  beforeEach(() => {
+    mockUseAuth.mockReturnValue({
+      onboardingCompleted: true,
+      isAuthenticated: true,
+      isLoading: false,
+      user: { id: "1", email: "test@test.com" },
+      session: {} as never,
+      error: null,
+      signIn: vi.fn(),
+      signUp: vi.fn(),
+      signOut: vi.fn(),
+    });
+  });
+
   it("renders sidebar with Office nav item", () => {
     render(
       <MemoryRouter initialEntries={["/dashboard/office"]}>
@@ -120,5 +136,65 @@ describe("Dashboard", () => {
     expect(
       screen.getByRole("link", { name: /terms/i }).getAttribute("href"),
     ).toBe("/terms");
+  });
+
+  it("redirects to chat when onboarding not completed and navigating to other page", () => {
+    mockUseAuth.mockReturnValue({
+      onboardingCompleted: false,
+      isAuthenticated: true,
+      isLoading: false,
+      user: { id: "1", email: "test@test.com" },
+      session: {} as never,
+      error: null,
+      signIn: vi.fn(),
+      signUp: vi.fn(),
+      signOut: vi.fn(),
+    });
+
+    render(
+      <MemoryRouter initialEntries={["/dashboard/office"]}>
+        <Routes>
+          <Route path="/dashboard" element={<Dashboard />}>
+            <Route path="office" element={<MockOutlet />} />
+            <Route path="chat" element={<div data-testid="chat">Chat</div>} />
+          </Route>
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    // Should have redirected to /dashboard/chat
+    expect(screen.getByTestId("chat")).toBeDefined();
+  });
+
+  it("navigates to chat when clicking locked nav item while onboarding incomplete", () => {
+    mockUseAuth.mockReturnValue({
+      onboardingCompleted: false,
+      isAuthenticated: true,
+      isLoading: false,
+      user: { id: "1", email: "test@test.com" },
+      session: {} as never,
+      error: null,
+      signIn: vi.fn(),
+      signUp: vi.fn(),
+      signOut: vi.fn(),
+    });
+
+    render(
+      <MemoryRouter initialEntries={["/dashboard/office"]}>
+        <Routes>
+          <Route path="/dashboard" element={<Dashboard />}>
+            <Route path="office" element={<MockOutlet />} />
+            <Route path="chat" element={<div data-testid="chat">Chat</div>} />
+          </Route>
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    // Click on Office nav item (which should be locked since onboarding incomplete)
+    const officeButton = screen.getByRole("button", { name: /office/i });
+    fireEvent.click(officeButton);
+
+    // Should navigate to chat instead of office
+    expect(screen.getByTestId("chat")).toBeDefined();
   });
 });

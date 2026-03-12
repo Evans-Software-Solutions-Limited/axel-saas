@@ -160,4 +160,36 @@ describe("onboardingApi", () => {
       "Network down",
     );
   });
+
+  it("throws when getOnboardingState returns success but missing required keys", async () => {
+    stateGetMock.mockResolvedValue({
+      data: {
+        success: true,
+        // missing state, messages, nextQuestion
+      },
+    });
+
+    await expect(getOnboardingState()).rejects.toThrow(
+      "Failed to fetch onboarding state",
+    );
+  });
+
+  it("throws when postOnboardingMessage returns success but missing required keys", async () => {
+    messagePostMock.mockResolvedValue({
+      data: {
+        success: true,
+        // missing state, messages, assistantResponse, isComplete
+      },
+    });
+
+    await expect(postOnboardingMessage("test")).rejects.toThrow(
+      "Failed to send onboarding message",
+    );
+  });
+
+  it("throws generic error when caught error has no status code", async () => {
+    messagePostMock.mockRejectedValue("string error not an object");
+
+    await expect(postOnboardingMessage("test")).rejects.toThrow();
+  });
 });

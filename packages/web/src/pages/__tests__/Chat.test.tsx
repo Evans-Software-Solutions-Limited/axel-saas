@@ -255,6 +255,20 @@ describe("Chat onboarding integration", () => {
     expect(await screen.findByText("State failed")).toBeDefined();
   });
 
+  it("shows generic error message when load fails with non-Error object", async () => {
+    vi.mocked(getOnboardingState).mockRejectedValue("string error");
+
+    render(
+      <MemoryRouter>
+        <Chat />
+      </MemoryRouter>,
+    );
+
+    expect(
+      await screen.findByText("Failed to load onboarding state"),
+    ).toBeDefined();
+  });
+
   it("renders empty transcript when backend has no messages and no next question", async () => {
     vi.mocked(getOnboardingState).mockResolvedValue({
       state: {
@@ -440,5 +454,114 @@ describe("Chat onboarding integration", () => {
     expect(
       await screen.findByText("Failed to send onboarding message"),
     ).toBeDefined();
+  });
+
+  it("does not send message when input is empty", async () => {
+    vi.mocked(getOnboardingState).mockResolvedValue({
+      state: {
+        id: "state-1",
+        status: "in_progress",
+        outstandingQuestions: ["channels"],
+        collectedAnswers: { name: "Bradley", role: "Founder" },
+        completedAt: null,
+        lastMessageAt: "2026-03-11T10:00:00.000Z",
+      },
+      messages: [
+        {
+          id: "m0",
+          role: "assistant",
+          content: "Which channels do you want?",
+          createdAt: "2026-03-11T10:00:00.000Z",
+        },
+      ],
+      nextQuestion: "Which channels do you want?",
+    });
+
+    render(
+      <MemoryRouter>
+        <Chat />
+      </MemoryRouter>,
+    );
+
+    await screen.findByText("Which channels do you want?");
+
+    // Try to send with empty input
+    fireEvent.click(screen.getByRole("button"));
+
+    // postOnboardingMessage should NOT have been called
+    expect(postOnboardingMessage).not.toHaveBeenCalled();
+  });
+
+  it("does not send message when already sending", async () => {
+    vi.mocked(getOnboardingState).mockResolvedValue({
+      state: {
+        id: "state-1",
+        status: "in_progress",
+        outstandingQuestions: ["channels"],
+        collectedAnswers: { name: "Bradley", role: "Founder" },
+        completedAt: null,
+        lastMessageAt: "2026-03-11T10:00:00.000Z",
+      },
+      messages: [
+        {
+          id: "m0",
+          role: "assistant",
+          content: "Which channels do you want?",
+          createdAt: "2026-03-11T10:00:00.000Z",
+        },
+      ],
+      nextQuestion: "Which channels do you want?",
+    });
+
+    // Make postOnboardingMessage hang (never resolve) to simulate isSending state
+    let resolvePostMessage: (value: unknown) => void;
+    vi.mocked(postOnboardingMessage).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolvePostMessage = resolve as (value: unknown) => void;
+        }),
+    );
+
+    render(
+      <MemoryRouter>
+        <Chat />
+      </MemoryRouter>,
+    );
+
+    await screen.findByText("Which channels do you want?");
+
+    // Start first message
+    fireEvent.change(screen.getByPlaceholderText(/tell axel what to do/i), {
+      target: { value: "Telegram" },
+    });
+    fireEvent.click(screen.getByRole("button"));
+
+    // Now try to send another message while first is still pending
+    fireEvent.change(screen.getByPlaceholderText(/tell axel what to do/i), {
+      target: { value: "Email" },
+    });
+    fireEvent.click(screen.getByRole("button"));
+
+    // postOnboardingMessage should only have been called once
+    expect(postOnboardingMessage).toHaveBeenCalledTimes(1);
+
+    // Resolve the pending promise
+    resolvePostMessage!({
+      state: {
+        id: "state-1",
+        status: "completed",
+        outstandingQuestions: [],
+        collectedAnswers: {
+          name: "Bradley",
+          role: "Founder",
+          channels: "Telegram",
+        },
+        completedAt: "2026-03-11T10:10:00.000Z",
+        lastMessageAt: "2026-03-11T10:10:00.000Z",
+      },
+      messages: [],
+      assistantResponse: "Done",
+      isComplete: true,
+    });
   });
 });
