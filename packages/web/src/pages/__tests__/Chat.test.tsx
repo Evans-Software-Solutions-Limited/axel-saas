@@ -12,6 +12,10 @@ import { useAuth } from "@/hooks/useAuth";
 
 const navigateMock = vi.fn();
 
+const { onboardingCompletePostMock } = vi.hoisted(() => ({
+  onboardingCompletePostMock: vi.fn(),
+}));
+
 vi.mock("react-router", async () => {
   const actual = await import("react-router");
   return {
@@ -22,6 +26,20 @@ vi.mock("react-router", async () => {
 
 vi.mock("@/hooks/useAuth", () => ({
   useAuth: vi.fn(),
+}));
+
+vi.mock("@/lib/eden", () => ({
+  api: {
+    core: {
+      users: {
+        onboarding: {
+          complete: {
+            post: onboardingCompletePostMock,
+          },
+        },
+      },
+    },
+  },
 }));
 
 vi.mock("../chat/onboardingApi", () => ({
@@ -47,11 +65,10 @@ describe("Chat onboarding integration", () => {
       success: true,
       status: "not_found",
     });
-    // Mock fetch for onboarding complete endpoint
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ success: true }),
-    }) as unknown as typeof fetch;
+    // Mock Eden client for onboarding complete endpoint
+    onboardingCompletePostMock.mockResolvedValue({
+      data: { success: true },
+    });
     vi.mocked(useAuth).mockReturnValue({
       isAuthenticated: true,
       isLoading: false,
@@ -478,10 +495,9 @@ describe("Chat onboarding integration", () => {
     });
 
     // Mock the POST /users/onboarding/complete endpoint
-    vi.mocked(fetch).mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ success: true }),
-    } as unknown as Response);
+    onboardingCompletePostMock.mockResolvedValue({
+      data: { success: true },
+    });
 
     render(
       <MemoryRouter>
@@ -601,10 +617,9 @@ describe("Chat onboarding integration", () => {
     });
 
     // Mock the POST /users/onboarding/complete endpoint
-    vi.mocked(fetch).mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ success: true }),
-    } as unknown as Response);
+    onboardingCompletePostMock.mockResolvedValue({
+      data: { success: true },
+    });
 
     render(
       <MemoryRouter>
@@ -653,10 +668,9 @@ describe("Chat onboarding integration", () => {
     );
 
     // Mock the POST /users/onboarding/complete endpoint
-    vi.mocked(fetch).mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ success: true }),
-    } as unknown as Response);
+    onboardingCompletePostMock.mockResolvedValue({
+      data: { success: true },
+    });
 
     render(
       <MemoryRouter>

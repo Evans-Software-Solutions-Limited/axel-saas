@@ -46,6 +46,11 @@ interface PostMessageSuccessPayload {
   nextQuestion: string | null;
 }
 
+interface CompleteOnboardingSuccessPayload {
+  success: true;
+  message: string;
+}
+
 interface ApiErrorLike {
   status?: number;
   message?: string;
@@ -157,4 +162,26 @@ export async function postOnboardingMessage(
 
     throw error;
   }
+}
+
+export interface CompleteOnboardingResult {
+  success: boolean;
+  message: string;
+}
+
+export async function completeOnboarding(): Promise<CompleteOnboardingResult> {
+  const response = await api.core.users["onboarding"].complete.post();
+  const data = response.data;
+
+  if (data?.success === true && "message" in data) {
+    return data as CompleteOnboardingSuccessPayload;
+  }
+
+  const responseError = getResponseError(response);
+  const errorMessage =
+    responseError?.message ??
+    getErrorMessage(responseError?.value) ??
+    "Failed to complete onboarding";
+
+  throw new Error(errorMessage);
 }

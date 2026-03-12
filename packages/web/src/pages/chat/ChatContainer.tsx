@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
+import { api } from "@/lib/eden";
 import {
   getOnboardingState,
   OnboardingAlreadyCompleteError,
@@ -39,16 +40,10 @@ export function ChatContainer() {
   const completeOnboarding = useCallback(async () => {
     try {
       // Call the backend to complete onboarding and generate workspace files
-      const completeResponse = await fetch("/api/users/onboarding/complete", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-      });
+      const response = await api.core.users["onboarding"].complete.post();
 
-      if (!completeResponse.ok) {
-        const errorData = await completeResponse.json();
-        console.error("Onboarding complete error:", errorData);
+      if (!response.data?.success) {
+        console.error("Onboarding complete error:", response.data?.error);
         // Continue anyway - the agent is still usable
       }
 
@@ -70,9 +65,17 @@ export function ChatContainer() {
 
     try {
       // First check if we should be in live mode
-      const agentStatus = await getAgentStatus();
+      // Note: getAgentStatus throws for new users - we catch and fall through to onboarding
+      let agentActive = false;
+      try {
+        const agentStatus = await getAgentStatus();
+        agentActive = agentStatus.success && agentStatus.status === "active";
+      } catch {
+        // getAgentStatus throws for new users - that's fine, fall through to onboarding
+        // This is expected when user hasn't completed onboarding yet
+      }
 
-      if (agentStatus.success && agentStatus.status === "active") {
+      if (agentActive) {
         // User has completed onboarding and has an active agent
         setChatMode("live");
         // Initialize with empty messages for live chat

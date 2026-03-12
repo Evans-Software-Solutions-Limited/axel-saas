@@ -308,11 +308,6 @@ export const onboardingHandler = new Elysia({ name: "OnboardingHandler" })
           return { success: false, error: "User not found" };
         }
 
-        // If already completed, return success
-        if (dbUser.onboardingCompleted) {
-          return { success: true, message: "Onboarding already completed" };
-        }
-
         // Get onboarding state with collected answers
         const { state: onboardingState } =
           await onboardingRepository.getStateWithMessages(dbUser.id);
@@ -323,6 +318,8 @@ export const onboardingHandler = new Elysia({ name: "OnboardingHandler" })
         }
 
         // Check if onboarding is actually complete (all required questions answered)
+        // Note: We don't early-return here - we need to regenerate workspace files
+        // even if onboarding was already marked complete (e.g., for re-provisioning)
         if (!onboardingRepository.isComplete(onboardingState)) {
           set.status = 400;
           return {
@@ -367,13 +364,13 @@ export const onboardingHandler = new Elysia({ name: "OnboardingHandler" })
           collectedAnswers,
         );
 
-        // Mark onboarding as complete in the database
+        // Mark onboarding as complete in the database (idempotent - safe to call again)
         await onboardingRepository.markCompleted(dbUser.id);
 
+        // Don't leak internal workspacePath to the client
         return {
           success: true,
           message: "Onboarding completed successfully",
-          workspacePath,
         };
       } catch (error) {
         console.error("Onboarding complete error:", error);
