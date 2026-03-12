@@ -18,6 +18,7 @@ vi.mock("../onboardingRepository", () => {
     onboardingRepository: {
       getStateWithMessages: vi.fn(),
       getOrCreateState: vi.fn(),
+      ensureTranscript: vi.fn(),
       processMessage: vi.fn(),
     },
     QUESTION_PROMPTS: {

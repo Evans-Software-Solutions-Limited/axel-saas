@@ -9,13 +9,6 @@ import {
 } from "./onboardingApi";
 import { ChatPresenter } from "./ChatPresenter";
 
-const toSyntheticAssistantMessage = (content: string): OnboardingMessage => ({
-  id: `assistant-next-question-${Date.now()}`,
-  role: "assistant",
-  content,
-  createdAt: new Date().toISOString(),
-});
-
 const toOptimisticUserMessage = (content: string): OnboardingMessage => ({
   id: `user-optimistic-${Date.now()}`,
   role: "user",
@@ -53,14 +46,7 @@ export function ChatContainer() {
       }
 
       setIsOnboardingMode(true);
-
-      if (result.messages.length > 0) {
-        setMessages(result.messages);
-      } else if (result.nextQuestion) {
-        setMessages([toSyntheticAssistantMessage(result.nextQuestion)]);
-      } else {
-        setMessages([]);
-      }
+      setMessages(result.messages);
     } catch (loadError) {
       const message =
         loadError instanceof Error

@@ -60,7 +60,14 @@ describe("Chat onboarding integration", () => {
         completedAt: null,
         lastMessageAt: "2026-03-11T10:00:00.000Z",
       },
-      messages: [],
+      messages: [
+        {
+          id: "m1",
+          role: "assistant",
+          content: "What do you do for work?",
+          createdAt: "2026-03-11T10:00:00.000Z",
+        },
+      ],
       nextQuestion: "What do you do for work?",
     });
 
@@ -133,7 +140,14 @@ describe("Chat onboarding integration", () => {
         completedAt: null,
         lastMessageAt: null,
       },
-      messages: [],
+      messages: [
+        {
+          id: "m0",
+          role: "assistant",
+          content: "What should I call you?",
+          createdAt: "2026-03-11T10:03:30.000Z",
+        },
+      ],
       nextQuestion: "What should I call you?",
     });
 
@@ -188,6 +202,8 @@ describe("Chat onboarding integration", () => {
     await waitFor(() => {
       expect(postOnboardingMessage).toHaveBeenCalledWith("Bradley");
     });
+    expect(screen.getByText("What should I call you?")).toBeDefined();
+    expect(screen.getByText("Bradley")).toBeDefined();
     expect(await screen.findByText("What do you do for work?")).toBeDefined();
   });
 
@@ -201,7 +217,14 @@ describe("Chat onboarding integration", () => {
         completedAt: "2026-03-11T10:10:00.000Z",
         lastMessageAt: "2026-03-11T10:10:00.000Z",
       },
-      messages: [],
+      messages: [
+        {
+          id: "m0",
+          role: "assistant",
+          content: "Which channels do you want?",
+          createdAt: "2026-03-11T10:00:00.000Z",
+        },
+      ],
       nextQuestion: null,
     });
 
@@ -242,7 +265,14 @@ describe("Chat onboarding integration", () => {
         completedAt: null,
         lastMessageAt: null,
       },
-      messages: [],
+      messages: [
+        {
+          id: "m0",
+          role: "assistant",
+          content: "Which channels do you want?",
+          createdAt: "2026-03-11T10:00:00.000Z",
+        },
+      ],
       nextQuestion: null,
     });
 
@@ -266,7 +296,14 @@ describe("Chat onboarding integration", () => {
         completedAt: null,
         lastMessageAt: "2026-03-11T10:00:00.000Z",
       },
-      messages: [],
+      messages: [
+        {
+          id: "m0",
+          role: "assistant",
+          content: "Which channels do you want?",
+          createdAt: "2026-03-11T10:00:00.000Z",
+        },
+      ],
       nextQuestion: "Which channels do you want?",
     });
 
@@ -327,7 +364,14 @@ describe("Chat onboarding integration", () => {
         completedAt: null,
         lastMessageAt: "2026-03-11T10:00:00.000Z",
       },
-      messages: [],
+      messages: [
+        {
+          id: "m0",
+          role: "assistant",
+          content: "Which channels do you want?",
+          createdAt: "2026-03-11T10:00:00.000Z",
+        },
+      ],
       nextQuestion: "Which channels do you want?",
     });
 
@@ -367,7 +411,14 @@ describe("Chat onboarding integration", () => {
         completedAt: null,
         lastMessageAt: "2026-03-11T10:00:00.000Z",
       },
-      messages: [],
+      messages: [
+        {
+          id: "m0",
+          role: "assistant",
+          content: "Which channels do you want?",
+          createdAt: "2026-03-11T10:00:00.000Z",
+        },
+      ],
       nextQuestion: "Which channels do you want?",
     });
 

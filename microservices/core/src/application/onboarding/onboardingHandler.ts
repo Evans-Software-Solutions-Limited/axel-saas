@@ -83,13 +83,18 @@ export const onboardingHandler = new Elysia({ name: "OnboardingHandler" })
           };
         }
 
-        const { state, messages } =
-          await onboardingRepository.getStateWithMessages(dbUser.id);
+        const { state } = await onboardingRepository.getStateWithMessages(
+          dbUser.id,
+        );
 
         if (!state) {
           // Create initial state if doesn't exist
           const newState = await onboardingRepository.getOrCreateState(
             dbUser.id,
+          );
+          const messages = await onboardingRepository.ensureTranscript(
+            dbUser.id,
+            newState,
           );
           const nextQuestion = onboardingRepository.getNextQuestion(newState);
 
@@ -103,13 +108,22 @@ export const onboardingHandler = new Elysia({ name: "OnboardingHandler" })
               completedAt: null,
               lastMessageAt: newState.lastMessageAt?.toISOString() ?? null,
             },
-            messages: [],
+            messages: messages.map((m) => ({
+              id: m.id,
+              role: m.role as "user" | "assistant",
+              content: m.content,
+              createdAt: m.createdAt.toISOString(),
+            })),
             nextQuestion: nextQuestion
               ? QUESTION_PROMPTS[nextQuestion as QuestionKey]
               : null,
           };
         }
 
+        const messages = await onboardingRepository.ensureTranscript(
+          dbUser.id,
+          state,
+        );
         const nextQuestion = onboardingRepository.getNextQuestion(state);
 
         return {

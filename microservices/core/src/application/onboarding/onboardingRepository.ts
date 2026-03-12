@@ -160,6 +160,29 @@ export class OnboardingRepository {
   }
 
   /**
+   * Ensure the transcript has a persisted assistant prompt.
+   * This prevents the frontend from relying on synthetic messages that vanish
+   * on the next server round-trip.
+   */
+  async ensureTranscript(
+    userId: string,
+    state: OnboardingState,
+  ): Promise<OnboardingMessage[]> {
+    const messages = await this.getMessages(userId);
+    if (messages.length > 0 || state.status === "completed") {
+      return messages;
+    }
+
+    await this.addMessage(
+      userId,
+      "assistant",
+      this.generateAssistantResponse(state, ""),
+    );
+
+    return this.getMessages(userId);
+  }
+
+  /**
    * Add a message to the onboarding conversation
    */
   async addMessage(

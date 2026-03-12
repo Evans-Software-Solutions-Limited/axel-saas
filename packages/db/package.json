@@ -11,7 +11,9 @@
     "test": "vitest",
     "test:unit": "vitest run",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate",
+    "db:migrate": "bun run ./scripts/migrate.ts",
+    "db:migrate:raw": "drizzle-kit migrate",
+    "db:baseline": "DRIZZLE_BASELINE_ONLY=1 bun run ./scripts/migrate.ts",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio"
   },
