@@ -41,6 +41,10 @@ function readMigrationRecords(): MigrationRecord[] {
     entries: JournalEntry[];
   };
 
+  // Note: This custom hash generation matches Drizzle's approach (SHA-256 of SQL content).
+  // If migrations fail to apply after baselining due to hash mismatches, the hash
+  // calculation may need to match Drizzle-kit's exact format. Current implementation
+  // hashes only the SQL file content, which should align with drizzle-kit's behavior.
   return journal.entries.map((entry) => {
     const migrationPath = path.join(migrationsFolder, `${entry.tag}.sql`);
     const migrationSql = fs.readFileSync(migrationPath, "utf8");

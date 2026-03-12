@@ -10,6 +10,7 @@ interface ChatPresenterProps {
   isLoadingState: boolean;
   isSending: boolean;
   isOnboardingMode: boolean;
+  nextQuestion: string | null;
   error: string | null;
   onInputChange: (value: string) => void;
   onSend: () => void;
@@ -21,6 +22,7 @@ export function ChatPresenter({
   isLoadingState,
   isSending,
   isOnboardingMode,
+  nextQuestion,
   error,
   onInputChange,
   onSend,
@@ -47,6 +49,15 @@ export function ChatPresenter({
         )}
 
         {error && <p className="text-sm text-red-400">{error}</p>}
+
+        {nextQuestion && (
+          <div className="bg-surface-raised border border-border rounded-lg p-4">
+            <p className="text-xs uppercase tracking-wide text-muted mb-2">
+              Next question
+            </p>
+            <p className="text-sm text-text">{nextQuestion}</p>
+          </div>
+        )}
 
         {messages.map((msg) => (
           <div

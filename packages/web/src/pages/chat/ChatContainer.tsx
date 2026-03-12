@@ -22,6 +22,7 @@ export function ChatContainer() {
   const [isLoadingState, setIsLoadingState] = useState(true);
   const [isSending, setIsSending] = useState(false);
   const [isOnboardingMode, setIsOnboardingMode] = useState(false);
+  const [nextQuestion, setNextQuestion] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
   const { setOnboardingCompleted, refreshOnboardingStatus } = useAuth();
@@ -47,6 +48,7 @@ export function ChatContainer() {
 
       setIsOnboardingMode(true);
       setMessages(result.messages);
+      setNextQuestion(result.nextQuestion);
     } catch (loadError) {
       const message =
         loadError instanceof Error
@@ -102,6 +104,7 @@ export function ChatContainer() {
       isLoadingState={isLoadingState}
       isSending={isSending}
       isOnboardingMode={isOnboardingMode}
+      nextQuestion={nextQuestion}
       error={error}
       onInputChange={setInput}
       onSend={() => {
