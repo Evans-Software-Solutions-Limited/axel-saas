@@ -101,6 +101,7 @@ describe("onboardingApi", () => {
         ],
         assistantResponse: "Which channels do you want?",
         isComplete: false,
+        nextQuestion: "Which channels do you want?",
       },
     });
 
