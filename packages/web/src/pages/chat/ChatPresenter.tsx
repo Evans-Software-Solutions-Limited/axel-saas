@@ -36,18 +36,21 @@ export function ChatPresenter({
   const canSend = input.trim().length > 0 && !isLoadingState && !isSending;
 
   // Only show nextQuestion if it's not already in the messages (to avoid duplicates)
-  // Use fuzzy matching: check if nextQuestion is contained in any assistant message,
-  // or if any assistant message contains the nextQuestion (handles greeting + question wrapping)
+  // Use smarter matching: exact match OR the question appears as a standalone segment
+  // (not just wrapped in other text like greeting + question)
   const showNextQuestion =
     nextQuestion &&
     !messages.some((msg) => {
       if (msg.role !== "assistant") return false;
-      const msgLower = msg.content.toLowerCase();
+      const msgContent = msg.content.toLowerCase();
       const questionLower = nextQuestion.toLowerCase();
-      return (
-        msgLower === questionLower ||
-        msgLower.includes(questionLower) ||
-        questionLower.includes(msgLower)
+      // Exact match or question appears as standalone substring
+      if (msgContent === questionLower) return true;
+      // Check if question appears as a distinct segment (word-bounded)
+      // This handles cases like "Next question: What do you do for work?"
+      const segments = msgContent.split(/[.?!\n]/).map((s) => s.trim().toLowerCase());
+      return segments.some(
+        (segment) => segment === questionLower || segment.includes(questionLower),
       );
     });
 

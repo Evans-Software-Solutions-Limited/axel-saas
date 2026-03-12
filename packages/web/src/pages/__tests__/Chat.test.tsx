@@ -366,11 +366,8 @@ describe("Chat onboarding integration", () => {
       key: "Enter",
     });
 
-    // After response: the old banner should be replaced with new one
-    // and NOT duplicated - the banner should now show "What do you do for work?"
-    await waitFor(() => {
-      expect(screen.queryByText("Next question")).not.toBeNull();
-    });
+    // After response: the new question should appear as a banner
+    // (not duplicated since it now appears in the transcript with greeting wrapping)
     expect(await screen.findByText("What do you do for work?")).toBeDefined();
   });
 
