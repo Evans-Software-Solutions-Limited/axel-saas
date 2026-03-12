@@ -8,6 +8,7 @@ import {
   jsonb,
   uniqueIndex,
   index,
+  foreignKey,
 } from "drizzle-orm/pg-core";
 
 // ─── Enums ────────────────────────────────────────────────────────────────────
@@ -41,8 +42,8 @@ export const users = pgTable(
   "users",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    supabaseUserId: text("supabase_user_id").notNull().unique(),
-    email: text("email").notNull().unique(),
+    supabaseUserId: text("supabase_user_id").notNull(),
+    email: text("email").notNull(),
     fullName: text("full_name"),
     onboardingCompleted: boolean("onboarding_completed")
       .notNull()
@@ -71,11 +72,9 @@ export const subscriptions = pgTable(
   "subscriptions",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    userId: uuid("user_id")
-      .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
-    stripeCustomerId: text("stripe_customer_id").unique(),
-    stripeSubscriptionId: text("stripe_subscription_id").unique(),
+    userId: uuid("user_id").notNull(),
+    stripeCustomerId: text("stripe_customer_id"),
+    stripeSubscriptionId: text("stripe_subscription_id"),
     tier: subscriptionTierEnum("tier").notNull(),
     status: subscriptionStatusEnum("status").notNull().default("incomplete"),
     currentPeriodEnd: timestamp("current_period_end", { withTimezone: true }),
@@ -91,6 +90,14 @@ export const subscriptions = pgTable(
     stripeCustomerIdIdx: uniqueIndex("subscriptions_stripe_customer_id_idx").on(
       table.stripeCustomerId,
     ),
+    stripeSubscriptionIdIdx: uniqueIndex(
+      "subscriptions_stripe_subscription_id_idx",
+    ).on(table.stripeSubscriptionId),
+    subscriptionsUserFk: foreignKey({
+      columns: [table.userId],
+      foreignColumns: [users.id],
+      name: "subscriptions_user_id_fkey",
+    }).onDelete("cascade"),
   }),
 );
 
@@ -103,10 +110,7 @@ export const provisioningState = pgTable(
   "provisioning_state",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    userId: uuid("user_id")
-      .notNull()
-      .unique()
-      .references(() => users.id, { onDelete: "cascade" }),
+    userId: uuid("user_id").notNull(),
     status: provisioningStatusEnum("status").notNull().default("pending"),
     ecsTaskArn: text("ecs_task_arn"),
     workspacePath: text("workspace_path"),
@@ -121,6 +125,11 @@ export const provisioningState = pgTable(
   },
   (table) => ({
     userIdIdx: uniqueIndex("provisioning_state_user_id_idx").on(table.userId),
+    provisioningStateUserFk: foreignKey({
+      columns: [table.userId],
+      foreignColumns: [users.id],
+      name: "provisioning_state_user_id_fkey",
+    }).onDelete("cascade"),
   }),
 );
 
@@ -133,10 +142,7 @@ export const onboardingAnswers = pgTable(
   "onboarding_answers",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    userId: uuid("user_id")
-      .notNull()
-      .unique()
-      .references(() => users.id, { onDelete: "cascade" }),
+    userId: uuid("user_id").notNull(),
     answers: jsonb("answers")
       .$type<Record<string, unknown>>()
       .notNull()
@@ -151,6 +157,11 @@ export const onboardingAnswers = pgTable(
   },
   (table) => ({
     userIdIdx: uniqueIndex("onboarding_answers_user_id_idx").on(table.userId),
+    onboardingAnswersUserFk: foreignKey({
+      columns: [table.userId],
+      foreignColumns: [users.id],
+      name: "onboarding_answers_user_id_fkey",
+    }).onDelete("cascade"),
   }),
 );
 
@@ -169,9 +180,7 @@ export const onboardingMessages = pgTable(
   "onboarding_messages",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    userId: uuid("user_id")
-      .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
+    userId: uuid("user_id").notNull(),
     role: text("role").notNull(), // "user" or "assistant"
     content: text("content").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true })
@@ -183,6 +192,11 @@ export const onboardingMessages = pgTable(
     createdAtIdx: index("onboarding_messages_created_at_idx").on(
       table.createdAt,
     ),
+    onboardingMessagesUserFk: foreignKey({
+      columns: [table.userId],
+      foreignColumns: [users.id],
+      name: "onboarding_messages_user_id_fkey",
+    }).onDelete("cascade"),
   }),
 );
 
@@ -193,10 +207,7 @@ export const onboardingState = pgTable(
   "onboarding_state",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    userId: uuid("user_id")
-      .notNull()
-      .unique()
-      .references(() => users.id, { onDelete: "cascade" }),
+    userId: uuid("user_id").notNull(),
     status: onboardingStatusEnum("status").notNull().default("not_started"),
     // Ordered questions the backend wants answered - stored as JSON array
     outstandingQuestions: jsonb("outstanding_questions")
@@ -226,6 +237,11 @@ export const onboardingState = pgTable(
   },
   (table) => ({
     userIdIdx: uniqueIndex("onboarding_state_user_id_idx").on(table.userId),
+    onboardingStateUserFk: foreignKey({
+      columns: [table.userId],
+      foreignColumns: [users.id],
+      name: "onboarding_state_user_id_fkey",
+    }).onDelete("cascade"),
   }),
 );
 
