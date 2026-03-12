@@ -207,6 +207,170 @@ describe("Chat onboarding integration", () => {
     expect(await screen.findByText("What do you do for work?")).toBeDefined();
   });
 
+  it("updates nextQuestion after sending message (fixes stale banner bug)", async () => {
+    // Initial state: question is "What should I call you?"
+    vi.mocked(getOnboardingState).mockResolvedValue({
+      state: {
+        id: "state-1",
+        status: "in_progress",
+        outstandingQuestions: ["role"],
+        collectedAnswers: {},
+        completedAt: null,
+        lastMessageAt: null,
+      },
+      messages: [
+        {
+          id: "m0",
+          role: "assistant",
+          content: "What should I call you?",
+          createdAt: "2026-03-11T10:03:30.000Z",
+        },
+      ],
+      nextQuestion: "What should I call you?",
+    });
+
+    // After sending "Bradley", backend returns next question as "What do you do for work?"
+    vi.mocked(postOnboardingMessage).mockResolvedValue({
+      state: {
+        id: "state-1",
+        status: "in_progress",
+        outstandingQuestions: ["channels"],
+        collectedAnswers: { name: "Bradley" },
+        completedAt: null,
+        lastMessageAt: "2026-03-11T10:05:00.000Z",
+      },
+      messages: [
+        {
+          id: "m1",
+          role: "assistant",
+          content: "What should I call you?",
+          createdAt: "2026-03-11T10:04:00.000Z",
+        },
+        {
+          id: "m2",
+          role: "user",
+          content: "Bradley",
+          createdAt: "2026-03-11T10:04:30.000Z",
+        },
+        {
+          id: "m3",
+          role: "assistant",
+          content: "What do you do for work?",
+          createdAt: "2026-03-11T10:05:00.000Z",
+        },
+      ],
+      assistantResponse: "What do you do for work?",
+      isComplete: false,
+    });
+
+    render(
+      <MemoryRouter>
+        <Chat />
+      </MemoryRouter>,
+    );
+
+    // Initial: banner shows "What should I call you?"
+    expect(await screen.findByText("What should I call you?")).toBeDefined();
+
+    // Send response
+    fireEvent.change(screen.getByPlaceholderText(/tell axel what to do/i), {
+      target: { value: "Bradley" },
+    });
+    fireEvent.keyDown(screen.getByPlaceholderText(/tell axel what to do/i), {
+      key: "Enter",
+    });
+
+    // After response: new banner should show "What do you do for work?"
+    // and old banner "What should I call you?" should NOT be duplicated
+    await waitFor(() => {
+      expect(screen.getAllByText("What should I call you?").length).toBe(1);
+    });
+    expect(await screen.findByText("What do you do for work?")).toBeDefined();
+  });
+
+  it("does not show stale banner when assistant wraps question with greeting", async () => {
+    // Initial state
+    vi.mocked(getOnboardingState).mockResolvedValue({
+      state: {
+        id: "state-1",
+        status: "in_progress",
+        outstandingQuestions: ["role"],
+        collectedAnswers: {},
+        completedAt: null,
+        lastMessageAt: null,
+      },
+      messages: [
+        {
+          id: "m0",
+          role: "assistant",
+          content: "What should I call you?",
+          createdAt: "2026-03-11T10:03:30.000Z",
+        },
+      ],
+      nextQuestion: "What should I call you?",
+    });
+
+    // After sending "Bradley", assistant response wraps the question with greeting
+    vi.mocked(postOnboardingMessage).mockResolvedValue({
+      state: {
+        id: "state-1",
+        status: "in_progress",
+        outstandingQuestions: ["channels"],
+        collectedAnswers: { name: "Bradley" },
+        completedAt: null,
+        lastMessageAt: "2026-03-11T10:05:00.000Z",
+      },
+      messages: [
+        {
+          id: "m1",
+          role: "assistant",
+          content: "What should I call you?",
+          createdAt: "2026-03-11T10:04:00.000Z",
+        },
+        {
+          id: "m2",
+          role: "user",
+          content: "Bradley",
+          createdAt: "2026-03-11T10:04:30.000Z",
+        },
+        {
+          id: "m3",
+          role: "assistant",
+          content:
+            "Thanks Bradley! Your next question is: What do you do for work?",
+          createdAt: "2026-03-11T10:05:00.000Z",
+        },
+      ],
+      assistantResponse:
+        "Thanks Bradley! Your next question is: What do you do for work?",
+      isComplete: false,
+    });
+
+    render(
+      <MemoryRouter>
+        <Chat />
+      </MemoryRouter>,
+    );
+
+    // Initial: banner shows "What should I call you?"
+    expect(await screen.findByText("What should I call you?")).toBeDefined();
+
+    // Send response
+    fireEvent.change(screen.getByPlaceholderText(/tell axel what to do/i), {
+      target: { value: "Bradley" },
+    });
+    fireEvent.keyDown(screen.getByPlaceholderText(/tell axel what to do/i), {
+      key: "Enter",
+    });
+
+    // After response: the old banner should be replaced with new one
+    // and NOT duplicated - the banner should now show "What do you do for work?"
+    await waitFor(() => {
+      expect(screen.queryByText("Next question")).not.toBeNull();
+    });
+    expect(await screen.findByText("What do you do for work?")).toBeDefined();
+  });
+
   it("handles initial completed onboarding state by unlocking and redirecting", async () => {
     vi.mocked(getOnboardingState).mockResolvedValue({
       state: {

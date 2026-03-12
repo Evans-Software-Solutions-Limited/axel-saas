@@ -36,11 +36,20 @@ export function ChatPresenter({
   const canSend = input.trim().length > 0 && !isLoadingState && !isSending;
 
   // Only show nextQuestion if it's not already in the messages (to avoid duplicates)
+  // Use fuzzy matching: check if nextQuestion is contained in any assistant message,
+  // or if any assistant message contains the nextQuestion (handles greeting + question wrapping)
   const showNextQuestion =
     nextQuestion &&
-    !messages.some(
-      (msg) => msg.content === nextQuestion && msg.role === "assistant",
-    );
+    !messages.some((msg) => {
+      if (msg.role !== "assistant") return false;
+      const msgLower = msg.content.toLowerCase();
+      const questionLower = nextQuestion.toLowerCase();
+      return (
+        msgLower === questionLower ||
+        msgLower.includes(questionLower) ||
+        questionLower.includes(msgLower)
+      );
+    });
 
   return (
     <div className="h-full flex flex-col p-6">
