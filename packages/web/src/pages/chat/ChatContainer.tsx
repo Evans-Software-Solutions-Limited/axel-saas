@@ -29,8 +29,8 @@ export function ChatContainer() {
 
   const completeOnboarding = useCallback(async () => {
     setIsOnboardingMode(false);
-    setOnboardingCompleted?.(true);
-    await refreshOnboardingStatus?.();
+    setOnboardingCompleted(true);
+    await refreshOnboardingStatus();
     navigate("/dashboard/office", { replace: true });
   }, [navigate, refreshOnboardingStatus, setOnboardingCompleted]);
 

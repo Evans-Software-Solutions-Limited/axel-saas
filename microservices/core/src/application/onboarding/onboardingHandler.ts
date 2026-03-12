@@ -83,9 +83,8 @@ export const onboardingHandler = new Elysia({ name: "OnboardingHandler" })
           };
         }
 
-        const { state } = await onboardingRepository.getStateWithMessages(
-          dbUser.id,
-        );
+        const { state, messages: existingMessages } =
+          await onboardingRepository.getStateWithMessages(dbUser.id);
 
         if (!state) {
           // Create initial state if doesn't exist
@@ -120,10 +119,12 @@ export const onboardingHandler = new Elysia({ name: "OnboardingHandler" })
           };
         }
 
-        const messages = await onboardingRepository.ensureTranscript(
-          dbUser.id,
-          state,
-        );
+        // Use existing messages from getStateWithMessages; only call ensureTranscript
+        // if we have no messages yet (to add the initial assistant prompt).
+        const messages =
+          existingMessages.length > 0
+            ? existingMessages
+            : await onboardingRepository.ensureTranscript(dbUser.id, state);
         const nextQuestion = onboardingRepository.getNextQuestion(state);
 
         return {

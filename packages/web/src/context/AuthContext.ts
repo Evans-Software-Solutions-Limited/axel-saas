@@ -16,8 +16,8 @@ export interface AuthState {
 }
 
 export interface AuthContextValue extends AuthState {
-  setOnboardingCompleted?: (completed: boolean) => void;
-  refreshOnboardingStatus?: () => Promise<void>;
+  setOnboardingCompleted: (completed: boolean) => void;
+  refreshOnboardingStatus: () => Promise<void>;
   signUp: (
     email: string,
     password: string,
