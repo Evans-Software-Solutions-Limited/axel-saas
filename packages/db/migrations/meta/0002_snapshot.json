@@ -67,8 +67,8 @@
         }
       },
       "foreignKeys": {
-        "onboarding_answers_user_id_users_id_fk": {
-          "name": "onboarding_answers_user_id_users_id_fk",
+        "onboarding_answers_user_id_fkey": {
+          "name": "onboarding_answers_user_id_fkey",
           "tableFrom": "onboarding_answers",
           "tableTo": "users",
           "columnsFrom": ["user_id"],
@@ -358,8 +358,8 @@
         }
       },
       "foreignKeys": {
-        "provisioning_state_user_id_users_id_fk": {
-          "name": "provisioning_state_user_id_users_id_fk",
+        "provisioning_state_user_id_fkey": {
+          "name": "provisioning_state_user_id_fkey",
           "tableFrom": "provisioning_state",
           "tableTo": "users",
           "columnsFrom": ["user_id"],
@@ -487,8 +487,8 @@
         }
       },
       "foreignKeys": {
-        "subscriptions_user_id_users_id_fk": {
-          "name": "subscriptions_user_id_users_id_fk",
+        "subscriptions_user_id_fkey": {
+          "name": "subscriptions_user_id_fkey",
           "tableFrom": "subscriptions",
           "tableTo": "users",
           "columnsFrom": ["user_id"],

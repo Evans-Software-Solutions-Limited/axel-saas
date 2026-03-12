@@ -22,6 +22,13 @@
       "when": 1773246028713,
       "tag": "0002_onboarding_state",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1773249428072,
+      "tag": "0003_talented_kinsey_walden",
+      "breakpoints": true
     }
   ]
 }

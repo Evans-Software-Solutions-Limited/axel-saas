@@ -5,6 +5,7 @@
 This package uses Drizzle's generated migration flow for staging and production.
 
 - Generate a schema migration: `bun run --filter @axel-saas/db db:generate --name your_change`
+- Generate a custom SQL migration: `bun run --filter @axel-saas/db db:generate:custom --name your_change`
 - Apply committed migrations: `bun run --filter @axel-saas/db db:migrate`
 - Apply raw Drizzle migrations without baseline handling: `bun run --filter @axel-saas/db db:migrate:raw`
 - Mark an existing schema as already having applied a migration prefix: `DRIZZLE_BASELINE_TAG=0001_auth_user_trigger bun run --filter @axel-saas/db db:baseline`
