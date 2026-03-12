@@ -71,12 +71,8 @@
           "name": "onboarding_answers_user_id_fkey",
           "tableFrom": "onboarding_answers",
           "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -161,12 +157,8 @@
           "name": "onboarding_messages_user_id_fkey",
           "tableFrom": "onboarding_messages",
           "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -272,12 +264,8 @@
           "name": "onboarding_state_user_id_fkey",
           "tableFrom": "onboarding_state",
           "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -374,12 +362,8 @@
           "name": "provisioning_state_user_id_fkey",
           "tableFrom": "provisioning_state",
           "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -507,12 +491,8 @@
           "name": "subscriptions_user_id_fkey",
           "tableFrom": "subscriptions",
           "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -618,43 +598,22 @@
     "public.onboarding_status": {
       "name": "onboarding_status",
       "schema": "public",
-      "values": [
-        "not_started",
-        "in_progress",
-        "completed"
-      ]
+      "values": ["not_started", "in_progress", "completed"]
     },
     "public.provisioning_status": {
       "name": "provisioning_status",
       "schema": "public",
-      "values": [
-        "pending",
-        "provisioning",
-        "active",
-        "failed",
-        "deprovisioned"
-      ]
+      "values": ["pending", "provisioning", "active", "failed", "deprovisioned"]
     },
     "public.subscription_status": {
       "name": "subscription_status",
       "schema": "public",
-      "values": [
-        "active",
-        "trialing",
-        "past_due",
-        "cancelled",
-        "incomplete"
-      ]
+      "values": ["active", "trialing", "past_due", "cancelled", "incomplete"]
     },
     "public.subscription_tier": {
       "name": "subscription_tier",
       "schema": "public",
-      "values": [
-        "starter",
-        "pro",
-        "business",
-        "developer"
-      ]
+      "values": ["starter", "pro", "business", "developer"]
     }
   },
   "schemas": {},

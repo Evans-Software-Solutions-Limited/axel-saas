@@ -70,13 +70,9 @@
         "onboarding_answers_user_id_fkey": {
           "name": "onboarding_answers_user_id_fkey",
           "tableFrom": "onboarding_answers",
-          "columnsFrom": [
-            "user_id"
-          ],
+          "columnsFrom": ["user_id"],
           "tableTo": "users",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "cascade"
         }
@@ -172,13 +168,9 @@
         "provisioning_state_user_id_fkey": {
           "name": "provisioning_state_user_id_fkey",
           "tableFrom": "provisioning_state",
-          "columnsFrom": [
-            "user_id"
-          ],
+          "columnsFrom": ["user_id"],
           "tableTo": "users",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "cascade"
         }
@@ -290,13 +282,9 @@
         "subscriptions_user_id_fkey": {
           "name": "subscriptions_user_id_fkey",
           "tableFrom": "subscriptions",
-          "columnsFrom": [
-            "user_id"
-          ],
+          "columnsFrom": ["user_id"],
           "tableTo": "users",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "cascade"
         }
@@ -402,34 +390,17 @@
     "public.provisioning_status": {
       "name": "provisioning_status",
       "schema": "public",
-      "values": [
-        "pending",
-        "provisioning",
-        "active",
-        "failed",
-        "deprovisioned"
-      ]
+      "values": ["pending", "provisioning", "active", "failed", "deprovisioned"]
     },
     "public.subscription_status": {
       "name": "subscription_status",
       "schema": "public",
-      "values": [
-        "active",
-        "trialing",
-        "past_due",
-        "cancelled",
-        "incomplete"
-      ]
+      "values": ["active", "trialing", "past_due", "cancelled", "incomplete"]
     },
     "public.subscription_tier": {
       "name": "subscription_tier",
       "schema": "public",
-      "values": [
-        "starter",
-        "pro",
-        "business",
-        "developer"
-      ]
+      "values": ["starter", "pro", "business", "developer"]
     }
   },
   "schemas": {},
