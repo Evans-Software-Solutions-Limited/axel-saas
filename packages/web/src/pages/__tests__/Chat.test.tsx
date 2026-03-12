@@ -855,7 +855,6 @@ describe("Chat onboarding integration", () => {
       vi.mocked(getAgentStatus).mockResolvedValue({
         success: true,
         status: "active",
-        gatewayUrl: "https://agent.example.com",
       });
 
       render(
@@ -875,7 +874,6 @@ describe("Chat onboarding integration", () => {
       vi.mocked(getAgentStatus).mockResolvedValue({
         success: true,
         status: "active",
-        gatewayUrl: "https://agent.example.com",
       });
 
       // Mock postChatMessage to return a response
@@ -920,7 +918,6 @@ describe("Chat onboarding integration", () => {
       vi.mocked(getAgentStatus).mockResolvedValue({
         success: true,
         status: "active",
-        gatewayUrl: "https://agent.example.com",
       });
 
       render(
@@ -944,7 +941,6 @@ describe("Chat onboarding integration", () => {
       vi.mocked(getAgentStatus).mockResolvedValue({
         success: true,
         status: "active",
-        gatewayUrl: "https://agent.example.com",
       });
 
       // Make postChatMessage hang
@@ -995,7 +991,6 @@ describe("Chat onboarding integration", () => {
       vi.mocked(getAgentStatus).mockResolvedValue({
         success: true,
         status: "active",
-        gatewayUrl: "https://agent.example.com",
       });
 
       // Mock postChatMessage to throw
@@ -1030,7 +1025,6 @@ describe("Chat onboarding integration", () => {
       vi.mocked(getAgentStatus).mockResolvedValue({
         success: true,
         status: "active",
-        gatewayUrl: "https://agent.example.com",
       });
 
       // Mock postChatMessage to throw a non-Error

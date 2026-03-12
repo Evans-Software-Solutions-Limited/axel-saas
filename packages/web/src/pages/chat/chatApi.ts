@@ -1,4 +1,5 @@
 import { api } from "@/lib/eden";
+import { getErrorMessage, getResponseError } from "./apiHelpers";
 
 export interface ChatMessage {
   id: string;
@@ -10,7 +11,6 @@ export interface ChatMessage {
 export interface AgentStatus {
   success: boolean;
   status: "active" | "provisioning" | "not_found";
-  gatewayUrl?: string;
 }
 
 export interface ChatMessageResult {
@@ -28,29 +28,7 @@ interface ChatMessageSuccessPayload {
 interface AgentStatusSuccessPayload {
   success: true;
   status: "active" | "provisioning" | "not_found";
-  gatewayUrl?: string;
 }
-
-interface ApiErrorLike {
-  status?: number;
-  message?: string;
-  value?: unknown;
-}
-
-const isObject = (value: unknown): value is Record<string, unknown> =>
-  typeof value === "object" && value !== null;
-
-const getErrorMessage = (value: unknown): string | undefined => {
-  if (!isObject(value)) return undefined;
-  const message = value["error"];
-  return typeof message === "string" ? message : undefined;
-};
-
-const getResponseError = (value: unknown): ApiErrorLike | undefined => {
-  if (!isObject(value)) return undefined;
-  const errorValue = value["error"];
-  return isObject(errorValue) ? (errorValue as ApiErrorLike) : undefined;
-};
 
 /**
  * Get the live agent's connection status

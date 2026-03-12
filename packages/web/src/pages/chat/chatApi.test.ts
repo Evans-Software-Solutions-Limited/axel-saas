@@ -35,7 +35,6 @@ describe("chatApi", () => {
         data: {
           success: true,
           status: "active",
-          gatewayUrl: "https://agent.example.com",
         },
       } as never);
 
@@ -44,7 +43,6 @@ describe("chatApi", () => {
       expect(result).toEqual({
         success: true,
         status: "active",
-        gatewayUrl: "https://agent.example.com",
       });
     });
 

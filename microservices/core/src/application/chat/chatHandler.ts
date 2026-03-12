@@ -70,7 +70,6 @@ export const chatHandler = new Elysia({ name: "ChatHandler" })
         return {
           success: true,
           status: container.status === "active" ? "active" : "provisioning",
-          gatewayUrl: container.gatewayUrl,
         };
       } catch (error) {
         console.error("Get agent status error:", error);

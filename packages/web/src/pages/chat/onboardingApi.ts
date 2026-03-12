@@ -1,4 +1,5 @@
 import { api } from "@/lib/eden";
+import { getErrorMessage, getResponseError, getStatusCode } from "./apiHelpers";
 
 export interface OnboardingState {
   id: string;
@@ -51,47 +52,12 @@ interface CompleteOnboardingSuccessPayload {
   message: string;
 }
 
-interface ApiErrorLike {
-  status?: number;
-  message?: string;
-  value?: unknown;
-}
-
 export class OnboardingAlreadyCompleteError extends Error {
   constructor() {
     super("Onboarding already completed");
     this.name = "OnboardingAlreadyCompleteError";
   }
 }
-
-const isObject = (value: unknown): value is Record<string, unknown> =>
-  typeof value === "object" && value !== null;
-
-const getErrorMessage = (value: unknown): string | undefined => {
-  if (!isObject(value)) return undefined;
-  const message = value["error"];
-  return typeof message === "string" ? message : undefined;
-};
-
-const getStatusCode = (value: unknown): number | undefined => {
-  if (!isObject(value)) return undefined;
-
-  const topLevelStatus = value["status"];
-  if (typeof topLevelStatus === "number") return topLevelStatus;
-
-  const nestedError = value["error"];
-  if (isObject(nestedError) && typeof nestedError["status"] === "number") {
-    return nestedError["status"];
-  }
-
-  return undefined;
-};
-
-const getResponseError = (value: unknown): ApiErrorLike | undefined => {
-  if (!isObject(value)) return undefined;
-  const errorValue = value["error"];
-  return isObject(errorValue) ? (errorValue as ApiErrorLike) : undefined;
-};
 
 export async function getOnboardingState(): Promise<GetOnboardingStateResult> {
   const response = await api.core.users.onboarding.state.get();
