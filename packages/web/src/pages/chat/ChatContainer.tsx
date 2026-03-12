@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
-import { api } from "@/lib/eden";
 import {
   getOnboardingState,
   OnboardingAlreadyCompleteError,
-  type OnboardingMessage,
   postOnboardingMessage,
+  completeOnboarding as completeOnboardingApi,
+  type OnboardingMessage,
 } from "./onboardingApi";
 import { getAgentStatus, postChatMessage, type ChatMessage } from "./chatApi";
 import { ChatPresenter } from "./ChatPresenter";
@@ -37,15 +37,10 @@ export function ChatContainer() {
   const { setOnboardingCompleted, refreshOnboardingStatus } = useAuth();
 
   // Call the onboarding complete endpoint and switch to live mode
-  const completeOnboarding = useCallback(async () => {
+  const handleCompleteOnboarding = useCallback(async () => {
     try {
       // Call the backend to complete onboarding and generate workspace files
-      const response = await api.core.users["onboarding"].complete.post();
-
-      if (!response.data?.success) {
-        console.error("Onboarding complete error:", response.data?.error);
-        // Continue anyway - the agent is still usable
-      }
+      await completeOnboardingApi();
 
       // Switch to live mode instead of navigating away
       setOnboardingCompleted(true);
@@ -54,6 +49,9 @@ export function ChatContainer() {
     } catch (err) {
       console.error("Failed to complete onboarding:", err);
       // Still switch to live mode - the user can chat
+      // But we must update auth state to avoid inconsistent routing
+      setOnboardingCompleted(true);
+      await refreshOnboardingStatus();
       setChatMode("live");
     }
   }, [setOnboardingCompleted, refreshOnboardingStatus]);
@@ -89,7 +87,7 @@ export function ChatContainer() {
       if (!result.state || result.state.status === "completed") {
         // Onboarding is done but agent might not be provisioned yet
         // Try to complete onboarding to set up the agent
-        await completeOnboarding();
+        await handleCompleteOnboarding();
         return;
       }
 
@@ -105,7 +103,7 @@ export function ChatContainer() {
     } finally {
       setIsLoadingState(false);
     }
-  }, [completeOnboarding]);
+  }, [handleCompleteOnboarding]);
 
   useEffect(() => {
     void loadState();
@@ -129,11 +127,11 @@ export function ChatContainer() {
       setMessages(result.messages);
       setNextQuestion(result.nextQuestion);
       if (result.isComplete || result.state.status === "completed") {
-        await completeOnboarding();
+        await handleCompleteOnboarding();
       }
     } catch (sendError) {
       if (sendError instanceof OnboardingAlreadyCompleteError) {
-        await completeOnboarding();
+        await handleCompleteOnboarding();
         return;
       }
 
@@ -146,7 +144,7 @@ export function ChatContainer() {
     } finally {
       setIsSending(false);
     }
-  }, [completeOnboarding, chatMode, input, isSending]);
+  }, [handleCompleteOnboarding, chatMode, input, isSending]);
 
   // Handle sending messages in live chat mode
   const handleLiveSend = useCallback(async () => {

@@ -197,6 +197,7 @@ _This file is generated from onboarding. Update via settings._
 
 // Generate MEMORY.md with seeded facts from onboarding
 export function generateMemoryContent(answers: OnboardingAnswers): string {
+  // Use default for display but track if name was actually provided
   const name = answers.name || "User";
   const role = answers.role || "";
   const typicalDay = answers.typicalDay || "";
@@ -204,7 +205,8 @@ export function generateMemoryContent(answers: OnboardingAnswers): string {
 
   const facts = [];
 
-  if (name) facts.push(`- Name is ${name}`);
+  // Only add name fact if it was actually provided (not the default)
+  if (answers.name) facts.push(`- Name is ${answers.name}`);
   if (role) facts.push(`- Role: ${role}`);
   if (typicalDay) facts.push(`- Typical work: ${typicalDay}`);
   if (helpWith) facts.push(`- Wants help with: ${helpWith}`);

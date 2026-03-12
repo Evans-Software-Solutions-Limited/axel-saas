@@ -268,6 +268,9 @@ export class OnboardingRepository {
   /**
    * Determine if onboarding is complete based on collected answers
    * Backend-owned decision logic
+   *
+   * Note: This allows completion for re-provisioning (status="completed") while
+   * still requiring onboarding to have actually started (status != "not_started").
    */
   isComplete(state: OnboardingState): boolean {
     // Check all required fields are completed
@@ -275,7 +278,13 @@ export class OnboardingRepository {
       (q) => state.requiredFieldsCompleted[q] === true,
     );
 
-    return requiredCompleted && state.status === "in_progress";
+    // Must have actually started onboarding to be complete
+    // But allow re-provisioning when already completed
+    if (state.status === "not_started") {
+      return false;
+    }
+
+    return requiredCompleted;
   }
 
   /**

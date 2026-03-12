@@ -111,11 +111,24 @@ describe("workspaceGenerator", () => {
       expect(memory).toContain("Wants help with:");
     });
 
-    it("should handle empty answers with defaults", () => {
+    it("should show 'No facts collected yet' when no answers provided", () => {
       const memory = generateMemoryContent({});
 
-      // When name is empty, defaults to "User"
+      // When name is empty, defaults to "User" for display
       expect(memory).toContain("What I Know About User");
+      // But no facts should be collected
+      expect(memory).toContain("- No facts collected yet");
+    });
+
+    it("should only add name fact when name was actually provided", () => {
+      // Provide name but no other fields
+      const memory = generateMemoryContent({ name: "Alice" });
+
+      expect(memory).toContain("Name is Alice");
+      // Role, typicalDay, helpWith are not provided, so they shouldn't appear
+      expect(memory).not.toContain("Role:");
+      expect(memory).not.toContain("Typical work:");
+      expect(memory).not.toContain("Wants help with:");
     });
   });
 

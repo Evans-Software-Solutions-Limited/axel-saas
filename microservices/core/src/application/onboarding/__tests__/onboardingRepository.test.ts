@@ -482,7 +482,7 @@ describe("OnboardingRepository Methods", () => {
       expect(repo.isComplete(state)).toBe(true);
     });
 
-    it("should return false when completed status", () => {
+    it("should return true when all required fields completed even if already completed (for re-provisioning)", () => {
       const state = {
         requiredFieldsCompleted: {
           name: true,
@@ -491,7 +491,9 @@ describe("OnboardingRepository Methods", () => {
         },
         status: "completed" as const,
       } as any;
-      expect(repo.isComplete(state)).toBe(false);
+      // isComplete returns true when fields are complete, regardless of status
+      // This allows re-provisioning to regenerate workspace files
+      expect(repo.isComplete(state)).toBe(true);
     });
   });
 
