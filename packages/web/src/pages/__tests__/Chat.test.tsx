@@ -1,5 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import {
+  render,
+  screen,
+  fireEvent,
+  waitFor,
+  act,
+} from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { Chat } from "../Chat";
 import {
@@ -7,7 +13,7 @@ import {
   postOnboardingMessage,
   OnboardingAlreadyCompleteError,
 } from "../chat/onboardingApi";
-import { getAgentStatus } from "../chat/chatApi";
+import { getAgentStatus, postChatMessage } from "../chat/chatApi";
 import { useAuth } from "@/hooks/useAuth";
 
 const navigateMock = vi.fn();
@@ -821,23 +827,232 @@ describe("Chat onboarding integration", () => {
     // postOnboardingMessage should only have been called once
     expect(postOnboardingMessage).toHaveBeenCalledTimes(1);
 
-    // Resolve the pending promise
-    resolvePostMessage!({
-      state: {
-        id: "state-1",
-        status: "completed",
-        outstandingQuestions: [],
-        collectedAnswers: {
-          name: "Bradley",
-          role: "Founder",
-          channels: "Telegram",
+    // Resolve the pending promise - wrap in act to fix React warnings
+    await act(async () => {
+      resolvePostMessage!({
+        state: {
+          id: "state-1",
+          status: "completed",
+          outstandingQuestions: [],
+          collectedAnswers: {
+            name: "Bradley",
+            role: "Founder",
+            channels: "Telegram",
+          },
+          completedAt: "2026-03-11T10:10:00.000Z",
+          lastMessageAt: "2026-03-11T10:10:00.000Z",
         },
-        completedAt: "2026-03-11T10:10:00.000Z",
-        lastMessageAt: "2026-03-11T10:10:00.000Z",
-      },
-      messages: [],
-      assistantResponse: "Done",
-      isComplete: true,
+        messages: [],
+        assistantResponse: "Done",
+        isComplete: true,
+      });
+    });
+  });
+
+  describe("Live chat mode", () => {
+    it("switches to live mode when agent is active", async () => {
+      // Mock agent status as active
+      vi.mocked(getAgentStatus).mockResolvedValue({
+        success: true,
+        status: "active",
+        gatewayUrl: "https://agent.example.com",
+      });
+
+      render(
+        <MemoryRouter>
+          <Chat />
+        </MemoryRouter>,
+      );
+
+      // Should show "Chat" label (not "Onboarding mode")
+      expect(await screen.findByText("Chat")).toBeDefined();
+      // Should show live chat placeholder
+      expect(screen.getByPlaceholderText(/ask axel to help/i)).toBeDefined();
+    });
+
+    it("sends message in live mode and shows assistant response", async () => {
+      // Mock agent status as active
+      vi.mocked(getAgentStatus).mockResolvedValue({
+        success: true,
+        status: "active",
+        gatewayUrl: "https://agent.example.com",
+      });
+
+      // Mock postChatMessage to return a response
+      vi.mocked(postChatMessage).mockResolvedValue({
+        success: true,
+        response: "Hello! I'm Axel, how can I help?",
+        messageId: "assistant-msg-1",
+      });
+
+      render(
+        <MemoryRouter>
+          <Chat />
+        </MemoryRouter>,
+      );
+
+      // Wait for live mode
+      expect(await screen.findByText("Chat")).toBeDefined();
+
+      // Type and send a message
+      fireEvent.change(screen.getByPlaceholderText(/ask axel to help/i), {
+        target: { value: "Hello" },
+      });
+      fireEvent.click(screen.getByRole("button"));
+
+      // Should show user's message
+      await waitFor(() => {
+        expect(screen.getByText("Hello")).toBeDefined();
+      });
+
+      // Should show assistant response
+      await waitFor(() => {
+        expect(
+          screen.getByText("Hello! I'm Axel, how can I help?"),
+        ).toBeDefined();
+      });
+
+      expect(postChatMessage).toHaveBeenCalledWith("Hello");
+    });
+
+    it("does not send message in live mode when input is empty", async () => {
+      // Mock agent status as active
+      vi.mocked(getAgentStatus).mockResolvedValue({
+        success: true,
+        status: "active",
+        gatewayUrl: "https://agent.example.com",
+      });
+
+      render(
+        <MemoryRouter>
+          <Chat />
+        </MemoryRouter>,
+      );
+
+      // Wait for live mode
+      expect(await screen.findByText("Chat")).toBeDefined();
+
+      // Try to send with empty input
+      fireEvent.click(screen.getByRole("button"));
+
+      // postChatMessage should NOT have been called
+      expect(postChatMessage).not.toHaveBeenCalled();
+    });
+
+    it("does not send message in live mode when already sending", async () => {
+      // Mock agent status as active
+      vi.mocked(getAgentStatus).mockResolvedValue({
+        success: true,
+        status: "active",
+        gatewayUrl: "https://agent.example.com",
+      });
+
+      // Make postChatMessage hang
+      let resolvePostMessage: (value: unknown) => void;
+      vi.mocked(postChatMessage).mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            resolvePostMessage = resolve as (value: unknown) => void;
+          }),
+      );
+
+      render(
+        <MemoryRouter>
+          <Chat />
+        </MemoryRouter>,
+      );
+
+      // Wait for live mode
+      expect(await screen.findByText("Chat")).toBeDefined();
+
+      // Start first message
+      fireEvent.change(screen.getByPlaceholderText(/ask axel to help/i), {
+        target: { value: "Hello" },
+      });
+      fireEvent.click(screen.getByRole("button"));
+
+      // Try to send another message while first is pending
+      fireEvent.change(screen.getByPlaceholderText(/ask axel to help/i), {
+        target: { value: "Another message" },
+      });
+      fireEvent.click(screen.getByRole("button"));
+
+      // postChatMessage should only have been called once
+      expect(postChatMessage).toHaveBeenCalledTimes(1);
+
+      // Resolve the pending promise
+      await act(async () => {
+        resolvePostMessage!({
+          success: true,
+          response: "Hi there!",
+          messageId: "msg-1",
+        });
+      });
+    });
+
+    it("shows error in live mode when send fails", async () => {
+      // Mock agent status as active
+      vi.mocked(getAgentStatus).mockResolvedValue({
+        success: true,
+        status: "active",
+        gatewayUrl: "https://agent.example.com",
+      });
+
+      // Mock postChatMessage to throw
+      vi.mocked(postChatMessage).mockRejectedValue(new Error("Failed to send"));
+
+      render(
+        <MemoryRouter>
+          <Chat />
+        </MemoryRouter>,
+      );
+
+      // Wait for live mode
+      expect(await screen.findByText("Chat")).toBeDefined();
+
+      // Type and try to send a message
+      fireEvent.change(screen.getByPlaceholderText(/ask axel to help/i), {
+        target: { value: "Hello" },
+      });
+      fireEvent.click(screen.getByRole("button"));
+
+      // Should show user's message (optimistic)
+      await waitFor(() => {
+        expect(screen.getByText("Hello")).toBeDefined();
+      });
+
+      // Should show error
+      expect(await screen.findByText("Failed to send")).toBeDefined();
+    });
+
+    it("falls back to default error message for non-Error failures in live mode", async () => {
+      // Mock agent status as active
+      vi.mocked(getAgentStatus).mockResolvedValue({
+        success: true,
+        status: "active",
+        gatewayUrl: "https://agent.example.com",
+      });
+
+      // Mock postChatMessage to throw a non-Error
+      vi.mocked(postChatMessage).mockRejectedValue("string error");
+
+      render(
+        <MemoryRouter>
+          <Chat />
+        </MemoryRouter>,
+      );
+
+      // Wait for live mode
+      expect(await screen.findByText("Chat")).toBeDefined();
+
+      // Type and try to send a message
+      fireEvent.change(screen.getByPlaceholderText(/ask axel to help/i), {
+        target: { value: "Hello" },
+      });
+      fireEvent.click(screen.getByRole("button"));
+
+      // Should show generic error
+      expect(await screen.findByText("Failed to send message")).toBeDefined();
     });
   });
 });
