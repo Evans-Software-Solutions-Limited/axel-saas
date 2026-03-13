@@ -64,14 +64,16 @@ export function ChatContainer() {
     try {
       // First check if we should be in live mode
       // Note: getAgentStatus throws for new users - we catch and fall through to onboarding
-      let agentActive = false;
+      let agentStatus: { success: boolean; status: string } | null = null;
       try {
-        const agentStatus = await getAgentStatus();
-        agentActive = agentStatus.success && agentStatus.status === "active";
+        agentStatus = await getAgentStatus();
       } catch {
         // getAgentStatus throws for new users - that's fine, fall through to onboarding
         // This is expected when user hasn't completed onboarding yet
       }
+
+      // Determine whether the live agent is already active.
+      const agentActive = agentStatus?.success && agentStatus.status === "active";
 
       if (agentActive) {
         // User has completed onboarding and has an active agent
@@ -81,13 +83,18 @@ export function ChatContainer() {
         return;
       }
 
-      // Otherwise, check onboarding state
+      // Check if onboarding is completed on the backend
       const result = await getOnboardingState();
 
+      // If onboarding is complete (regardless of agent provisioning state),
+      // go to live mode. The agent may still be provisioning in the background.
       if (!result.state || result.state.status === "completed") {
-        // Onboarding is done but agent might not be provisioned yet
-        // Try to complete onboarding to set up the agent
-        await handleCompleteOnboarding();
+        // Onboarding is done - switch to live mode
+        // Don't re-trigger onboarding completion here - that causes a loop
+        // when agent exists but gatewayUrl isn't set yet (provisioning in progress)
+        setOnboardingCompleted(true);
+        await refreshOnboardingStatus();
+        setChatMode("live");
         return;
       }
 
@@ -103,7 +110,7 @@ export function ChatContainer() {
     } finally {
       setIsLoadingState(false);
     }
-  }, [handleCompleteOnboarding]);
+  }, [setOnboardingCompleted, refreshOnboardingStatus]);
 
   useEffect(() => {
     void loadState();
@@ -182,9 +189,9 @@ export function ChatContainer() {
 
   const handleSend = useCallback(() => {
     if (chatMode === "onboarding") {
-      handleOnboardingSend();
+      void handleOnboardingSend();
     } else if (chatMode === "live") {
-      handleLiveSend();
+      void handleLiveSend();
     }
   }, [chatMode, handleOnboardingSend, handleLiveSend]);
 

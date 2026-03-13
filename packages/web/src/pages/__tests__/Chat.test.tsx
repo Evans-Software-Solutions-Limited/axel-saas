@@ -9,6 +9,7 @@ import {
 import { MemoryRouter } from "react-router";
 import { Chat } from "../Chat";
 import {
+  completeOnboarding,
   getOnboardingState,
   postOnboardingMessage,
   OnboardingAlreadyCompleteError,
@@ -49,6 +50,7 @@ vi.mock("@/lib/eden", () => ({
 }));
 
 vi.mock("../chat/onboardingApi", () => ({
+  completeOnboarding: vi.fn(),
   getOnboardingState: vi.fn(),
   postOnboardingMessage: vi.fn(),
   OnboardingAlreadyCompleteError: class OnboardingAlreadyCompleteError extends Error {},
@@ -74,6 +76,10 @@ describe("Chat onboarding integration", () => {
     // Mock Eden client for onboarding complete endpoint
     onboardingCompletePostMock.mockResolvedValue({
       data: { success: true },
+    });
+    vi.mocked(completeOnboarding).mockResolvedValue({
+      success: true,
+      message: "Onboarding completed",
     });
     vi.mocked(useAuth).mockReturnValue({
       isAuthenticated: true,
@@ -515,6 +521,7 @@ describe("Chat onboarding integration", () => {
     await waitFor(() => {
       expect(setOnboardingCompleted).toHaveBeenCalledWith(true);
       expect(refreshOnboardingStatus).toHaveBeenCalled();
+      expect(onboardingCompletePostMock).not.toHaveBeenCalled();
       // No longer navigating to /dashboard/office
       expect(navigateMock).not.toHaveBeenCalled();
     });
