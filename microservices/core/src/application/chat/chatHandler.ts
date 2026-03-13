@@ -27,6 +27,13 @@ export interface AgentStatusResponse {
   gatewayUrl?: string;
 }
 
+function getDemoChatResponse(message: string): ChatMessageResponse {
+  return {
+    success: true,
+    response: `Demo response: I received your message "${message}". The gateway is not configured yet.`,
+  };
+}
+
 export const chatHandler = new Elysia({ name: "ChatHandler" })
   .derive(async ({ headers }) => ({
     user: await getAuthUser(headers.authorization),
@@ -114,7 +121,7 @@ export const chatHandler = new Elysia({ name: "ChatHandler" })
           dbUser.id,
         );
 
-        if (!container || !container.gatewayUrl) {
+        if (!container) {
           set.status = 503;
           return {
             success: false,
@@ -130,11 +137,20 @@ export const chatHandler = new Elysia({ name: "ChatHandler" })
           };
         }
 
-        // Forward message to the container gateway
-        const gatewayUrl = container.gatewayUrl;
+        if (!container.gatewayUrl) {
+          if (process.env.NODE_ENV !== "production") {
+            return getDemoChatResponse(body.message);
+          }
+
+          set.status = 503;
+          return {
+            success: false,
+            error: "Agent is not ready. Please try again later.",
+          };
+        }
 
         try {
-          const gatewayResponse = await fetch(`${gatewayUrl}/api/chat`, {
+          const gatewayResponse = await fetch(`${container.gatewayUrl}/api/chat`, {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
@@ -167,10 +183,7 @@ export const chatHandler = new Elysia({ name: "ChatHandler" })
           console.error("Gateway fetch error:", fetchError);
           // For development/demo, return a mock response if gateway is not available
           if (process.env.NODE_ENV !== "production") {
-            return {
-              success: true,
-              response: `Demo response: I received your message "${body.message}". The gateway is not configured yet.`,
-            };
+            return getDemoChatResponse(body.message);
           }
 
           set.status = 502;

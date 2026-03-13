@@ -1,5 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
+const { mockGetContainerByUserId } = vi.hoisted(() => ({
+  mockGetContainerByUserId: vi.fn(),
+}));
+
 // Mock db before imports
 vi.mock("@axel-saas/db", () => ({
   getDb: vi.fn(() => ({})),
@@ -14,10 +18,12 @@ vi.mock("../../repositories/userRepository", () => ({
 
 // Mock provisioningRepository
 vi.mock("../../repositories/provisioningRepository", () => {
+  class MockProvisioningRepository {
+    getContainerByUserId = mockGetContainerByUserId;
+  }
+
   return {
-    ProvisioningRepository: vi.fn().mockImplementation(() => ({
-      getContainerByUserId: vi.fn(),
-    })),
+    ProvisioningRepository: MockProvisioningRepository,
   };
 });
 
@@ -39,12 +45,12 @@ global.fetch = vi.fn();
 // Import after mocks
 import { chatHandler } from "../chatHandler";
 import { userRepository } from "../../repositories/userRepository";
-import { ProvisioningRepository } from "../../repositories/provisioningRepository";
 
 describe("ChatHandler", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.restoreAllMocks();
+    mockGetContainerByUserId.mockReset();
   });
 
   describe("chatHandler instance", () => {
@@ -118,15 +124,9 @@ describe("ChatHandler", () => {
 
       vi.mocked(userRepository.getUserBySupabaseId).mockResolvedValue(mockUser);
 
-      const mockRepo = {
-        getContainerByUserId: vi.fn().mockResolvedValue(mockContainer),
-      };
-      vi.mocked(ProvisioningRepository).mockImplementation(
-        () => mockRepo as any,
-      );
+      mockGetContainerByUserId.mockResolvedValue(mockContainer);
 
-      const repo = new ProvisioningRepository();
-      const container = await repo.getContainerByUserId("db-user-123");
+      const container = await mockGetContainerByUserId("db-user-123");
 
       expect(container?.status).toBe("active");
       expect(container?.gatewayUrl).toBe("https://gateway.example.com");
@@ -152,15 +152,9 @@ describe("ChatHandler", () => {
 
       vi.mocked(userRepository.getUserBySupabaseId).mockResolvedValue(mockUser);
 
-      const mockRepo = {
-        getContainerByUserId: vi.fn().mockResolvedValue(mockContainer),
-      };
-      vi.mocked(ProvisioningRepository).mockImplementation(
-        () => mockRepo as any,
-      );
+      mockGetContainerByUserId.mockResolvedValue(mockContainer);
 
-      const repo = new ProvisioningRepository();
-      const container = await repo.getContainerByUserId("db-user-123");
+      const container = await mockGetContainerByUserId("db-user-123");
 
       expect(container?.status).toBe("pending");
     });
@@ -178,15 +172,9 @@ describe("ChatHandler", () => {
 
       vi.mocked(userRepository.getUserBySupabaseId).mockResolvedValue(mockUser);
 
-      const mockRepo = {
-        getContainerByUserId: vi.fn().mockResolvedValue(null),
-      };
-      vi.mocked(ProvisioningRepository).mockImplementation(
-        () => mockRepo as any,
-      );
+      mockGetContainerByUserId.mockResolvedValue(null);
 
-      const repo = new ProvisioningRepository();
-      const container = await repo.getContainerByUserId("db-user-123");
+      const container = await mockGetContainerByUserId("db-user-123");
 
       expect(container).toBeNull();
     });
@@ -223,15 +211,9 @@ describe("ChatHandler", () => {
 
       vi.mocked(userRepository.getUserBySupabaseId).mockResolvedValue(mockUser);
 
-      const mockRepo = {
-        getContainerByUserId: vi.fn().mockResolvedValue(null),
-      };
-      vi.mocked(ProvisioningRepository).mockImplementation(
-        () => mockRepo as any,
-      );
+      mockGetContainerByUserId.mockResolvedValue(null);
 
-      const repo = new ProvisioningRepository();
-      const container = await repo.getContainerByUserId("db-user-123");
+      const container = await mockGetContainerByUserId("db-user-123");
 
       expect(container).toBeNull();
     });
@@ -256,18 +238,110 @@ describe("ChatHandler", () => {
 
       vi.mocked(userRepository.getUserBySupabaseId).mockResolvedValue(mockUser);
 
-      const mockRepo = {
-        getContainerByUserId: vi.fn().mockResolvedValue(mockContainer),
-      };
-      vi.mocked(ProvisioningRepository).mockImplementation(
-        () => mockRepo as any,
-      );
+      mockGetContainerByUserId.mockResolvedValue(mockContainer);
 
-      const repo = new ProvisioningRepository();
-      const container = await repo.getContainerByUserId("db-user-123");
+      const container = await mockGetContainerByUserId("db-user-123");
 
       expect(container?.status).toBe("pending");
       expect(container?.gatewayUrl).toBeNull();
+    });
+
+    it("should return demo response in development when active container has no gateway URL", async () => {
+      const originalNodeEnv = process.env.NODE_ENV;
+      process.env.NODE_ENV = "test";
+
+      try {
+        const mockUser = {
+          id: "db-user-123",
+          supabaseUserId: "supabase-123",
+          email: "test@example.com",
+          fullName: "Test User",
+          onboardingCompleted: true,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        };
+
+        const mockContainer = {
+          taskArn: "arn:aws:ecs:region:account:task/task-id",
+          status: "active",
+          gatewayUrl: null,
+          workspacePath: "/workspace/user123",
+        };
+
+        vi.mocked(userRepository.getUserBySupabaseId).mockResolvedValue(
+          mockUser,
+        );
+        mockGetContainerByUserId.mockResolvedValue(mockContainer);
+
+        const result = await chatHandler.handle(
+          new Request("http://localhost/users/chat/message", {
+            method: "POST",
+            headers: {
+              Authorization: "Bearer test-token",
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ message: "hello" }),
+          }),
+        );
+
+        expect(result.status).toBe(200);
+        await expect(result.json()).resolves.toMatchObject({
+          success: true,
+          response: expect.stringContaining('I received your message "hello"'),
+        });
+        expect(global.fetch).not.toHaveBeenCalled();
+      } finally {
+        process.env.NODE_ENV = originalNodeEnv;
+      }
+    });
+
+    it("should return 503 in production when active container has no gateway URL", async () => {
+      const originalNodeEnv = process.env.NODE_ENV;
+      process.env.NODE_ENV = "production";
+
+      try {
+        const mockUser = {
+          id: "db-user-123",
+          supabaseUserId: "supabase-123",
+          email: "test@example.com",
+          fullName: "Test User",
+          onboardingCompleted: true,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        };
+
+        const mockContainer = {
+          taskArn: "arn:aws:ecs:region:account:task/task-id",
+          status: "active",
+          gatewayUrl: null,
+          workspacePath: "/workspace/user123",
+        };
+
+        vi.mocked(userRepository.getUserBySupabaseId).mockResolvedValue(
+          mockUser,
+        );
+        mockGetContainerByUserId.mockResolvedValue(mockContainer);
+
+        const result = await chatHandler.handle(
+          new Request("http://localhost/users/chat/message", {
+            method: "POST",
+            headers: {
+              Authorization: "Bearer test-token",
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ message: "hello" }),
+          }),
+        );
+
+        expect(result.status).toBe(503);
+        await expect(result.json()).resolves.toMatchObject({
+          success: false,
+          error: "Agent is not ready. Please try again later.",
+        });
+        expect(global.fetch).not.toHaveBeenCalled();
+      } finally {
+        process.env.NODE_ENV = originalNodeEnv;
+      }
     });
 
     it("should forward message to gateway when container is active", async () => {
@@ -278,12 +352,7 @@ describe("ChatHandler", () => {
         workspacePath: "/workspace/user123",
       };
 
-      const mockRepo = {
-        getContainerByUserId: vi.fn().mockResolvedValue(mockContainer),
-      };
-      vi.mocked(ProvisioningRepository).mockImplementation(
-        () => mockRepo as any,
-      );
+      mockGetContainerByUserId.mockResolvedValue(mockContainer);
 
       // Mock fetch response
       const mockGatewayResponse = {
@@ -296,8 +365,7 @@ describe("ChatHandler", () => {
         json: () => Promise.resolve(mockGatewayResponse),
       });
 
-      const repo = new ProvisioningRepository();
-      const container = await repo.getContainerByUserId("db-user-123");
+      const container = await mockGetContainerByUserId("db-user-123");
 
       expect(container?.status).toBe("active");
       expect(container?.gatewayUrl).toBe("https://gateway.example.com");
@@ -317,18 +385,12 @@ describe("ChatHandler", () => {
         workspacePath: "/workspace/user123",
       };
 
-      const mockRepo = {
-        getContainerByUserId: vi.fn().mockResolvedValue(mockContainer),
-      };
-      vi.mocked(ProvisioningRepository).mockImplementation(
-        () => mockRepo as any,
-      );
+      mockGetContainerByUserId.mockResolvedValue(mockContainer);
 
       // Mock fetch to throw error
       global.fetch = vi.fn().mockRejectedValue(new Error("Network error"));
 
-      const repo = new ProvisioningRepository();
-      const container = await repo.getContainerByUserId("db-user-123");
+      const container = await mockGetContainerByUserId("db-user-123");
 
       expect(container?.status).toBe("active");
 
@@ -353,18 +415,12 @@ describe("ChatHandler", () => {
         workspacePath: "/workspace/user123",
       };
 
-      const mockRepo = {
-        getContainerByUserId: vi.fn().mockResolvedValue(mockContainer),
-      };
-      vi.mocked(ProvisioningRepository).mockImplementation(
-        () => mockRepo as any,
-      );
+      mockGetContainerByUserId.mockResolvedValue(mockContainer);
 
       // Mock fetch to throw error
       global.fetch = vi.fn().mockRejectedValue(new Error("Connection refused"));
 
-      const repo = new ProvisioningRepository();
-      const container = await repo.getContainerByUserId("db-user-123");
+      const container = await mockGetContainerByUserId("db-user-123");
 
       expect(container?.status).toBe("active");
 
