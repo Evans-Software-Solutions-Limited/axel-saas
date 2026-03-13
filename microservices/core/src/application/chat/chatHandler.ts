@@ -27,11 +27,54 @@ export interface AgentStatusResponse {
   gatewayUrl?: string;
 }
 
-function getDemoChatResponse(message: string): ChatMessageResponse {
-  return {
-    success: true,
-    response: `Demo response: I received your message "${message}". The gateway is not configured yet.`,
-  };
+/**
+ * Generate a contextual response using user's onboarding data
+ * This provides a personalized response when the gateway is unavailable
+ */
+export function generateContextualResponse(
+  userName: string | null,
+  userRole: string | null,
+  userGoals: string | null,
+  userMessage: string,
+): string {
+  const name = userName || "there";
+  const role = userRole || "your work";
+  const goals = userGoals || "what you're focused on";
+
+  // Simple response logic based on message content
+  const lowerMessage = userMessage.toLowerCase();
+
+  // Greeting responses - use word boundaries to avoid matching substrings.
+  const greetingRegex = /\b(hello|hi|hey)\b/i;
+  if (greetingRegex.test(lowerMessage)) {
+    return `Hey ${name}! Good to hear from you. How's ${role} going?`;
+  }
+
+  // How can you help / what can you do
+  if (
+    lowerMessage.includes("what can you do") ||
+    lowerMessage.includes("how can you help") ||
+    lowerMessage.includes("help me")
+  ) {
+    return `I'm here to help you with ${goals}. I can assist with research, drafting, scheduling, and more. What do you need?`;
+  }
+
+  // Questions about the user
+  if (
+    lowerMessage.includes("who am i") ||
+    lowerMessage.includes("what do you know about me")
+  ) {
+    if (userName || userRole) {
+      const details = [];
+      if (userName) details.push(`you're ${userName}`);
+      if (userRole) details.push(`you work as ${userRole}`);
+      return `From what you've told me, ${details.join(", and ")}. You're focused on ${goals}. That's what I know about you!`;
+    }
+    return `I'm still getting to know you! Complete onboarding and I'll remember all the details.`;
+  }
+
+  // Default contextual response
+  return `Hey ${name}, thanks for reaching out! I'm here to help you with ${goals}. What would you like to work on?`;
 }
 
 /**
@@ -70,6 +113,29 @@ function validateGatewayUrl(urlString: string): string | null {
     console.error("Invalid gateway URL:", err);
     return null;
   }
+}
+
+async function getDemoChatResponse(
+  userId: string,
+  message: string,
+): Promise<ChatMessageResponse> {
+  const onboardingAnswers = await userRepository.getOnboardingAnswers(userId);
+  const userName = (onboardingAnswers?.name as string | null) || null;
+  const userRole = (onboardingAnswers?.role as string | null) || null;
+  const userGoals =
+    (onboardingAnswers?.helpWith as string | null) ||
+    (onboardingAnswers?.proactiveAreas as string | null) ||
+    null;
+
+  return {
+    success: true,
+    response: generateContextualResponse(
+      userName,
+      userRole,
+      userGoals,
+      message,
+    ),
+  };
 }
 
 export const chatHandler = new Elysia({ name: "ChatHandler" })
@@ -177,7 +243,7 @@ export const chatHandler = new Elysia({ name: "ChatHandler" })
 
         if (!container.gatewayUrl) {
           if (process.env.NODE_ENV !== "production") {
-            return getDemoChatResponse(body.message);
+            return getDemoChatResponse(dbUser.id, body.message);
           }
 
           set.status = 503;
@@ -230,9 +296,9 @@ export const chatHandler = new Elysia({ name: "ChatHandler" })
           };
         } catch (fetchError) {
           console.error("Gateway fetch error:", fetchError);
-          // For development/demo, return a mock response if gateway is not available
+          // For development/demo, return a contextual response using onboarding data
           if (process.env.NODE_ENV !== "production") {
-            return getDemoChatResponse(body.message);
+            return getDemoChatResponse(dbUser.id, body.message);
           }
 
           set.status = 502;

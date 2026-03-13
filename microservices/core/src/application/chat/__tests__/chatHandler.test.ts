@@ -21,6 +21,7 @@ vi.mock("@axel-saas/db", () => ({
 vi.mock("../../repositories/userRepository", () => ({
   userRepository: {
     getUserBySupabaseId: vi.fn(),
+    getOnboardingAnswers: vi.fn(),
   },
 }));
 
@@ -57,8 +58,183 @@ function resetAuthMocks() {
 global.fetch = vi.fn();
 
 // Import after mocks
-import { chatHandler } from "../chatHandler";
+import { chatHandler, generateContextualResponse } from "../chatHandler";
 import { userRepository } from "../../repositories/userRepository";
+
+describe("generateContextualResponse", () => {
+  describe("greeting responses", () => {
+    it("should personalize greeting with user's name", () => {
+      const response = generateContextualResponse(
+        "Bradley",
+        "Software Engineer",
+        "building SaaS products",
+        "hello",
+      );
+      expect(response).toContain("Bradley");
+    });
+
+    it("should use 'there' when no name provided", () => {
+      const response = generateContextualResponse(
+        null,
+        "Software Engineer",
+        "building SaaS products",
+        "hi",
+      );
+      expect(response).toContain("there");
+    });
+
+    it("should include user's role in greeting", () => {
+      const response = generateContextualResponse(
+        "Bradley",
+        "Software Engineer",
+        "building SaaS products",
+        "hey",
+      );
+      expect(response).toContain("Software Engineer");
+    });
+
+    it("should NOT trigger greeting for 'this' (contains 'hi' substring)", () => {
+      const response = generateContextualResponse(
+        "Bradley",
+        "Engineer",
+        "building products",
+        "this is a test",
+      );
+      expect(response).not.toContain("Good to hear from you");
+      expect(response).toContain("thanks for reaching out");
+    });
+
+    it("should NOT trigger greeting for 'they' (contains 'hey' substring)", () => {
+      const response = generateContextualResponse(
+        "Bradley",
+        "Engineer",
+        "building products",
+        "they are coming over",
+      );
+      expect(response).not.toContain("Good to hear from you");
+      expect(response).toContain("thanks for reaching out");
+    });
+
+    it("should NOT trigger greeting for 'thin' (contains 'hi' substring)", () => {
+      const response = generateContextualResponse(
+        "Bradley",
+        "Engineer",
+        "building products",
+        "i am feeling thin today",
+      );
+      expect(response).not.toContain("Good to hear from you");
+    });
+
+    it("should NOT trigger greeting for 'his' (contains 'hi' substring)", () => {
+      const response = generateContextualResponse(
+        "Bradley",
+        "Engineer",
+        "building products",
+        "his work is done",
+      );
+      expect(response).not.toContain("Good to hear from you");
+    });
+
+    it("should NOT trigger greeting for 'theme' (contains 'he' substring)", () => {
+      const response = generateContextualResponse(
+        "Bradley",
+        "Engineer",
+        "building products",
+        "what is the theme?",
+      );
+      expect(response).not.toContain("Good to hear from you");
+    });
+
+    it("should handle actual greetings with punctuation", () => {
+      const response = generateContextualResponse(
+        "Bradley",
+        "Engineer",
+        "building products",
+        "hi there!",
+      );
+      expect(response).toContain("Good to hear from you");
+    });
+
+    it("should handle greetings at start of message", () => {
+      const response = generateContextualResponse(
+        "Bradley",
+        "Engineer",
+        "building products",
+        "hello, can you help me?",
+      );
+      expect(response).toContain("Good to hear from you");
+    });
+  });
+
+  describe("help/capability questions", () => {
+    it("should respond to 'what can you do' with user goals", () => {
+      const response = generateContextualResponse(
+        "Bradley",
+        "Founder",
+        "growing the business",
+        "what can you do?",
+      );
+      expect(response).toContain("growing the business");
+    });
+
+    it("should respond to 'how can you help' with user goals", () => {
+      const response = generateContextualResponse(
+        "Bradley",
+        null,
+        "managing properties",
+        "how can you help me?",
+      );
+      expect(response).toContain("managing properties");
+    });
+  });
+
+  describe("identity questions", () => {
+    it("should tell user about themselves when data available", () => {
+      const response = generateContextualResponse(
+        "Bradley",
+        "Founder",
+        "growing the business",
+        "who am i?",
+      );
+      expect(response).toContain("Bradley");
+      expect(response).toContain("Founder");
+    });
+
+    it("should indicate learning when no data available", () => {
+      const response = generateContextualResponse(
+        null,
+        null,
+        null,
+        "what do you know about me?",
+      );
+      expect(response).toContain("getting to know");
+    });
+  });
+
+  describe("default responses", () => {
+    it("should personalize default response with user data", () => {
+      const response = generateContextualResponse(
+        "Bradley",
+        "Founder",
+        "scaling the company",
+        "let's get started",
+      );
+      expect(response).toContain("Bradley");
+      expect(response).toContain("scaling the company");
+    });
+
+    it("should handle missing data gracefully", () => {
+      const response = generateContextualResponse(
+        null,
+        null,
+        null,
+        "something else",
+      );
+      expect(response).toBeDefined();
+      expect(response.length).toBeGreaterThan(0);
+    });
+  });
+});
 
 describe("ChatHandler", () => {
   beforeEach(() => {
@@ -262,7 +438,7 @@ describe("ChatHandler", () => {
       expect(container?.gatewayUrl).toBeNull();
     });
 
-    it("should return demo response in development when active container has no gateway URL", async () => {
+    it("should return contextual response in development when active container has no gateway URL", async () => {
       const originalNodeEnv = process.env.NODE_ENV;
       process.env.NODE_ENV = "test";
 
@@ -287,6 +463,11 @@ describe("ChatHandler", () => {
         vi.mocked(userRepository.getUserBySupabaseId).mockResolvedValue(
           mockUser,
         );
+        vi.mocked(userRepository.getOnboardingAnswers).mockResolvedValue({
+          name: "Bradley",
+          role: "Founder",
+          helpWith: "scaling the company",
+        });
         mockGetContainerByUserId.mockResolvedValue(mockContainer);
 
         const result = await chatHandler.handle(
@@ -303,7 +484,7 @@ describe("ChatHandler", () => {
         expect(result.status).toBe(200);
         await expect(result.json()).resolves.toMatchObject({
           success: true,
-          response: expect.stringContaining('I received your message "hello"'),
+          response: expect.stringContaining("Bradley"),
         });
         expect(global.fetch).not.toHaveBeenCalled();
       } finally {
@@ -423,26 +604,62 @@ describe("ChatHandler", () => {
       }
     });
 
-    it("should return demo response in development when gateway unavailable", async () => {
-      const mockContainer = {
-        taskArn: "arn:aws:ecs:region:account:task/task-id",
-        status: "active",
-        gatewayUrl: "https://gateway.example.com",
-        workspacePath: "/workspace/user123",
-      };
+    it("should return contextual response in development when gateway unavailable", async () => {
+      const originalNodeEnv = process.env.NODE_ENV;
+      process.env.NODE_ENV = "test";
 
-      mockGetContainerByUserId.mockResolvedValue(mockContainer);
+      try {
+        const mockUser = {
+          id: "db-user-123",
+          supabaseUserId: "supabase-123",
+          email: "test@example.com",
+          fullName: "Test User",
+          onboardingCompleted: true,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        };
 
-      // Mock fetch to throw error
-      global.fetch = vi.fn().mockRejectedValue(new Error("Connection refused"));
+        vi.mocked(userRepository.getUserBySupabaseId).mockResolvedValue(
+          mockUser,
+        );
+        vi.mocked(userRepository.getOnboardingAnswers).mockResolvedValue({
+          name: "Bradley",
+          role: "Founder",
+          helpWith: "scaling the company",
+        });
 
-      const container = await mockGetContainerByUserId("db-user-123");
+        global.fetch = vi
+          .fn()
+          .mockRejectedValue(new Error("Connection refused"));
 
-      expect(container?.status).toBe("active");
+        const mockContainer = {
+          taskArn: "arn:aws:ecs:region:account:task/task-id",
+          status: "active",
+          gatewayUrl: "https://gateway.example.com",
+          workspacePath: "/workspace/user123",
+        };
 
-      // Test handles the error - in dev mode returns demo response
-      // This is verified by the handler code checking NODE_ENV !== 'production'
-      expect(process.env.NODE_ENV).not.toBe("production");
+        mockGetContainerByUserId.mockResolvedValue(mockContainer);
+
+        const result = await chatHandler.handle(
+          new Request("http://localhost/users/chat/message", {
+            method: "POST",
+            headers: {
+              Authorization: "Bearer test-token",
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ message: "what can you do?" }),
+          }),
+        );
+
+        expect(result.status).toBe(200);
+        await expect(result.json()).resolves.toMatchObject({
+          success: true,
+          response: expect.stringContaining("scaling the company"),
+        });
+      } finally {
+        process.env.NODE_ENV = originalNodeEnv;
+      }
     });
   });
 });
