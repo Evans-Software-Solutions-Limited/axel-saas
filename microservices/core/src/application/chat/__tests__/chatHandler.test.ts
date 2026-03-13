@@ -628,7 +628,9 @@ describe("ChatHandler", () => {
           helpWith: "scaling the company",
         });
 
-        global.fetch = vi.fn().mockRejectedValue(new Error("Connection refused"));
+        global.fetch = vi
+          .fn()
+          .mockRejectedValue(new Error("Connection refused"));
 
         const mockContainer = {
           taskArn: "arn:aws:ecs:region:account:task/task-id",
@@ -659,6 +661,5 @@ describe("ChatHandler", () => {
         process.env.NODE_ENV = originalNodeEnv;
       }
     });
-
   });
 });

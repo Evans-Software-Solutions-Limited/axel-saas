@@ -129,7 +129,12 @@ async function getDemoChatResponse(
 
   return {
     success: true,
-    response: generateContextualResponse(userName, userRole, userGoals, message),
+    response: generateContextualResponse(
+      userName,
+      userRole,
+      userGoals,
+      message,
+    ),
   };
 }
 
