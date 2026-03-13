@@ -29,6 +29,13 @@
       "when": 1773249428072,
       "tag": "0003_talented_kinsey_walden",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1773436710000,
+      "tag": "0004_add_gateway_url",
+      "breakpoints": true
     }
   ]
 }
