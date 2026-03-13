@@ -1,7 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-const { mockGetContainerByUserId } = vi.hoisted(() => ({
+const {
+  mockGetContainerByUserId,
+  mockGetAuthUser,
+  mockRequireAuth,
+  mockGetUser,
+} = vi.hoisted(() => ({
   mockGetContainerByUserId: vi.fn(),
+  mockGetAuthUser: vi.fn(),
+  mockRequireAuth: vi.fn(),
+  mockGetUser: vi.fn(),
 }));
 
 // Mock db before imports
@@ -29,15 +37,21 @@ vi.mock("../../repositories/provisioningRepository", () => {
 
 // Mock auth utils
 vi.mock("@axel-saas/api-utils/auth/supabaseAuth", () => ({
-  getAuthUser: vi.fn().mockResolvedValue({ sub: "supabase-123" }),
-  requireAuth: vi.fn(({ user, set }: any) => {
+  getAuthUser: mockGetAuthUser,
+  requireAuth: mockRequireAuth,
+  getUser: mockGetUser,
+}));
+
+function resetAuthMocks() {
+  mockGetAuthUser.mockReset().mockResolvedValue({ sub: "supabase-123" });
+  mockRequireAuth.mockReset().mockImplementation(({ user, set }: any) => {
     if (!user) {
       set.status = 401;
       return { success: false, error: "Unauthorized" };
     }
-  }),
-  getUser: vi.fn().mockReturnValue({ sub: "supabase-123" }),
-}));
+  });
+  mockGetUser.mockReset().mockReturnValue({ sub: "supabase-123" });
+}
 
 // Mock fetch for gateway calls
 global.fetch = vi.fn();
@@ -51,6 +65,8 @@ describe("ChatHandler", () => {
     vi.clearAllMocks();
     vi.restoreAllMocks();
     mockGetContainerByUserId.mockReset();
+    resetAuthMocks();
+    global.fetch = vi.fn();
   });
 
   describe("chatHandler instance", () => {
