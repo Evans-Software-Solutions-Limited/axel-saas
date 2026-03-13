@@ -5,11 +5,13 @@ const {
   mockGetAuthUser,
   mockRequireAuth,
   mockGetUser,
+  mockFindSubscriptionByUserId,
 } = vi.hoisted(() => ({
   mockGetContainerByUserId: vi.fn(),
   mockGetAuthUser: vi.fn(),
   mockRequireAuth: vi.fn(),
   mockGetUser: vi.fn(),
+  mockFindSubscriptionByUserId: vi.fn(),
 }));
 
 // Mock db before imports
@@ -36,12 +38,35 @@ vi.mock("../../repositories/provisioningRepository", () => {
   };
 });
 
+// Mock subscriptionRepository
+vi.mock("../../repositories/subscriptionRepository", () => {
+  class MockSubscriptionRepository {
+    findByUserId = mockFindSubscriptionByUserId;
+  }
+
+  return {
+    SubscriptionRepository: MockSubscriptionRepository,
+  };
+});
+
 // Mock auth utils
 vi.mock("@axel-saas/api-utils/auth/supabaseAuth", () => ({
   getAuthUser: mockGetAuthUser,
   requireAuth: mockRequireAuth,
   getUser: mockGetUser,
 }));
+
+const mockActiveSubscription = {
+  id: "sub-123",
+  userId: "db-user-123",
+  stripeCustomerId: "cus_test",
+  stripeSubscriptionId: "sub_test",
+  tier: "pro" as const,
+  status: "active" as const,
+  currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+  createdAt: new Date(),
+  updatedAt: new Date(),
+};
 
 function resetAuthMocks() {
   mockGetAuthUser.mockReset().mockResolvedValue({ sub: "supabase-123" });
@@ -52,6 +77,10 @@ function resetAuthMocks() {
     }
   });
   mockGetUser.mockReset().mockReturnValue({ sub: "supabase-123" });
+  // Default: active subscription so existing tests pass
+  mockFindSubscriptionByUserId
+    .mockReset()
+    .mockResolvedValue(mockActiveSubscription);
 }
 
 // Mock fetch for gateway calls
@@ -660,6 +689,175 @@ describe("ChatHandler", () => {
       } finally {
         process.env.NODE_ENV = originalNodeEnv;
       }
+    });
+  });
+
+  describe("Payment gate", () => {
+    const mockOnboardedUser = {
+      id: "db-user-123",
+      supabaseUserId: "supabase-123",
+      email: "test@example.com",
+      fullName: "Test User",
+      onboardingCompleted: true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    describe("GET /users/me/agent", () => {
+      it("should return subscription_required when user has no subscription", async () => {
+        vi.mocked(userRepository.getUserBySupabaseId).mockResolvedValue(
+          mockOnboardedUser,
+        );
+        mockFindSubscriptionByUserId.mockResolvedValue(null);
+
+        const result = await chatHandler.handle(
+          new Request("http://localhost/users/me/agent", {
+            method: "GET",
+            headers: { Authorization: "Bearer test-token" },
+          }),
+        );
+
+        expect(result.status).toBe(200);
+        await expect(result.json()).resolves.toMatchObject({
+          success: true,
+          status: "subscription_required",
+        });
+      });
+
+      it("should return subscription_required when subscription is cancelled", async () => {
+        vi.mocked(userRepository.getUserBySupabaseId).mockResolvedValue(
+          mockOnboardedUser,
+        );
+        mockFindSubscriptionByUserId.mockResolvedValue({
+          ...mockActiveSubscription,
+          status: "cancelled",
+        });
+
+        const result = await chatHandler.handle(
+          new Request("http://localhost/users/me/agent", {
+            method: "GET",
+            headers: { Authorization: "Bearer test-token" },
+          }),
+        );
+
+        expect(result.status).toBe(200);
+        await expect(result.json()).resolves.toMatchObject({
+          success: true,
+          status: "subscription_required",
+        });
+      });
+
+      it("should proceed past gate for active subscription", async () => {
+        vi.mocked(userRepository.getUserBySupabaseId).mockResolvedValue(
+          mockOnboardedUser,
+        );
+        mockFindSubscriptionByUserId.mockResolvedValue(mockActiveSubscription);
+        mockGetContainerByUserId.mockResolvedValue(null);
+
+        const result = await chatHandler.handle(
+          new Request("http://localhost/users/me/agent", {
+            method: "GET",
+            headers: { Authorization: "Bearer test-token" },
+          }),
+        );
+
+        expect(result.status).toBe(200);
+        const json = (await result.json()) as { status: string };
+        expect(json.status).not.toBe("subscription_required");
+      });
+
+      it("should proceed past gate for trialing subscription", async () => {
+        vi.mocked(userRepository.getUserBySupabaseId).mockResolvedValue(
+          mockOnboardedUser,
+        );
+        mockFindSubscriptionByUserId.mockResolvedValue({
+          ...mockActiveSubscription,
+          status: "trialing",
+        });
+        mockGetContainerByUserId.mockResolvedValue(null);
+
+        const result = await chatHandler.handle(
+          new Request("http://localhost/users/me/agent", {
+            method: "GET",
+            headers: { Authorization: "Bearer test-token" },
+          }),
+        );
+
+        expect(result.status).toBe(200);
+        const json = (await result.json()) as { status: string };
+        expect(json.status).toBe("not_found");
+      });
+    });
+
+    describe("POST /users/chat/message", () => {
+      it("should return 402 when user has no subscription", async () => {
+        vi.mocked(userRepository.getUserBySupabaseId).mockResolvedValue(
+          mockOnboardedUser,
+        );
+        mockFindSubscriptionByUserId.mockResolvedValue(null);
+
+        const result = await chatHandler.handle(
+          new Request("http://localhost/users/chat/message", {
+            method: "POST",
+            headers: {
+              Authorization: "Bearer test-token",
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ message: "hello" }),
+          }),
+        );
+
+        expect(result.status).toBe(402);
+        await expect(result.json()).resolves.toMatchObject({
+          success: false,
+          error: "Subscription required to use chat",
+        });
+      });
+
+      it("should return 402 when subscription is past_due", async () => {
+        vi.mocked(userRepository.getUserBySupabaseId).mockResolvedValue(
+          mockOnboardedUser,
+        );
+        mockFindSubscriptionByUserId.mockResolvedValue({
+          ...mockActiveSubscription,
+          status: "past_due",
+        });
+
+        const result = await chatHandler.handle(
+          new Request("http://localhost/users/chat/message", {
+            method: "POST",
+            headers: {
+              Authorization: "Bearer test-token",
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ message: "hello" }),
+          }),
+        );
+
+        expect(result.status).toBe(402);
+      });
+
+      it("should proceed past gate for active subscription", async () => {
+        vi.mocked(userRepository.getUserBySupabaseId).mockResolvedValue(
+          mockOnboardedUser,
+        );
+        mockFindSubscriptionByUserId.mockResolvedValue(mockActiveSubscription);
+        mockGetContainerByUserId.mockResolvedValue(null);
+
+        const result = await chatHandler.handle(
+          new Request("http://localhost/users/chat/message", {
+            method: "POST",
+            headers: {
+              Authorization: "Bearer test-token",
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ message: "hello" }),
+          }),
+        );
+
+        // Not 402 — payment gate passed, hits the no-container 503 next
+        expect(result.status).toBe(503);
+      });
     });
   });
 });

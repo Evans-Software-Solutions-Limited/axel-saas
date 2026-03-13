@@ -6,6 +6,7 @@ import {
 } from "@axel-saas/api-utils/auth/supabaseAuth";
 import { userRepository } from "../repositories/userRepository";
 import { ProvisioningRepository } from "../repositories/provisioningRepository";
+import { SubscriptionRepository } from "../repositories/subscriptionRepository";
 
 // Create instance for use in handler
 const provisioningRepo = new ProvisioningRepository();
@@ -23,7 +24,7 @@ export interface ChatMessageResponse {
 
 export interface AgentStatusResponse {
   success: boolean;
-  status: "active" | "provisioning" | "not_found";
+  status: "active" | "provisioning" | "not_found" | "subscription_required";
   gatewayUrl?: string;
 }
 
@@ -165,6 +166,19 @@ export const chatHandler = new Elysia({ name: "ChatHandler" })
           };
         }
 
+        // Require an active or trialing subscription before agent access
+        const subRepo = new SubscriptionRepository();
+        const subscription = await subRepo.findByUserId(dbUser.id);
+        if (
+          !subscription ||
+          !["active", "trialing"].includes(subscription.status)
+        ) {
+          return {
+            success: true,
+            status: "subscription_required" as const,
+          };
+        }
+
         // Get container info
         const container = await provisioningRepo.getContainerByUserId(
           dbUser.id,
@@ -217,6 +231,20 @@ export const chatHandler = new Elysia({ name: "ChatHandler" })
           return {
             success: false,
             error: "Onboarding must be completed before using chat",
+          };
+        }
+
+        // Require an active or trialing subscription before chat access
+        const subRepo = new SubscriptionRepository();
+        const subscription = await subRepo.findByUserId(dbUser.id);
+        if (
+          !subscription ||
+          !["active", "trialing"].includes(subscription.status)
+        ) {
+          set.status = 402;
+          return {
+            success: false,
+            error: "Subscription required to use chat",
           };
         }
 

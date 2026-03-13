@@ -1056,4 +1056,23 @@ describe("Chat onboarding integration", () => {
       expect(await screen.findByText("Failed to send message")).toBeDefined();
     });
   });
+
+  describe("subscription_required redirect", () => {
+    it("redirects to /subscribe when agent status is subscription_required", async () => {
+      vi.mocked(getAgentStatus).mockResolvedValue({
+        success: true,
+        status: "subscription_required",
+      });
+
+      render(
+        <MemoryRouter>
+          <Chat />
+        </MemoryRouter>,
+      );
+
+      await waitFor(() => {
+        expect(navigateMock).toHaveBeenCalledWith("/subscribe");
+      });
+    });
+  });
 });

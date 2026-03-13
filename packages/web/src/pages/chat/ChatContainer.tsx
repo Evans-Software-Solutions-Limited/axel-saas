@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { useNavigate } from "react-router";
 import { useAuth } from "@/hooks/useAuth";
 import {
   getOnboardingState,
@@ -35,6 +36,7 @@ export function ChatContainer() {
   const [nextQuestion, setNextQuestion] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const { setOnboardingCompleted, refreshOnboardingStatus } = useAuth();
+  const navigate = useNavigate();
 
   // Call the onboarding complete endpoint and switch to live mode
   const handleCompleteOnboarding = useCallback(async () => {
@@ -70,6 +72,15 @@ export function ChatContainer() {
       } catch {
         // getAgentStatus throws for new users - that's fine, fall through to onboarding
         // This is expected when user hasn't completed onboarding yet
+      }
+
+      // Redirect to subscribe if payment is required
+      if (
+        agentStatus?.success &&
+        agentStatus.status === "subscription_required"
+      ) {
+        navigate("/subscribe");
+        return;
       }
 
       // Determine whether the live agent is already active.
@@ -111,7 +122,7 @@ export function ChatContainer() {
     } finally {
       setIsLoadingState(false);
     }
-  }, [setOnboardingCompleted, refreshOnboardingStatus]);
+  }, [navigate, setOnboardingCompleted, refreshOnboardingStatus]);
 
   useEffect(() => {
     void loadState();

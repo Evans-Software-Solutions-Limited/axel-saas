@@ -1,4 +1,4 @@
-import { useNavigate } from "react-router";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -9,56 +9,75 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { IconCheck } from "@tabler/icons-react";
+import { createCheckoutSession } from "./subscribeApi";
 
 const plans = [
   {
     name: "Starter",
-    price: "£29",
+    tierId: "starter",
+    price: "£19",
     period: "/month",
-    description: "Basic tasks and automation",
+    description: "Daily brief, Telegram & basic task automation",
     features: [
+      "Daily brief",
+      "Telegram integration",
       "Basic task automation",
-      "Email management",
-      "Calendar integration",
-      "Up to 100 tasks/month",
+      "Email triage",
     ],
     highlight: false,
   },
   {
-    name: "Professional",
-    price: "£79",
+    name: "Pro",
+    tierId: "pro",
+    price: "£49",
     period: "/month",
     description: "Everything for growing teams",
     features: [
       "Everything in Starter",
-      "Document management",
-      "Advanced integrations",
-      "Up to 1,000 tasks/month",
-      "Priority support",
+      "Calendar management",
+      "Email send/receive",
+      "Integrations",
+      "Sub-agents",
     ],
     highlight: true,
   },
   {
     name: "Business",
+    tierId: "business",
+    price: "£99",
+    period: "/month",
+    description: "Scale across multiple agents",
+    features: [
+      "Everything in Pro",
+      "Custom channels",
+      "Multiple agents",
+      "Priority support",
+    ],
+    highlight: false,
+  },
+  {
+    name: "Developer",
+    tierId: "developer",
     price: "£149",
     period: "/month",
-    description: "Enterprise features",
+    description: "Full exec access with API & code generation",
     features: [
-      "Everything in Professional",
-      "Team agents",
-      "Compliance knowledge base",
-      "Up to 10,000 tasks/month",
-      "Dedicated support",
+      "Everything in Business",
+      "Full exec access",
+      "Code generation",
+      "API access",
+      "Heavy sub-agent use",
     ],
     highlight: false,
   },
   {
     name: "Enterprise",
+    tierId: null,
     price: "Custom",
-    period: "/month",
+    period: "",
     description: "Full deployment and integration",
     features: [
-      "Everything in Business",
+      "Everything in Developer",
       "Full deployment",
       "Custom integrations",
       "MCP knowledge integrations",
@@ -70,16 +89,24 @@ const plans = [
 ];
 
 export function Subscribe() {
-  const navigate = useNavigate();
+  const [loadingTier, setLoadingTier] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleSelectPlan = (planName: string) => {
-    // In a real app, this would process the payment
-    if (planName === "Enterprise") {
-      // Handle Enterprise inquiry
-      console.log("Enterprise plan inquiry");
-    } else {
-      // Proceed to root redirect after selecting plan (routes to chat or dashboard based on onboarding state)
-      navigate("/");
+  const handleSelectPlan = async (tierId: string | null) => {
+    if (!tierId) {
+      // Enterprise — contact sales
+      window.location.assign("mailto:sales@axel.ai");
+      return;
+    }
+
+    setError(null);
+    setLoadingTier(tierId);
+    try {
+      const { url } = await createCheckoutSession(tierId);
+      window.location.assign(url);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to start checkout");
+      setLoadingTier(null);
     }
   };
 
@@ -94,11 +121,12 @@ export function Subscribe() {
           <p className="text-muted text-lg">
             Pick the perfect plan for your team's needs
           </p>
+          {error && <p className="text-red-500 text-sm mt-2">{error}</p>}
         </div>
       </div>
 
       {/* Pricing Cards */}
-      <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
         {plans.map((plan) => (
           <Card
             key={plan.name}
@@ -145,14 +173,19 @@ export function Subscribe() {
 
               {/* CTA Button */}
               <Button
-                onClick={() => handleSelectPlan(plan.name)}
+                onClick={() => handleSelectPlan(plan.tierId)}
+                disabled={loadingTier !== null}
                 className={`w-full ${
                   plan.highlight
                     ? "bg-accent hover:bg-accent/90 text-white"
                     : "bg-surface-raised hover:bg-surface-elevated text-text border border-border"
                 }`}
               >
-                {plan.name === "Enterprise" ? "Contact sales" : "Get started"}
+                {plan.tierId === null
+                  ? "Contact sales"
+                  : loadingTier === plan.tierId
+                    ? "Redirecting..."
+                    : "Get started"}
               </Button>
             </CardContent>
           </Card>
