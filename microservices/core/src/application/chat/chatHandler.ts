@@ -34,6 +34,44 @@ function getDemoChatResponse(message: string): ChatMessageResponse {
   };
 }
 
+/**
+ * Validate gateway URL to prevent auth token leakage to untrusted endpoints.
+ * Returns the validated URL or null if invalid.
+ */
+function validateGatewayUrl(urlString: string): string | null {
+  try {
+    const url = new URL(urlString);
+
+    // Only allow HTTPS in production, allow HTTP for development
+    if (process.env.NODE_ENV === "production" && url.protocol !== "https:") {
+      console.error("Gateway URL must use HTTPS in production");
+      return null;
+    }
+
+    // Block private/localhost addresses in production
+    if (process.env.NODE_ENV === "production") {
+      const hostname = url.hostname;
+      const privateRanges = [
+        /^localhost$/i,
+        /^127\./,
+        /^192\.168\./,
+        /^10\./,
+        /^172\.(1[6-9]|2[0-9]|3[01])\./,
+      ];
+
+      if (privateRanges.some((range) => range.test(hostname))) {
+        console.error("Gateway URL cannot be a private IP address");
+        return null;
+      }
+    }
+
+    return url.toString();
+  } catch (err) {
+    console.error("Invalid gateway URL:", err);
+    return null;
+  }
+}
+
 export const chatHandler = new Elysia({ name: "ChatHandler" })
   .derive(async ({ headers }) => ({
     user: await getAuthUser(headers.authorization),
@@ -149,8 +187,19 @@ export const chatHandler = new Elysia({ name: "ChatHandler" })
           };
         }
 
+        // Validate gateway URL to prevent auth header leakage
+        const gatewayUrl = validateGatewayUrl(container.gatewayUrl);
+        if (!gatewayUrl) {
+          console.error("Invalid gateway URL:", container.gatewayUrl);
+          set.status = 500;
+          return {
+            success: false,
+            error: "Gateway configuration error",
+          };
+        }
+
         try {
-          const gatewayResponse = await fetch(`${container.gatewayUrl}/api/chat`, {
+          const gatewayResponse = await fetch(`${gatewayUrl}/api/chat`, {
             method: "POST",
             headers: {
               "Content-Type": "application/json",

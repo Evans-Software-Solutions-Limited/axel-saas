@@ -47,12 +47,12 @@ export function ChatContainer() {
       await refreshOnboardingStatus();
       setChatMode("live");
     } catch (err) {
-      console.error("Failed to complete onboarding:", err);
-      // Still switch to live mode - the user can chat
-      // But we must update auth state to avoid inconsistent routing
-      setOnboardingCompleted(true);
-      await refreshOnboardingStatus();
-      setChatMode("live");
+      // If onboarding completion fails, do NOT mark it as complete
+      // The user should retry or contact support
+      const message =
+        err instanceof Error ? err.message : "Failed to complete onboarding";
+      setError(message);
+      // Don't switch mode; stay in onboarding mode to allow retry
     }
   }, [setOnboardingCompleted, refreshOnboardingStatus]);
 
@@ -73,7 +73,8 @@ export function ChatContainer() {
       }
 
       // Determine whether the live agent is already active.
-      const agentActive = agentStatus?.success && agentStatus.status === "active";
+      const agentActive =
+        agentStatus?.success && agentStatus.status === "active";
 
       if (agentActive) {
         // User has completed onboarding and has an active agent

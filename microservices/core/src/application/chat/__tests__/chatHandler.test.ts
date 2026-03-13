@@ -30,9 +30,9 @@ vi.mock("../../repositories/provisioningRepository", () => {
 // Mock auth utils
 vi.mock("@axel-saas/api-utils/auth/supabaseAuth", () => ({
   getAuthUser: vi.fn().mockResolvedValue({ sub: "supabase-123" }),
-  requireAuth: vi.fn((ctx: any) => {
-    if (!ctx.user) {
-      ctx.set.status = 401;
+  requireAuth: vi.fn(({ user, set }: any) => {
+    if (!user) {
+      set.status = 401;
       return { success: false, error: "Unauthorized" };
     }
   }),

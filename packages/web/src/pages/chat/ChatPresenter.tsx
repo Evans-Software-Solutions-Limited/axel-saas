@@ -65,8 +65,8 @@ export function ChatPresenter({
       return msgContent.includes(coreNextQuestion);
     });
 
-  // Input is disabled during loading or when already sending
-  const inputDisabled = isLoadingState || isSending;
+  // Input is disabled during loading, when already sending, or when there's an error
+  const inputDisabled = isLoadingState || isSending || error !== null;
 
   return (
     <div className="h-full flex flex-col p-6">
