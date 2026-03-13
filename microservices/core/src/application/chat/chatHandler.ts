@@ -59,8 +59,8 @@ export const chatHandler = new Elysia({ name: "ChatHandler" })
           dbUser.id,
         );
 
-        if (!container || !container.gatewayUrl) {
-          // Return not found - container not yet provisioned
+        if (!container) {
+          // No provisioning record exists yet.
           return {
             success: true,
             status: "not_found",
@@ -69,7 +69,10 @@ export const chatHandler = new Elysia({ name: "ChatHandler" })
 
         return {
           success: true,
-          status: container.status === "active" ? "active" : "provisioning",
+          status:
+            container.status === "active" && container.gatewayUrl
+              ? "active"
+              : "provisioning",
         };
       } catch (error) {
         console.error("Get agent status error:", error);
