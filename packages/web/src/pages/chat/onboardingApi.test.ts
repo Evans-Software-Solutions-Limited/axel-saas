@@ -1,14 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  completeOnboarding,
   getOnboardingState,
   OnboardingAlreadyCompleteError,
   postOnboardingMessage,
 } from "./onboardingApi";
 
-const { stateGetMock, messagePostMock } = vi.hoisted(() => ({
-  stateGetMock: vi.fn(),
-  messagePostMock: vi.fn(),
-}));
+const { stateGetMock, messagePostMock, onboardingCompletePostMock } =
+  vi.hoisted(() => ({
+    stateGetMock: vi.fn(),
+    messagePostMock: vi.fn(),
+    onboardingCompletePostMock: vi.fn(),
+  }));
 
 vi.mock("@/lib/eden", () => ({
   api: {
@@ -20,6 +23,9 @@ vi.mock("@/lib/eden", () => ({
           },
           message: {
             post: messagePostMock,
+          },
+          complete: {
+            post: onboardingCompletePostMock,
           },
         },
       },
@@ -192,5 +198,61 @@ describe("onboardingApi", () => {
     messagePostMock.mockRejectedValue("string error not an object");
 
     await expect(postOnboardingMessage("test")).rejects.toThrow();
+  });
+
+  describe("completeOnboarding", () => {
+    it("returns success when API responds with success payload", async () => {
+      onboardingCompletePostMock.mockResolvedValue({
+        data: {
+          success: true,
+          message: "Onboarding completed",
+        },
+      } as never);
+
+      const result = await completeOnboarding();
+
+      expect(result).toEqual({
+        success: true,
+        message: "Onboarding completed",
+      });
+    });
+
+    it("throws error when API returns failure with response error message", async () => {
+      onboardingCompletePostMock.mockResolvedValue({
+        data: undefined,
+        error: {
+          message: "Already completed",
+        },
+      } as never);
+
+      await expect(completeOnboarding()).rejects.toThrow("Already completed");
+    });
+
+    it("throws error when API returns failure with nested error value", async () => {
+      onboardingCompletePostMock.mockResolvedValue({
+        data: undefined,
+        error: {
+          value: { error: "Backend error" },
+        },
+      } as never);
+
+      await expect(completeOnboarding()).rejects.toThrow("Backend error");
+    });
+
+    it("throws default error when API returns failure without message", async () => {
+      onboardingCompletePostMock.mockResolvedValue({
+        data: undefined,
+      } as never);
+
+      await expect(completeOnboarding()).rejects.toThrow(
+        "Failed to complete onboarding",
+      );
+    });
+
+    it("throws error when API throws exception", async () => {
+      onboardingCompletePostMock.mockRejectedValue(new Error("Network error"));
+
+      await expect(completeOnboarding()).rejects.toThrow("Network error");
+    });
   });
 });

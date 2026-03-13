@@ -10,6 +10,7 @@ import {
 } from "./application/subscriptions/subscriptionHandler";
 import { userHandler } from "./application/users/userHandler";
 import { onboardingHandler } from "./application/onboarding/onboardingHandler";
+import { chatHandler } from "./application/chat/chatHandler";
 
 const getAllowedOrigins = (): string[] => {
   const origins: string[] = [];
@@ -52,6 +53,7 @@ const app = new Elysia()
   // Protected routes — each handler applies supabaseAuth internally
   .use(userHandler)
   .use(onboardingHandler)
+  .use(chatHandler)
   .use(subscriptionHandler);
 
 export type CoreApi = typeof app;

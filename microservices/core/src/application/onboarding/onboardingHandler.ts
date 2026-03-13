@@ -10,6 +10,14 @@ import {
   QUESTION_PROMPTS,
   type QuestionKey,
 } from "./onboardingRepository";
+import {
+  generateWorkspaceFiles,
+  writeWorkspaceFiles,
+} from "../workspace/workspaceGenerator";
+import { ProvisioningRepository } from "../repositories/provisioningRepository";
+
+// Create instance for use in handler
+const provisioningRepo = new ProvisioningRepository();
 
 // Types for API responses
 export interface OnboardingStateResponse {
@@ -283,6 +291,96 @@ export const onboardingHandler = new Elysia({ name: "OnboardingHandler" })
     {
       detail: {
         description: "Start onboarding conversation",
+        tags: ["Onboarding"],
+      },
+    },
+  )
+  .post(
+    "/users/onboarding/complete",
+    async (ctx) => {
+      const { set } = ctx;
+      try {
+        const dbUser = await userRepository.getUserBySupabaseId(
+          getUser(ctx).sub,
+        );
+        if (!dbUser) {
+          set.status = 404;
+          return { success: false, error: "User not found" };
+        }
+
+        // Get onboarding state with collected answers
+        const { state: onboardingState } =
+          await onboardingRepository.getStateWithMessages(dbUser.id);
+
+        if (!onboardingState) {
+          set.status = 400;
+          return { success: false, error: "No onboarding state found" };
+        }
+
+        // Check if onboarding is actually complete (all required questions answered)
+        // Note: We don't early-return here - we need to regenerate workspace files
+        // even if onboarding was already marked complete (e.g., for re-provisioning)
+        if (!onboardingRepository.isComplete(onboardingState)) {
+          set.status = 400;
+          return {
+            success: false,
+            error:
+              "Onboarding not complete. Please answer all required questions.",
+          };
+        }
+
+        // Generate workspace files from collected answers
+        const collectedAnswers = onboardingState.collectedAnswers;
+        const tier = "starter"; // TODO: Get tier from subscription
+
+        const workspaceFiles = generateWorkspaceFiles(collectedAnswers, tier);
+
+        // Get or create provisioning state
+        let provisioning = await provisioningRepo.findByUserId(dbUser.id);
+        if (!provisioning) {
+          provisioning = await provisioningRepo.create({
+            userId: dbUser.id,
+            status: "pending",
+          });
+        }
+
+        // Determine workspace path - in production this would be EFS
+        const workspacePath = process.env.WORKSPACE_PATH
+          ? `${process.env.WORKSPACE_PATH}/${dbUser.id}/workspace`
+          : `/tmp/workspace/${dbUser.id}/workspace`;
+
+        // Write workspace files
+        await writeWorkspaceFiles(workspacePath, workspaceFiles);
+
+        // Update provisioning state to active
+        await provisioningRepo.updateProvisioned(
+          provisioning.id,
+          workspacePath,
+        );
+
+        // Store raw answers for regeneration
+        await userRepository.updateOnboardingAnswers(
+          dbUser.id,
+          collectedAnswers,
+        );
+
+        // Mark onboarding as complete in the database (idempotent - safe to call again)
+        await onboardingRepository.markCompleted(dbUser.id);
+
+        // Don't leak internal workspacePath to the client
+        return {
+          success: true,
+          message: "Onboarding completed successfully",
+        };
+      } catch (error) {
+        console.error("Onboarding complete error:", error);
+        set.status = 500;
+        return { success: false, error: "Failed to complete onboarding" };
+      }
+    },
+    {
+      detail: {
+        description: "Complete onboarding and generate workspace files",
         tags: ["Onboarding"],
       },
     },

@@ -1,15 +1,27 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import {
+  render,
+  screen,
+  fireEvent,
+  waitFor,
+  act,
+} from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { Chat } from "../Chat";
 import {
+  completeOnboarding,
   getOnboardingState,
   postOnboardingMessage,
   OnboardingAlreadyCompleteError,
 } from "../chat/onboardingApi";
+import { getAgentStatus, postChatMessage } from "../chat/chatApi";
 import { useAuth } from "@/hooks/useAuth";
 
 const navigateMock = vi.fn();
+
+const { onboardingCompletePostMock } = vi.hoisted(() => ({
+  onboardingCompletePostMock: vi.fn(),
+}));
 
 vi.mock("react-router", async () => {
   const actual = await import("react-router");
@@ -23,10 +35,30 @@ vi.mock("@/hooks/useAuth", () => ({
   useAuth: vi.fn(),
 }));
 
+vi.mock("@/lib/eden", () => ({
+  api: {
+    core: {
+      users: {
+        onboarding: {
+          complete: {
+            post: onboardingCompletePostMock,
+          },
+        },
+      },
+    },
+  },
+}));
+
 vi.mock("../chat/onboardingApi", () => ({
+  completeOnboarding: vi.fn(),
   getOnboardingState: vi.fn(),
   postOnboardingMessage: vi.fn(),
   OnboardingAlreadyCompleteError: class OnboardingAlreadyCompleteError extends Error {},
+}));
+
+vi.mock("../chat/chatApi", () => ({
+  getAgentStatus: vi.fn(),
+  postChatMessage: vi.fn(),
 }));
 
 describe("Chat onboarding integration", () => {
@@ -35,6 +67,20 @@ describe("Chat onboarding integration", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.restoreAllMocks();
+    // Default: no active agent - will fall through to onboarding
+    vi.mocked(getAgentStatus).mockResolvedValue({
+      success: true,
+      status: "not_found",
+    });
+    // Mock Eden client for onboarding complete endpoint
+    onboardingCompletePostMock.mockResolvedValue({
+      data: { success: true },
+    });
+    vi.mocked(completeOnboarding).mockResolvedValue({
+      success: true,
+      message: "Onboarding completed",
+    });
     vi.mocked(useAuth).mockReturnValue({
       isAuthenticated: true,
       isLoading: false,
@@ -79,7 +125,9 @@ describe("Chat onboarding integration", () => {
 
     expect(await screen.findByText("Onboarding mode")).toBeDefined();
     expect(await screen.findByText("What do you do for work?")).toBeDefined();
-    expect(screen.getByPlaceholderText(/tell axel what to do/i)).toBeDefined();
+    expect(
+      screen.getByPlaceholderText(/answer axel's question/i),
+    ).toBeDefined();
   });
 
   it("restores persisted onboarding transcript after refresh", async () => {
@@ -193,10 +241,10 @@ describe("Chat onboarding integration", () => {
 
     await screen.findByText("What should I call you?");
 
-    fireEvent.change(screen.getByPlaceholderText(/tell axel what to do/i), {
+    fireEvent.change(screen.getByPlaceholderText(/answer axel's question/i), {
       target: { value: "Bradley" },
     });
-    fireEvent.keyDown(screen.getByPlaceholderText(/tell axel what to do/i), {
+    fireEvent.keyDown(screen.getByPlaceholderText(/answer axel's question/i), {
       key: "Enter",
     });
 
@@ -275,10 +323,10 @@ describe("Chat onboarding integration", () => {
     expect(await screen.findByText("What should I call you?")).toBeDefined();
 
     // Send response
-    fireEvent.change(screen.getByPlaceholderText(/tell axel what to do/i), {
+    fireEvent.change(screen.getByPlaceholderText(/answer axel's question/i), {
       target: { value: "Bradley" },
     });
-    fireEvent.keyDown(screen.getByPlaceholderText(/tell axel what to do/i), {
+    fireEvent.keyDown(screen.getByPlaceholderText(/answer axel's question/i), {
       key: "Enter",
     });
 
@@ -359,10 +407,10 @@ describe("Chat onboarding integration", () => {
     expect(await screen.findByText("What should I call you?")).toBeDefined();
 
     // Send response
-    fireEvent.change(screen.getByPlaceholderText(/tell axel what to do/i), {
+    fireEvent.change(screen.getByPlaceholderText(/answer axel's question/i), {
       target: { value: "Bradley" },
     });
-    fireEvent.keyDown(screen.getByPlaceholderText(/tell axel what to do/i), {
+    fireEvent.keyDown(screen.getByPlaceholderText(/answer axel's question/i), {
       key: "Enter",
     });
 
@@ -437,7 +485,7 @@ describe("Chat onboarding integration", () => {
     expect(allQuestionTexts.length).toBe(1);
   });
 
-  it("handles initial completed onboarding state by unlocking and redirecting", async () => {
+  it("handles initial completed onboarding state by switching to live mode", async () => {
     vi.mocked(getOnboardingState).mockResolvedValue({
       state: {
         id: "state-1",
@@ -458,18 +506,24 @@ describe("Chat onboarding integration", () => {
       nextQuestion: null,
     });
 
+    // Mock the POST /users/onboarding/complete endpoint
+    onboardingCompletePostMock.mockResolvedValue({
+      data: { success: true },
+    });
+
     render(
       <MemoryRouter>
         <Chat />
       </MemoryRouter>,
     );
 
+    // Should complete onboarding and switch to live mode instead of navigating
     await waitFor(() => {
       expect(setOnboardingCompleted).toHaveBeenCalledWith(true);
       expect(refreshOnboardingStatus).toHaveBeenCalled();
-      expect(navigateMock).toHaveBeenCalledWith("/dashboard/office", {
-        replace: true,
-      });
+      expect(onboardingCompletePostMock).not.toHaveBeenCalled();
+      // No longer navigating to /dashboard/office
+      expect(navigateMock).not.toHaveBeenCalled();
     });
   });
 
@@ -494,9 +548,7 @@ describe("Chat onboarding integration", () => {
       </MemoryRouter>,
     );
 
-    expect(
-      await screen.findByText("Failed to load onboarding state"),
-    ).toBeDefined();
+    expect(await screen.findByText("Failed to load state")).toBeDefined();
   });
 
   it("renders empty transcript when backend has no messages and no next question", async () => {
@@ -530,7 +582,7 @@ describe("Chat onboarding integration", () => {
     expect(screen.queryByText("What should I call you?")).toBeNull();
   });
 
-  it("unlocks app and redirects when backend marks onboarding complete", async () => {
+  it("completes onboarding and switches to live mode when backend marks onboarding complete", async () => {
     vi.mocked(getOnboardingState).mockResolvedValue({
       state: {
         id: "state-1",
@@ -577,6 +629,11 @@ describe("Chat onboarding integration", () => {
       nextQuestion: null,
     });
 
+    // Mock the POST /users/onboarding/complete endpoint
+    onboardingCompletePostMock.mockResolvedValue({
+      data: { success: true },
+    });
+
     render(
       <MemoryRouter>
         <Chat />
@@ -585,7 +642,7 @@ describe("Chat onboarding integration", () => {
 
     await screen.findByText("Which channels do you want?");
 
-    fireEvent.change(screen.getByPlaceholderText(/tell axel what to do/i), {
+    fireEvent.change(screen.getByPlaceholderText(/answer axel's question/i), {
       target: { value: "Telegram" },
     });
     fireEvent.click(screen.getByRole("button"));
@@ -593,13 +650,12 @@ describe("Chat onboarding integration", () => {
     await waitFor(() => {
       expect(setOnboardingCompleted).toHaveBeenCalledWith(true);
       expect(refreshOnboardingStatus).toHaveBeenCalled();
-      expect(navigateMock).toHaveBeenCalledWith("/dashboard/office", {
-        replace: true,
-      });
+      // No longer navigating to /dashboard/office - stays in chat
+      expect(navigateMock).not.toHaveBeenCalled();
     });
   });
 
-  it("handles 409 completed-state conflict by unlocking and redirecting", async () => {
+  it("handles 409 completed-state conflict by switching to live mode", async () => {
     vi.mocked(getOnboardingState).mockResolvedValue({
       state: {
         id: "state-1",
@@ -624,6 +680,11 @@ describe("Chat onboarding integration", () => {
       new OnboardingAlreadyCompleteError(),
     );
 
+    // Mock the POST /users/onboarding/complete endpoint
+    onboardingCompletePostMock.mockResolvedValue({
+      data: { success: true },
+    });
+
     render(
       <MemoryRouter>
         <Chat />
@@ -632,7 +693,7 @@ describe("Chat onboarding integration", () => {
 
     await screen.findByText("Which channels do you want?");
 
-    fireEvent.change(screen.getByPlaceholderText(/tell axel what to do/i), {
+    fireEvent.change(screen.getByPlaceholderText(/answer axel's question/i), {
       target: { value: "Telegram" },
     });
     fireEvent.click(screen.getByRole("button"));
@@ -640,9 +701,8 @@ describe("Chat onboarding integration", () => {
     await waitFor(() => {
       expect(setOnboardingCompleted).toHaveBeenCalledWith(true);
       expect(refreshOnboardingStatus).toHaveBeenCalled();
-      expect(navigateMock).toHaveBeenCalledWith("/dashboard/office", {
-        replace: true,
-      });
+      // No longer navigating to /dashboard/office - stays in chat
+      expect(navigateMock).not.toHaveBeenCalled();
     });
   });
 
@@ -677,14 +737,12 @@ describe("Chat onboarding integration", () => {
 
     await screen.findByText("Which channels do you want?");
 
-    fireEvent.change(screen.getByPlaceholderText(/tell axel what to do/i), {
+    fireEvent.change(screen.getByPlaceholderText(/answer axel's question/i), {
       target: { value: "Telegram" },
     });
     fireEvent.click(screen.getByRole("button"));
 
-    expect(
-      await screen.findByText("Failed to send onboarding message"),
-    ).toBeDefined();
+    expect(await screen.findByText("Failed to send message")).toBeDefined();
   });
 
   it("does not send message when input is empty", async () => {
@@ -762,13 +820,13 @@ describe("Chat onboarding integration", () => {
     await screen.findByText("Which channels do you want?");
 
     // Start first message
-    fireEvent.change(screen.getByPlaceholderText(/tell axel what to do/i), {
+    fireEvent.change(screen.getByPlaceholderText(/answer axel's question/i), {
       target: { value: "Telegram" },
     });
     fireEvent.click(screen.getByRole("button"));
 
     // Now try to send another message while first is still pending
-    fireEvent.change(screen.getByPlaceholderText(/tell axel what to do/i), {
+    fireEvent.change(screen.getByPlaceholderText(/answer axel's question/i), {
       target: { value: "Email" },
     });
     fireEvent.click(screen.getByRole("button"));
@@ -776,23 +834,226 @@ describe("Chat onboarding integration", () => {
     // postOnboardingMessage should only have been called once
     expect(postOnboardingMessage).toHaveBeenCalledTimes(1);
 
-    // Resolve the pending promise
-    resolvePostMessage!({
-      state: {
-        id: "state-1",
-        status: "completed",
-        outstandingQuestions: [],
-        collectedAnswers: {
-          name: "Bradley",
-          role: "Founder",
-          channels: "Telegram",
+    // Resolve the pending promise - wrap in act to fix React warnings
+    await act(async () => {
+      resolvePostMessage!({
+        state: {
+          id: "state-1",
+          status: "completed",
+          outstandingQuestions: [],
+          collectedAnswers: {
+            name: "Bradley",
+            role: "Founder",
+            channels: "Telegram",
+          },
+          completedAt: "2026-03-11T10:10:00.000Z",
+          lastMessageAt: "2026-03-11T10:10:00.000Z",
         },
-        completedAt: "2026-03-11T10:10:00.000Z",
-        lastMessageAt: "2026-03-11T10:10:00.000Z",
-      },
-      messages: [],
-      assistantResponse: "Done",
-      isComplete: true,
+        messages: [],
+        assistantResponse: "Done",
+        isComplete: true,
+      });
+    });
+  });
+
+  describe("Live chat mode", () => {
+    it("switches to live mode when agent is active", async () => {
+      // Mock agent status as active
+      vi.mocked(getAgentStatus).mockResolvedValue({
+        success: true,
+        status: "active",
+      });
+
+      render(
+        <MemoryRouter>
+          <Chat />
+        </MemoryRouter>,
+      );
+
+      // Should show "Chat" label (not "Onboarding mode")
+      expect(await screen.findByText("Chat")).toBeDefined();
+      // Should show live chat placeholder
+      expect(screen.getByPlaceholderText(/ask axel to help/i)).toBeDefined();
+    });
+
+    it("sends message in live mode and shows assistant response", async () => {
+      // Mock agent status as active
+      vi.mocked(getAgentStatus).mockResolvedValue({
+        success: true,
+        status: "active",
+      });
+
+      // Mock postChatMessage to return a response
+      vi.mocked(postChatMessage).mockResolvedValue({
+        success: true,
+        response: "Hello! I'm Axel, how can I help?",
+        messageId: "assistant-msg-1",
+      });
+
+      render(
+        <MemoryRouter>
+          <Chat />
+        </MemoryRouter>,
+      );
+
+      // Wait for live mode
+      expect(await screen.findByText("Chat")).toBeDefined();
+
+      // Type and send a message
+      fireEvent.change(screen.getByPlaceholderText(/ask axel to help/i), {
+        target: { value: "Hello" },
+      });
+      fireEvent.click(screen.getByRole("button"));
+
+      // Should show user's message
+      await waitFor(() => {
+        expect(screen.getByText("Hello")).toBeDefined();
+      });
+
+      // Should show assistant response
+      await waitFor(() => {
+        expect(
+          screen.getByText("Hello! I'm Axel, how can I help?"),
+        ).toBeDefined();
+      });
+
+      expect(postChatMessage).toHaveBeenCalledWith("Hello");
+    });
+
+    it("does not send message in live mode when input is empty", async () => {
+      // Mock agent status as active
+      vi.mocked(getAgentStatus).mockResolvedValue({
+        success: true,
+        status: "active",
+      });
+
+      render(
+        <MemoryRouter>
+          <Chat />
+        </MemoryRouter>,
+      );
+
+      // Wait for live mode
+      expect(await screen.findByText("Chat")).toBeDefined();
+
+      // Try to send with empty input
+      fireEvent.click(screen.getByRole("button"));
+
+      // postChatMessage should NOT have been called
+      expect(postChatMessage).not.toHaveBeenCalled();
+    });
+
+    it("does not send message in live mode when already sending", async () => {
+      // Mock agent status as active
+      vi.mocked(getAgentStatus).mockResolvedValue({
+        success: true,
+        status: "active",
+      });
+
+      // Make postChatMessage hang
+      let resolvePostMessage: (value: unknown) => void;
+      vi.mocked(postChatMessage).mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            resolvePostMessage = resolve as (value: unknown) => void;
+          }),
+      );
+
+      render(
+        <MemoryRouter>
+          <Chat />
+        </MemoryRouter>,
+      );
+
+      // Wait for live mode
+      expect(await screen.findByText("Chat")).toBeDefined();
+
+      // Start first message
+      fireEvent.change(screen.getByPlaceholderText(/ask axel to help/i), {
+        target: { value: "Hello" },
+      });
+      fireEvent.click(screen.getByRole("button"));
+
+      // Try to send another message while first is pending
+      fireEvent.change(screen.getByPlaceholderText(/ask axel to help/i), {
+        target: { value: "Another message" },
+      });
+      fireEvent.click(screen.getByRole("button"));
+
+      // postChatMessage should only have been called once
+      expect(postChatMessage).toHaveBeenCalledTimes(1);
+
+      // Resolve the pending promise
+      await act(async () => {
+        resolvePostMessage!({
+          success: true,
+          response: "Hi there!",
+          messageId: "msg-1",
+        });
+      });
+    });
+
+    it("shows error in live mode when send fails", async () => {
+      // Mock agent status as active
+      vi.mocked(getAgentStatus).mockResolvedValue({
+        success: true,
+        status: "active",
+      });
+
+      // Mock postChatMessage to throw
+      vi.mocked(postChatMessage).mockRejectedValue(new Error("Failed to send"));
+
+      render(
+        <MemoryRouter>
+          <Chat />
+        </MemoryRouter>,
+      );
+
+      // Wait for live mode
+      expect(await screen.findByText("Chat")).toBeDefined();
+
+      // Type and try to send a message
+      fireEvent.change(screen.getByPlaceholderText(/ask axel to help/i), {
+        target: { value: "Hello" },
+      });
+      fireEvent.click(screen.getByRole("button"));
+
+      // Should show user's message (optimistic)
+      await waitFor(() => {
+        expect(screen.getByText("Hello")).toBeDefined();
+      });
+
+      // Should show error
+      expect(await screen.findByText("Failed to send")).toBeDefined();
+    });
+
+    it("falls back to default error message for non-Error failures in live mode", async () => {
+      // Mock agent status as active
+      vi.mocked(getAgentStatus).mockResolvedValue({
+        success: true,
+        status: "active",
+      });
+
+      // Mock postChatMessage to throw a non-Error
+      vi.mocked(postChatMessage).mockRejectedValue("string error");
+
+      render(
+        <MemoryRouter>
+          <Chat />
+        </MemoryRouter>,
+      );
+
+      // Wait for live mode
+      expect(await screen.findByText("Chat")).toBeDefined();
+
+      // Type and try to send a message
+      fireEvent.change(screen.getByPlaceholderText(/ask axel to help/i), {
+        target: { value: "Hello" },
+      });
+      fireEvent.click(screen.getByRole("button"));
+
+      // Should show generic error
+      expect(await screen.findByText("Failed to send message")).toBeDefined();
     });
   });
 });

@@ -1,4 +1,5 @@
 import { api } from "@/lib/eden";
+import { getErrorMessage, getResponseError, getStatusCode } from "./apiHelpers";
 
 export interface OnboardingState {
   id: string;
@@ -46,10 +47,9 @@ interface PostMessageSuccessPayload {
   nextQuestion: string | null;
 }
 
-interface ApiErrorLike {
-  status?: number;
-  message?: string;
-  value?: unknown;
+interface CompleteOnboardingSuccessPayload {
+  success: true;
+  message: string;
 }
 
 export class OnboardingAlreadyCompleteError extends Error {
@@ -58,35 +58,6 @@ export class OnboardingAlreadyCompleteError extends Error {
     this.name = "OnboardingAlreadyCompleteError";
   }
 }
-
-const isObject = (value: unknown): value is Record<string, unknown> =>
-  typeof value === "object" && value !== null;
-
-const getErrorMessage = (value: unknown): string | undefined => {
-  if (!isObject(value)) return undefined;
-  const message = value["error"];
-  return typeof message === "string" ? message : undefined;
-};
-
-const getStatusCode = (value: unknown): number | undefined => {
-  if (!isObject(value)) return undefined;
-
-  const topLevelStatus = value["status"];
-  if (typeof topLevelStatus === "number") return topLevelStatus;
-
-  const nestedError = value["error"];
-  if (isObject(nestedError) && typeof nestedError["status"] === "number") {
-    return nestedError["status"];
-  }
-
-  return undefined;
-};
-
-const getResponseError = (value: unknown): ApiErrorLike | undefined => {
-  if (!isObject(value)) return undefined;
-  const errorValue = value["error"];
-  return isObject(errorValue) ? (errorValue as ApiErrorLike) : undefined;
-};
 
 export async function getOnboardingState(): Promise<GetOnboardingStateResult> {
   const response = await api.core.users.onboarding.state.get();
@@ -157,4 +128,26 @@ export async function postOnboardingMessage(
 
     throw error;
   }
+}
+
+export interface CompleteOnboardingResult {
+  success: boolean;
+  message: string;
+}
+
+export async function completeOnboarding(): Promise<CompleteOnboardingResult> {
+  const response = await api.core.users["onboarding"].complete.post();
+  const data = response.data;
+
+  if (data?.success === true && "message" in data) {
+    return data as CompleteOnboardingSuccessPayload;
+  }
+
+  const responseError = getResponseError(response);
+  const errorMessage =
+    responseError?.message ??
+    getErrorMessage(responseError?.value) ??
+    "Failed to complete onboarding";
+
+  throw new Error(errorMessage);
 }

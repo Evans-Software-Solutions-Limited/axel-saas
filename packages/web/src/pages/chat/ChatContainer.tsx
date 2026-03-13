@@ -1,103 +1,202 @@
 import { useCallback, useEffect, useState } from "react";
-import { useNavigate } from "react-router";
 import { useAuth } from "@/hooks/useAuth";
 import {
   getOnboardingState,
   OnboardingAlreadyCompleteError,
-  type OnboardingMessage,
   postOnboardingMessage,
+  completeOnboarding as completeOnboardingApi,
+  type OnboardingMessage,
 } from "./onboardingApi";
+import { getAgentStatus, postChatMessage, type ChatMessage } from "./chatApi";
 import { ChatPresenter } from "./ChatPresenter";
 
-const toOptimisticUserMessage = (content: string): OnboardingMessage => ({
+const toOptimisticOnboardingMessage = (content: string): OnboardingMessage => ({
   id: `user-optimistic-${Date.now()}`,
   role: "user",
   content,
   createdAt: new Date().toISOString(),
 });
 
+const toOptimisticChatMessage = (content: string): ChatMessage => ({
+  id: `user-optimistic-${Date.now()}`,
+  role: "user",
+  content,
+  createdAt: new Date().toISOString(),
+});
+
+type ChatMode = "loading" | "onboarding" | "live";
+
 export function ChatContainer() {
   const [messages, setMessages] = useState<OnboardingMessage[]>([]);
   const [input, setInput] = useState("");
   const [isLoadingState, setIsLoadingState] = useState(true);
   const [isSending, setIsSending] = useState(false);
-  const [isOnboardingMode, setIsOnboardingMode] = useState(false);
+  const [chatMode, setChatMode] = useState<ChatMode>("loading");
   const [nextQuestion, setNextQuestion] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const navigate = useNavigate();
   const { setOnboardingCompleted, refreshOnboardingStatus } = useAuth();
 
-  const completeOnboarding = useCallback(async () => {
-    setIsOnboardingMode(false);
-    setOnboardingCompleted(true);
-    await refreshOnboardingStatus();
-    navigate("/dashboard/office", { replace: true });
-  }, [navigate, refreshOnboardingStatus, setOnboardingCompleted]);
+  // Call the onboarding complete endpoint and switch to live mode
+  const handleCompleteOnboarding = useCallback(async () => {
+    try {
+      // Call the backend to complete onboarding and generate workspace files
+      await completeOnboardingApi();
 
+      // Switch to live mode instead of navigating away
+      setOnboardingCompleted(true);
+      await refreshOnboardingStatus();
+      setChatMode("live");
+    } catch (err) {
+      // If onboarding completion fails, do NOT mark it as complete
+      // The user should retry or contact support
+      const message =
+        err instanceof Error ? err.message : "Failed to complete onboarding";
+      setError(message);
+      // Don't switch mode; stay in onboarding mode to allow retry
+    }
+  }, [setOnboardingCompleted, refreshOnboardingStatus]);
+
+  // Load initial state - determines if onboarding or live chat
   const loadState = useCallback(async () => {
     setIsLoadingState(true);
     setError(null);
 
     try {
-      const result = await getOnboardingState();
+      // First check if we should be in live mode
+      // Note: getAgentStatus throws for new users - we catch and fall through to onboarding
+      let agentStatus: { success: boolean; status: string } | null = null;
+      try {
+        agentStatus = await getAgentStatus();
+      } catch {
+        // getAgentStatus throws for new users - that's fine, fall through to onboarding
+        // This is expected when user hasn't completed onboarding yet
+      }
 
-      if (!result.state || result.state.status === "completed") {
-        await completeOnboarding();
+      // Determine whether the live agent is already active.
+      const agentActive =
+        agentStatus?.success && agentStatus.status === "active";
+
+      if (agentActive) {
+        // User has completed onboarding and has an active agent
+        setChatMode("live");
+        // Initialize with empty messages for live chat
+        setMessages([]);
         return;
       }
 
-      setIsOnboardingMode(true);
+      // Check if onboarding is completed on the backend
+      const result = await getOnboardingState();
+
+      // If onboarding is complete (regardless of agent provisioning state),
+      // go to live mode. The agent may still be provisioning in the background.
+      if (!result.state || result.state.status === "completed") {
+        // Onboarding is done - switch to live mode
+        // Don't re-trigger onboarding completion here - that causes a loop
+        // when agent exists but gatewayUrl isn't set yet (provisioning in progress)
+        setOnboardingCompleted(true);
+        await refreshOnboardingStatus();
+        setChatMode("live");
+        return;
+      }
+
+      // In onboarding mode
+      setChatMode("onboarding");
       setMessages(result.messages);
       setNextQuestion(result.nextQuestion);
     } catch (loadError) {
       const message =
-        loadError instanceof Error
-          ? loadError.message
-          : "Failed to load onboarding state";
+        loadError instanceof Error ? loadError.message : "Failed to load state";
       setError(message);
       setMessages([]);
     } finally {
       setIsLoadingState(false);
     }
-  }, [completeOnboarding]);
+  }, [setOnboardingCompleted, refreshOnboardingStatus]);
 
   useEffect(() => {
     void loadState();
   }, [loadState]);
 
-  const handleSend = useCallback(async () => {
+  // Handle sending messages in onboarding mode
+  const handleOnboardingSend = useCallback(async () => {
     const trimmed = input.trim();
-    if (!trimmed || isSending || !isOnboardingMode) return;
+    if (!trimmed || isSending || chatMode !== "onboarding") return;
 
     setError(null);
     setInput("");
     setIsSending(true);
-    setMessages((current) => [...current, toOptimisticUserMessage(trimmed)]);
+    setMessages((current) => [
+      ...current,
+      toOptimisticOnboardingMessage(trimmed),
+    ]);
 
     try {
       const result = await postOnboardingMessage(trimmed);
       setMessages(result.messages);
-      // Update nextQuestion from the backend response
       setNextQuestion(result.nextQuestion);
       if (result.isComplete || result.state.status === "completed") {
-        await completeOnboarding();
+        await handleCompleteOnboarding();
       }
     } catch (sendError) {
       if (sendError instanceof OnboardingAlreadyCompleteError) {
-        await completeOnboarding();
+        await handleCompleteOnboarding();
         return;
       }
 
       const message =
         sendError instanceof Error
           ? sendError.message
-          : "Failed to send onboarding message";
+          : "Failed to send message";
       setError(message);
       setMessages((current) => current.slice(0, -1));
     } finally {
       setIsSending(false);
     }
-  }, [completeOnboarding, input, isOnboardingMode, isSending]);
+  }, [handleCompleteOnboarding, chatMode, input, isSending]);
+
+  // Handle sending messages in live chat mode
+  const handleLiveSend = useCallback(async () => {
+    const trimmed = input.trim();
+    if (!trimmed || isSending || chatMode !== "live") return;
+
+    setError(null);
+    setInput("");
+    setIsSending(true);
+    setMessages((current) => [...current, toOptimisticChatMessage(trimmed)]);
+
+    try {
+      const result = await postChatMessage(trimmed);
+
+      // Add assistant response
+      const assistantMessage: ChatMessage = {
+        id: result.messageId || `assistant-${Date.now()}`,
+        role: "assistant",
+        content: result.response,
+        createdAt: new Date().toISOString(),
+      };
+
+      setMessages((current) => [...current, assistantMessage]);
+    } catch (sendError) {
+      const message =
+        sendError instanceof Error
+          ? sendError.message
+          : "Failed to send message";
+      setError(message);
+      setMessages((current) => current.slice(0, -1));
+    } finally {
+      setIsSending(false);
+    }
+  }, [chatMode, input, isSending]);
+
+  const handleSend = useCallback(() => {
+    if (chatMode === "onboarding") {
+      void handleOnboardingSend();
+    } else if (chatMode === "live") {
+      void handleLiveSend();
+    }
+  }, [chatMode, handleOnboardingSend, handleLiveSend]);
+
+  const isOnboardingMode = chatMode === "onboarding";
 
   return (
     <ChatPresenter

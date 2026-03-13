@@ -74,4 +74,36 @@ export class ProvisioningRepository {
       })
       .where(eq(provisioningState.id, provisioningId));
   }
+
+  /**
+   * Update gateway URL for a user's container
+   */
+  async updateGatewayUrl(userId: string, gatewayUrl: string): Promise<void> {
+    const existing = await this.findByUserId(userId);
+    if (existing) {
+      await this.db
+        .update(provisioningState)
+        .set({ gatewayUrl, updatedAt: new Date() })
+        .where(eq(provisioningState.userId, userId));
+    }
+  }
+
+  /**
+   * Get container by user ID - returns gateway URL if available
+   */
+  async getContainerByUserId(userId: string): Promise<{
+    taskArn: string | null;
+    status: ProvisioningStatus | null;
+    gatewayUrl: string | null;
+    workspacePath: string | null;
+  } | null> {
+    const row = await this.findByUserId(userId);
+    if (!row) return null;
+    return {
+      taskArn: row.ecsTaskArn,
+      status: row.status,
+      gatewayUrl: row.gatewayUrl,
+      workspacePath: row.workspacePath,
+    };
+  }
 }

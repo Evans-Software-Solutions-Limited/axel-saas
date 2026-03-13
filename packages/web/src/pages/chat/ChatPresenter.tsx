@@ -4,8 +4,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { OnboardingMessage } from "./onboardingApi";
 
+// Support both onboarding and live chat messages
+type Message = OnboardingMessage;
+
 interface ChatPresenterProps {
-  messages: OnboardingMessage[];
+  messages: Message[];
   input: string;
   isLoadingState: boolean;
   isSending: boolean;
@@ -62,6 +65,9 @@ export function ChatPresenter({
       return msgContent.includes(coreNextQuestion);
     });
 
+  // Input is disabled during loading, when already sending, or when there's an error
+  const inputDisabled = isLoadingState || isSending || error !== null;
+
   return (
     <div className="h-full flex flex-col p-6">
       <div className="mb-4">
@@ -71,9 +77,7 @@ export function ChatPresenter({
       </div>
 
       <div className="flex-1 overflow-y-auto mb-4 space-y-4">
-        {isLoadingState && (
-          <p className="text-sm text-muted">Loading onboarding state...</p>
-        )}
+        {isLoadingState && <p className="text-sm text-muted">Loading...</p>}
 
         {error && <p className="text-sm text-red-400">{error}</p>}
 
@@ -118,14 +122,18 @@ export function ChatPresenter({
           onKeyDown={(e) => {
             if (e.key === "Enter") onSend();
           }}
-          placeholder="Tell Axel what to do..."
+          placeholder={
+            isOnboardingMode
+              ? "Answer Axel's question..."
+              : "Ask Axel to help..."
+          }
           className="bg-surface-raised border-border text-text"
-          disabled={!isOnboardingMode || isLoadingState || isSending}
+          disabled={inputDisabled}
         />
         <Button
           onClick={onSend}
           className="bg-accent hover:bg-accent/90 text-white px-4"
-          disabled={!canSend || !isOnboardingMode}
+          disabled={!canSend}
         >
           <IconSend className="w-4 h-4" />
         </Button>
