@@ -113,6 +113,11 @@ export const stripeHandler = new Elysia({ name: "StripeHandler" })
       cancel_url: `${webUrl}/subscribe?checkout=cancelled`,
     });
 
+    if (!session.url) {
+      set.status = 500;
+      return { error: "Checkout session URL unavailable" };
+    }
+
     return { url: session.url };
   })
   .post("/stripe/webhook", async ({ body, headers, set }) => {

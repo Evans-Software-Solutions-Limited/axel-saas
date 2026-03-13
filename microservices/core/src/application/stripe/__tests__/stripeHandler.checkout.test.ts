@@ -268,6 +268,25 @@ describe("StripeHandler Checkout Route", () => {
       expect(response.status).toBe(401);
     });
 
+    it("should return 500 when Stripe returns a null session URL", async () => {
+      mockSessionCreate.mockResolvedValueOnce({ url: null });
+
+      const response = await stripeHandler.handle(
+        new Request("http://localhost/stripe/create-checkout-session", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: "Bearer valid_token",
+          },
+          body: JSON.stringify({ tier: "pro" }),
+        }),
+      );
+
+      expect(response.status).toBe(500);
+      const json = (await response.json()) as { error: string };
+      expect(json.error).toBe("Checkout session URL unavailable");
+    });
+
     it("should accept all valid tiers", async () => {
       for (const tier of ["starter", "pro", "business", "developer"]) {
         const response = await stripeHandler.handle(
