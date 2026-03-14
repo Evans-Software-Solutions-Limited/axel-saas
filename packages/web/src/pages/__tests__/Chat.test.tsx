@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
   render,
   screen,
@@ -14,7 +14,11 @@ import {
   postOnboardingMessage,
   OnboardingAlreadyCompleteError,
 } from "../chat/onboardingApi";
-import { getAgentStatus, postChatMessage } from "../chat/chatApi";
+import {
+  getAgentStatus,
+  postChatMessage,
+  SubscriptionRequiredError,
+} from "../chat/chatApi";
 import { useAuth } from "@/hooks/useAuth";
 
 const navigateMock = vi.fn();
@@ -59,6 +63,12 @@ vi.mock("../chat/onboardingApi", () => ({
 vi.mock("../chat/chatApi", () => ({
   getAgentStatus: vi.fn(),
   postChatMessage: vi.fn(),
+  SubscriptionRequiredError: class SubscriptionRequiredError extends Error {
+    constructor() {
+      super("subscription_required");
+      this.name = "SubscriptionRequiredError";
+    }
+  },
 }));
 
 describe("Chat onboarding integration", () => {
@@ -1025,6 +1035,59 @@ describe("Chat onboarding integration", () => {
       }
     });
 
+    it("does not reschedule timer or update state after unmount during in-flight poll", async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+
+      try {
+        let resolveInFlightPoll!: (value: {
+          success: boolean;
+          status: string;
+        }) => void;
+
+        // Call 1 (loadState): provisioning → triggers startProvisioningPoll
+        // Call 2 (immediate poll): hangs until we manually resolve it
+        vi.mocked(getAgentStatus)
+          .mockResolvedValueOnce({ success: true, status: "provisioning" })
+          .mockImplementationOnce(
+            () =>
+              new Promise((resolve) => {
+                resolveInFlightPoll = resolve as (value: {
+                  success: boolean;
+                  status: string;
+                }) => void;
+              }),
+          );
+
+        const { unmount } = render(
+          <MemoryRouter>
+            <Chat />
+          </MemoryRouter>,
+        );
+
+        // Wait for provisioning mode to be rendered (Call 1 resolved, Call 2 in-flight)
+        await screen.findByText("Setting up");
+
+        // Unmount while Call 2 is still in-flight
+        unmount();
+
+        // Resolve the in-flight call as "provisioning" — without the mounted guard
+        // this would schedule a new setTimeout on an unmounted component
+        await act(async () => {
+          resolveInFlightPoll({ success: true, status: "provisioning" });
+        });
+
+        // Advance well past the poll interval — a leaked timer would trigger Call 3
+        await act(async () => {
+          vi.advanceTimersByTime(10000);
+        });
+
+        // Only the two calls before unmount should have occurred; no Call 3
+        expect(getAgentStatus).toHaveBeenCalledTimes(2);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
     it("enters provisioning mode after completing onboarding when agent is provisioning", async () => {
       vi.useFakeTimers({ shouldAdvanceTime: true });
 
@@ -1383,6 +1446,56 @@ describe("Chat onboarding integration", () => {
 
       // Should show generic error
       expect(await screen.findByText("Failed to send message")).toBeDefined();
+    });
+  });
+
+  describe("subscription_required redirect", () => {
+    it("redirects to /subscribe on load when agent status is subscription_required", async () => {
+      vi.mocked(getAgentStatus).mockResolvedValue({
+        success: true,
+        status: "subscription_required",
+      });
+
+      render(
+        <MemoryRouter>
+          <Chat />
+        </MemoryRouter>,
+      );
+
+      await waitFor(() => {
+        expect(navigateMock).toHaveBeenCalledWith("/subscribe");
+      });
+    });
+
+    it("redirects to /subscribe when postChatMessage returns 402", async () => {
+      vi.mocked(getAgentStatus).mockResolvedValue({
+        success: true,
+        status: "active",
+      });
+
+      vi.mocked(postChatMessage).mockRejectedValue(
+        new SubscriptionRequiredError(),
+      );
+
+      render(
+        <MemoryRouter>
+          <Chat />
+        </MemoryRouter>,
+      );
+
+      expect(await screen.findByText("Chat")).toBeDefined();
+
+      fireEvent.change(screen.getByPlaceholderText(/ask axel to help/i), {
+        target: { value: "Hello" },
+      });
+      fireEvent.click(screen.getByRole("button"));
+
+      await waitFor(() => {
+        expect(navigateMock).toHaveBeenCalledWith("/subscribe");
+      });
+
+      // Should not show an error banner for subscription errors
+      expect(screen.queryByText("subscription_required")).toBeNull();
     });
   });
 });

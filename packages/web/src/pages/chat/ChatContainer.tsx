@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router";
 import { useAuth } from "@/hooks/useAuth";
 import {
   getOnboardingState,
@@ -7,7 +8,12 @@ import {
   completeOnboarding as completeOnboardingApi,
   type OnboardingMessage,
 } from "./onboardingApi";
-import { getAgentStatus, postChatMessage, type ChatMessage } from "./chatApi";
+import {
+  getAgentStatus,
+  postChatMessage,
+  SubscriptionRequiredError,
+  type ChatMessage,
+} from "./chatApi";
 import { ChatPresenter } from "./ChatPresenter";
 
 const toOptimisticOnboardingMessage = (content: string): OnboardingMessage => ({
@@ -37,13 +43,16 @@ export function ChatContainer() {
   const [nextQuestion, setNextQuestion] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const pollingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const mountedRef = useRef(true);
   const { setOnboardingCompleted, refreshOnboardingStatus } = useAuth();
+  const navigate = useNavigate();
 
   // Poll agent status until it becomes active, then switch to live mode
   const startProvisioningPoll = useCallback(() => {
     const poll = async () => {
       try {
         const agentStatus = await getAgentStatus();
+        if (!mountedRef.current) return;
         if (agentStatus.success && agentStatus.status === "active") {
           setChatMode("live");
           setMessages([]);
@@ -52,6 +61,7 @@ export function ChatContainer() {
       } catch {
         // Ignore poll errors and retry
       }
+      if (!mountedRef.current) return;
       pollingTimerRef.current = setTimeout(() => {
         void poll();
       }, PROVISIONING_POLL_INTERVAL_MS);
@@ -108,6 +118,15 @@ export function ChatContainer() {
         // This is expected when user hasn't completed onboarding yet
       }
 
+      // Redirect to subscribe if payment is required
+      if (
+        agentStatus?.success &&
+        agentStatus.status === "subscription_required"
+      ) {
+        navigate("/subscribe");
+        return;
+      }
+
       // Determine whether the live agent is already active.
       const agentActive =
         agentStatus?.success && agentStatus.status === "active";
@@ -159,15 +178,22 @@ export function ChatContainer() {
     } finally {
       setIsLoadingState(false);
     }
-  }, [setOnboardingCompleted, refreshOnboardingStatus, startProvisioningPoll]);
+  }, [
+    navigate,
+    setOnboardingCompleted,
+    refreshOnboardingStatus,
+    startProvisioningPoll,
+  ]);
 
   useEffect(() => {
     void loadState();
   }, [loadState]);
 
-  // Clean up any pending poll timer on unmount
+  // Clean up any pending poll timer on unmount and guard async continuations
   useEffect(() => {
+    mountedRef.current = true;
     return () => {
+      mountedRef.current = false;
       if (pollingTimerRef.current !== null) {
         clearTimeout(pollingTimerRef.current);
       }
@@ -234,6 +260,10 @@ export function ChatContainer() {
 
       setMessages((current) => [...current, assistantMessage]);
     } catch (sendError) {
+      if (sendError instanceof SubscriptionRequiredError) {
+        navigate("/subscribe");
+        return;
+      }
       const message =
         sendError instanceof Error
           ? sendError.message
@@ -243,7 +273,7 @@ export function ChatContainer() {
     } finally {
       setIsSending(false);
     }
-  }, [chatMode, input, isSending]);
+  }, [chatMode, input, isSending, navigate]);
 
   const handleSend = useCallback(() => {
     if (chatMode === "onboarding") {
