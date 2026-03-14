@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   render,
   screen,
@@ -852,6 +852,335 @@ describe("Chat onboarding integration", () => {
         messages: [],
         assistantResponse: "Done",
         isComplete: true,
+      });
+    });
+  });
+
+  describe("Provisioning mode", () => {
+    it("shows provisioning state when agent status is provisioning on load", async () => {
+      // Always return provisioning so the poll reschedules (not a concern for this test)
+      vi.mocked(getAgentStatus).mockResolvedValue({
+        success: true,
+        status: "provisioning",
+      });
+
+      render(
+        <MemoryRouter>
+          <Chat />
+        </MemoryRouter>,
+      );
+
+      expect(await screen.findByText("Setting up")).toBeDefined();
+      expect(
+        await screen.findByText(/your agent is being set up/i),
+      ).toBeDefined();
+      expect(
+        screen.getByPlaceholderText(/setting up your agent/i),
+      ).toBeDefined();
+    });
+
+    it("disables input and send button in provisioning mode", async () => {
+      vi.mocked(getAgentStatus).mockResolvedValue({
+        success: true,
+        status: "provisioning",
+      });
+
+      render(
+        <MemoryRouter>
+          <Chat />
+        </MemoryRouter>,
+      );
+
+      await screen.findByText("Setting up");
+
+      const input = screen.getByPlaceholderText(/setting up your agent/i);
+      const button = screen.getByRole("button");
+
+      expect((input as HTMLInputElement).disabled).toBe(true);
+      expect((button as HTMLButtonElement).disabled).toBe(true);
+    });
+
+    it("polls agent status and switches to live mode when agent becomes active", async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+
+      try {
+        // Call 1 (loadState): provisioning
+        // Call 2 (immediate poll): provisioning (so "Setting up" renders stably)
+        // Call 3 (poll after timer): active
+        vi.mocked(getAgentStatus)
+          .mockResolvedValueOnce({ success: true, status: "provisioning" })
+          .mockResolvedValueOnce({ success: true, status: "provisioning" })
+          .mockResolvedValueOnce({ success: true, status: "active" });
+
+        render(
+          <MemoryRouter>
+            <Chat />
+          </MemoryRouter>,
+        );
+
+        // Should enter provisioning mode
+        await screen.findByText("Setting up");
+
+        // Advance timer to trigger the poll that returns active
+        await act(async () => {
+          vi.advanceTimersByTime(3000);
+        });
+
+        // Should switch to live mode after poll
+        await waitFor(() => {
+          expect(screen.queryByText("Setting up")).toBeNull();
+          expect(screen.getByText("Chat")).toBeDefined();
+        });
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("continues polling when agent status remains provisioning", async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+
+      try {
+        // Call 1 (loadState): provisioning
+        // Call 2 (immediate poll): provisioning (renders "Setting up" stably)
+        // Call 3 (poll after first timer): provisioning (still waiting)
+        // Call 4 (poll after second timer): active
+        vi.mocked(getAgentStatus)
+          .mockResolvedValueOnce({ success: true, status: "provisioning" })
+          .mockResolvedValueOnce({ success: true, status: "provisioning" })
+          .mockResolvedValueOnce({ success: true, status: "provisioning" })
+          .mockResolvedValueOnce({ success: true, status: "active" });
+
+        render(
+          <MemoryRouter>
+            <Chat />
+          </MemoryRouter>,
+        );
+
+        await screen.findByText("Setting up");
+
+        // First timer advance: still provisioning
+        await act(async () => {
+          vi.advanceTimersByTime(3000);
+        });
+
+        await waitFor(() => {
+          expect(screen.getByText("Setting up")).toBeDefined();
+        });
+
+        // Second timer advance: active
+        await act(async () => {
+          vi.advanceTimersByTime(3000);
+        });
+
+        await waitFor(() => {
+          expect(screen.getByText("Chat")).toBeDefined();
+        });
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("continues polling when poll throws an error", async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+
+      try {
+        // Call 1 (loadState): provisioning
+        // Call 2 (immediate poll): provisioning (renders "Setting up" stably)
+        // Call 3 (poll after timer): throws (reschedules)
+        // Call 4 (poll after second timer): active
+        vi.mocked(getAgentStatus)
+          .mockResolvedValueOnce({ success: true, status: "provisioning" })
+          .mockResolvedValueOnce({ success: true, status: "provisioning" })
+          .mockRejectedValueOnce(new Error("Network error"))
+          .mockResolvedValueOnce({ success: true, status: "active" });
+
+        render(
+          <MemoryRouter>
+            <Chat />
+          </MemoryRouter>,
+        );
+
+        await screen.findByText("Setting up");
+
+        // First timer: poll throws, reschedules
+        await act(async () => {
+          vi.advanceTimersByTime(3000);
+        });
+
+        // Should still be in provisioning mode
+        await waitFor(() => {
+          expect(screen.getByText("Setting up")).toBeDefined();
+        });
+
+        // Second timer: poll returns active
+        await act(async () => {
+          vi.advanceTimersByTime(3000);
+        });
+
+        await waitFor(() => {
+          expect(screen.getByText("Chat")).toBeDefined();
+        });
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("enters provisioning mode after completing onboarding when agent is provisioning", async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+
+      try {
+        // Call 1 (loadState): not_found (no agent yet)
+        // Call 2 (handleCompleteOnboarding check): provisioning
+        // Call 3 (immediate poll): provisioning (renders "Setting up" stably)
+        // Call 4 (poll after timer): active
+        vi.mocked(getAgentStatus)
+          .mockRejectedValueOnce(new Error("not found"))
+          .mockResolvedValueOnce({ success: true, status: "provisioning" })
+          .mockResolvedValueOnce({ success: true, status: "provisioning" })
+          .mockResolvedValueOnce({ success: true, status: "active" });
+
+        vi.mocked(getOnboardingState).mockResolvedValue({
+          state: {
+            id: "state-1",
+            status: "in_progress",
+            outstandingQuestions: ["channels"],
+            collectedAnswers: { name: "Bradley", role: "Founder" },
+            completedAt: null,
+            lastMessageAt: "2026-03-11T10:00:00.000Z",
+          },
+          messages: [
+            {
+              id: "m0",
+              role: "assistant",
+              content: "Which channels do you want?",
+              createdAt: "2026-03-11T10:00:00.000Z",
+            },
+          ],
+          nextQuestion: "Which channels do you want?",
+        });
+
+        vi.mocked(postOnboardingMessage).mockResolvedValue({
+          state: {
+            id: "state-1",
+            status: "completed",
+            outstandingQuestions: [],
+            collectedAnswers: {
+              name: "Bradley",
+              role: "Founder",
+              channels: "Telegram",
+            },
+            completedAt: "2026-03-11T10:10:00.000Z",
+            lastMessageAt: "2026-03-11T10:10:00.000Z",
+          },
+          messages: [
+            {
+              id: "m1",
+              role: "assistant",
+              content: "All set. You're onboarded.",
+              createdAt: "2026-03-11T10:10:00.000Z",
+            },
+          ],
+          assistantResponse: "All set. You're onboarded.",
+          isComplete: true,
+          nextQuestion: null,
+        });
+
+        render(
+          <MemoryRouter>
+            <Chat />
+          </MemoryRouter>,
+        );
+
+        await screen.findByText("Which channels do you want?");
+
+        fireEvent.change(
+          screen.getByPlaceholderText(/answer axel's question/i),
+          {
+            target: { value: "Telegram" },
+          },
+        );
+        fireEvent.click(screen.getByRole("button"));
+
+        // Should enter provisioning mode after completing onboarding
+        await waitFor(() => {
+          expect(screen.getByText("Setting up")).toBeDefined();
+        });
+
+        // Advance timer to trigger the poll (becomes active)
+        await act(async () => {
+          vi.advanceTimersByTime(3000);
+        });
+
+        await waitFor(() => {
+          expect(screen.getByText("Chat")).toBeDefined();
+        });
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("falls back to live mode when agent status check fails after completing onboarding", async () => {
+      // Initial: not_found
+      vi.mocked(getAgentStatus)
+        .mockRejectedValueOnce(new Error("not found"))
+        // After completeOnboarding: throws
+        .mockRejectedValueOnce(new Error("status check failed"));
+
+      vi.mocked(getOnboardingState).mockResolvedValue({
+        state: {
+          id: "state-1",
+          status: "in_progress",
+          outstandingQuestions: ["channels"],
+          collectedAnswers: { name: "Bradley", role: "Founder" },
+          completedAt: null,
+          lastMessageAt: "2026-03-11T10:00:00.000Z",
+        },
+        messages: [
+          {
+            id: "m0",
+            role: "assistant",
+            content: "Which channels do you want?",
+            createdAt: "2026-03-11T10:00:00.000Z",
+          },
+        ],
+        nextQuestion: "Which channels do you want?",
+      });
+
+      vi.mocked(postOnboardingMessage).mockResolvedValue({
+        state: {
+          id: "state-1",
+          status: "completed",
+          outstandingQuestions: [],
+          collectedAnswers: {
+            name: "Bradley",
+            role: "Founder",
+            channels: "Telegram",
+          },
+          completedAt: "2026-03-11T10:10:00.000Z",
+          lastMessageAt: "2026-03-11T10:10:00.000Z",
+        },
+        messages: [],
+        assistantResponse: "All set.",
+        isComplete: true,
+        nextQuestion: null,
+      });
+
+      render(
+        <MemoryRouter>
+          <Chat />
+        </MemoryRouter>,
+      );
+
+      await screen.findByText("Which channels do you want?");
+
+      fireEvent.change(screen.getByPlaceholderText(/answer axel's question/i), {
+        target: { value: "Telegram" },
+      });
+      fireEvent.click(screen.getByRole("button"));
+
+      // Should fall back to live mode when status check fails
+      await waitFor(() => {
+        expect(screen.getByText("Chat")).toBeDefined();
       });
     });
   });

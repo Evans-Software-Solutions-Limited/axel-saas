@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import {
   getOnboardingState,
@@ -24,7 +24,9 @@ const toOptimisticChatMessage = (content: string): ChatMessage => ({
   createdAt: new Date().toISOString(),
 });
 
-type ChatMode = "loading" | "onboarding" | "live";
+type ChatMode = "loading" | "onboarding" | "provisioning" | "live";
+
+const PROVISIONING_POLL_INTERVAL_MS = 3000;
 
 export function ChatContainer() {
   const [messages, setMessages] = useState<OnboardingMessage[]>([]);
@@ -34,18 +36,52 @@ export function ChatContainer() {
   const [chatMode, setChatMode] = useState<ChatMode>("loading");
   const [nextQuestion, setNextQuestion] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const pollingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { setOnboardingCompleted, refreshOnboardingStatus } = useAuth();
 
-  // Call the onboarding complete endpoint and switch to live mode
+  // Poll agent status until it becomes active, then switch to live mode
+  const startProvisioningPoll = useCallback(() => {
+    const poll = async () => {
+      try {
+        const agentStatus = await getAgentStatus();
+        if (agentStatus.success && agentStatus.status === "active") {
+          setChatMode("live");
+          setMessages([]);
+          return;
+        }
+      } catch {
+        // Ignore poll errors and retry
+      }
+      pollingTimerRef.current = setTimeout(() => {
+        void poll();
+      }, PROVISIONING_POLL_INTERVAL_MS);
+    };
+    void poll();
+  }, []);
+
+  // Call the onboarding complete endpoint and switch to live or provisioning mode
   const handleCompleteOnboarding = useCallback(async () => {
     try {
       // Call the backend to complete onboarding and generate workspace files
       await completeOnboardingApi();
 
-      // Switch to live mode instead of navigating away
       setOnboardingCompleted(true);
       await refreshOnboardingStatus();
-      setChatMode("live");
+
+      // Check whether the agent is already active or still provisioning
+      let agentStatus: { success: boolean; status: string } | null = null;
+      try {
+        agentStatus = await getAgentStatus();
+      } catch {
+        // If status check fails, fall back to live mode
+      }
+
+      if (agentStatus?.success && agentStatus.status === "provisioning") {
+        setChatMode("provisioning");
+        startProvisioningPoll();
+      } else {
+        setChatMode("live");
+      }
     } catch (err) {
       // If onboarding completion fails, do NOT mark it as complete
       // The user should retry or contact support
@@ -54,7 +90,7 @@ export function ChatContainer() {
       setError(message);
       // Don't switch mode; stay in onboarding mode to allow retry
     }
-  }, [setOnboardingCompleted, refreshOnboardingStatus]);
+  }, [setOnboardingCompleted, refreshOnboardingStatus, startProvisioningPoll]);
 
   // Load initial state - determines if onboarding or live chat
   const loadState = useCallback(async () => {
@@ -81,6 +117,18 @@ export function ChatContainer() {
         setChatMode("live");
         // Initialize with empty messages for live chat
         setMessages([]);
+        return;
+      }
+
+      // If the agent is provisioning, show the provisioning state and poll until active
+      const agentProvisioning =
+        agentStatus?.success && agentStatus.status === "provisioning";
+
+      if (agentProvisioning) {
+        setOnboardingCompleted(true);
+        await refreshOnboardingStatus();
+        setChatMode("provisioning");
+        startProvisioningPoll();
         return;
       }
 
@@ -111,11 +159,20 @@ export function ChatContainer() {
     } finally {
       setIsLoadingState(false);
     }
-  }, [setOnboardingCompleted, refreshOnboardingStatus]);
+  }, [setOnboardingCompleted, refreshOnboardingStatus, startProvisioningPoll]);
 
   useEffect(() => {
     void loadState();
   }, [loadState]);
+
+  // Clean up any pending poll timer on unmount
+  useEffect(() => {
+    return () => {
+      if (pollingTimerRef.current !== null) {
+        clearTimeout(pollingTimerRef.current);
+      }
+    };
+  }, []);
 
   // Handle sending messages in onboarding mode
   const handleOnboardingSend = useCallback(async () => {
@@ -197,6 +254,7 @@ export function ChatContainer() {
   }, [chatMode, handleOnboardingSend, handleLiveSend]);
 
   const isOnboardingMode = chatMode === "onboarding";
+  const isProvisioningMode = chatMode === "provisioning";
 
   return (
     <ChatPresenter
@@ -205,6 +263,7 @@ export function ChatContainer() {
       isLoadingState={isLoadingState}
       isSending={isSending}
       isOnboardingMode={isOnboardingMode}
+      isProvisioningMode={isProvisioningMode}
       nextQuestion={nextQuestion}
       error={error}
       onInputChange={setInput}
