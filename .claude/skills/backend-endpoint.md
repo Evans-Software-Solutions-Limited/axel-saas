@@ -24,7 +24,7 @@ export const myHandler = new Elysia({
     async (ctx) => {
       const { body } = ctx;
       const { sub: userId } = getUser(ctx);  // Extract from validated token
-      
+
       // Call repository or service logic
       // Return typed response
       return { success: true, data: {...} };

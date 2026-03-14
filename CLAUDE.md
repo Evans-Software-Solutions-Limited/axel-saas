@@ -18,20 +18,21 @@ Auth flow: Supabase JWT → Elysia middleware (`requireAuth`, `getAuthUser`) →
 
 ## Key Directories
 
-| Path | Purpose |
-|------|---------|
-| `microservices/core/src/application/` | Business logic: handlers, repositories, domain modules |
-| `microservices/core/src/application/stripe/` | Stripe webhooks & event handling |
-| `microservices/core/src/application/subscriptions/` | Subscription tiers, checkout, billing state |
-| `packages/web/src/pages/` | Page-level components (Chat, Settings, Integrations, Crons, Tasks) |
-| `packages/web/src/components/` | Reusable UI components |
-| `packages/db/src/schema.ts` | Drizzle schema definitions |
-| `packages/db/migrations/` | SQL migrations (version numbered, meta journal) |
-| `infra/` | SST resource definitions (API, storage, auth) |
+| Path                                                | Purpose                                                            |
+| --------------------------------------------------- | ------------------------------------------------------------------ |
+| `microservices/core/src/application/`               | Business logic: handlers, repositories, domain modules             |
+| `microservices/core/src/application/stripe/`        | Stripe webhooks & event handling                                   |
+| `microservices/core/src/application/subscriptions/` | Subscription tiers, checkout, billing state                        |
+| `packages/web/src/pages/`                           | Page-level components (Chat, Settings, Integrations, Crons, Tasks) |
+| `packages/web/src/components/`                      | Reusable UI components                                             |
+| `packages/db/src/schema.ts`                         | Drizzle schema definitions                                         |
+| `packages/db/migrations/`                           | SQL migrations (version numbered, meta journal)                    |
+| `infra/`                                            | SST resource definitions (API, storage, auth)                      |
 
 ## Standards
 
 ### Code Quality
+
 - **Typecheck:** `bun run typecheck` (turbo → all packages)
 - **Lint:** `bun run lint` (eslint via turbo)
 - **Format:** `bun run prettier:check` / `--write` (enforce via CI)
@@ -39,6 +40,7 @@ Auth flow: Supabase JWT → Elysia middleware (`requireAuth`, `getAuthUser`) →
 - **Tests:** `bun run test:unit` (Vitest via turbo)
 
 ### Testing Rules
+
 - **Coverage threshold:** 90% (lines, functions, branches, statements) — non-negotiable
 - **No fake tests.** No skips, no coverage exclusions added by agents. Tests must prove behaviour.
 - **Coverage includes:** `src/application/**/*.ts` and `src/**/repositories/*.ts`
@@ -46,6 +48,7 @@ Auth flow: Supabase JWT → Elysia middleware (`requireAuth`, `getAuthUser`) →
 - **Test structure:** Colocate tests (`__tests__/` directory), one test file per module
 
 ### Elysia Routes
+
 - Routes defined as modules (subscribe, mount in api.ts)
 - Auth: derive user context + `requireAuth` guard, then use `getUser(ctx)` in handler
 - Stripe: unsigned webhook route (Stripe signs the payload)
@@ -53,12 +56,14 @@ Auth flow: Supabase JWT → Elysia middleware (`requireAuth`, `getAuthUser`) →
 - Type guards: `t.Object({...})` for request body schema
 
 ### Frontend
+
 - Pages are containers (logic, state, API calls)
 - Components are presenters (props only, no hooks)
 - Context for global state (auth, user profile)
 - Tests: component rendering, user interactions, API call mocking
 
 ### Database Migrations
+
 - **Create:** `bun run --filter @axel-saas/db migrate:create`
 - **Apply:** `bun run --filter @axel-saas/db migrate:up`
 - Each migration in `packages/db/migrations/` (SQL + meta JSON snapshot)
@@ -79,6 +84,7 @@ If any fail, fix it. No exceptions.
 ## Dangerous Areas
 
 ### Stripe Payments
+
 - **File:** `microservices/core/src/application/stripe/stripeHandler.ts`
 - **Risk:** Unsigned webhooks, state sync, idempotency
 - **Rules:**
@@ -89,6 +95,7 @@ If any fail, fix it. No exceptions.
   - Test webhook replay scenarios
 
 ### Subscriptions & Billing
+
 - **File:** `microservices/core/src/application/subscriptions/`
 - **Risk:** Double-charging, tier downgrades losing features, payment state mismatch
 - **Rules:**
@@ -98,6 +105,7 @@ If any fail, fix it. No exceptions.
   - Cancellation must revoke access immediately (use TTL/expiry fields, not hard deletes)
 
 ### Auth & Access Control
+
 - **File:** `packages/api-utils/auth/supabaseAuth.ts` + route handlers
 - **Risk:** Auth bypass, privilege escalation, cross-user data access
 - **Rules:**
