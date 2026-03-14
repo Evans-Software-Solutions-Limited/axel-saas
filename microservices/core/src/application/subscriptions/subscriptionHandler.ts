@@ -171,6 +171,14 @@ export const subscriptionHandler = new Elysia({
         cancel_url: `${webUrl}/subscribe?checkout=cancelled`,
       });
 
+      if (!session.url) {
+        set.status = 500;
+        return {
+          success: false,
+          error: "Stripe did not return a checkout URL",
+        };
+      }
+
       return { success: true, url: session.url };
     },
     {

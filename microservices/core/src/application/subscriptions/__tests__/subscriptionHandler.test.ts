@@ -543,5 +543,25 @@ describe("SubscriptionHandler", () => {
 
       expect(result.status).toBe(404);
     });
+
+    it("should return 500 when Stripe returns null session URL", async () => {
+      mockSessionCreate.mockResolvedValue({ url: null });
+
+      const result = await subscriptionHandler.handle(
+        new Request("http://localhost/subscriptions/checkout", {
+          method: "POST",
+          headers: {
+            authorization: "Bearer test_token",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ tierId: "starter" }),
+        }),
+      );
+
+      expect(result.status).toBe(500);
+      const json = (await result.json()) as { success: boolean; error: string };
+      expect(json.success).toBe(false);
+      expect(json.error).toMatch(/checkout URL/i);
+    });
   });
 });
