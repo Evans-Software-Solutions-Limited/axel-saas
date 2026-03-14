@@ -89,6 +89,22 @@ export class ProvisioningRepository {
   }
 
   /**
+   * Atomically set gateway URL and mark provisioning as active.
+   * Called when a container reports it is ready to serve traffic.
+   */
+  async activateGateway(userId: string, gatewayUrl: string): Promise<void> {
+    await this.db
+      .update(provisioningState)
+      .set({
+        gatewayUrl,
+        status: "active" as const,
+        provisionedAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(eq(provisioningState.userId, userId));
+  }
+
+  /**
    * Get container by user ID - returns gateway URL if available
    */
   async getContainerByUserId(userId: string): Promise<{

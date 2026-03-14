@@ -9,6 +9,7 @@ import {
 import { SubscriptionRepository } from "../repositories/subscriptionRepository";
 import { ProvisioningRepository } from "../repositories/provisioningRepository";
 import { userRepository } from "../repositories/userRepository";
+import { triggerContainerLaunch } from "../provisioning/provisioningService";
 
 function getStripeInstance() {
   const secretKey = process.env.STRIPE_SECRET_KEY;
@@ -164,7 +165,7 @@ export const stripeHandler = new Elysia({ name: "StripeHandler" })
             : undefined,
         });
 
-        // Create provisioning state
+        // Create provisioning state if it doesn't exist
         const existingProv = await provRepo.findByUserId(metadata.userId);
         if (!existingProv) {
           await provRepo.create({
@@ -172,6 +173,23 @@ export const stripeHandler = new Elysia({ name: "StripeHandler" })
             status: "pending",
           });
         }
+
+        // Trigger container launch (best-effort — webhook failure does not
+        // block the payment confirmation response to Stripe)
+        const workspacePath = process.env.WORKSPACE_PATH
+          ? `${process.env.WORKSPACE_PATH}/${metadata.userId}/workspace`
+          : `/tmp/workspace/${metadata.userId}/workspace`;
+
+        triggerContainerLaunch(provRepo, {
+          userId: metadata.userId,
+          tier: metadata.tier,
+          workspacePath,
+        }).catch((err: unknown) => {
+          console.error(
+            `[provisioning] Failed to trigger container launch for user ${metadata.userId}:`,
+            err,
+          );
+        });
       } else if (event.type === "customer.subscription.updated") {
         const subscription = event.data.object as Stripe.Subscription;
         const sub = await subRepo.findByStripeCustomerId(
