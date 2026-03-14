@@ -25,7 +25,7 @@ export function Login() {
 
     const result = await signIn(email, password);
     if (result.success) {
-      navigate("/onboarding");
+      navigate("/");
     }
 
     setIsLoading(false);

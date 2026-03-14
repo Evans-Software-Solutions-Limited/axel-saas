@@ -98,7 +98,7 @@ function App() {
             path="/onboarding"
             element={
               <ProtectedRoute>
-                <Navigate to="/dashboard/chat" />
+                <Navigate to="/dashboard/chat" replace />
               </ProtectedRoute>
             }
           />

@@ -7,6 +7,12 @@ vi.mock("@/hooks/useAuth", () => ({
   useAuth: vi.fn(),
 }));
 
+const mockNavigate = vi.fn();
+vi.mock("react-router", async (importActual) => {
+  const actual = await importActual<typeof import("react-router")>();
+  return { ...actual, useNavigate: () => mockNavigate };
+});
+
 import { useAuth } from "@/hooks/useAuth";
 
 const mockAuth = (overrides: Partial<ReturnType<typeof useAuth>> = {}) => ({
@@ -27,6 +33,7 @@ const mockAuth = (overrides: Partial<ReturnType<typeof useAuth>> = {}) => ({
 describe("Login", () => {
   beforeEach(() => {
     vi.mocked(useAuth).mockReturnValue(mockAuth({ error: null }));
+    mockNavigate.mockClear();
   });
 
   it("renders sign in form and Axel branding", () => {
@@ -91,6 +98,29 @@ describe("Login", () => {
       );
     });
     expect(screen.getByText(/welcome back/i)).toBeDefined();
+  });
+
+  it("navigates to the root redirect on successful login", async () => {
+    const signIn = vi.fn().mockResolvedValue({ success: true });
+    vi.mocked(useAuth).mockReturnValue(mockAuth({ signIn, error: null }));
+    render(
+      <MemoryRouter>
+        <Login />
+      </MemoryRouter>,
+    );
+    await act(async () => {
+      fireEvent.change(screen.getByLabelText(/email/i), {
+        target: { value: "test@example.com" },
+      });
+      fireEvent.change(screen.getByLabelText(/password/i), {
+        target: { value: "password123" },
+      });
+      fireEvent.submit(
+        screen.getByRole("button", { name: /^Sign in$/i }).closest("form")!,
+      );
+    });
+    expect(mockNavigate).toHaveBeenCalledWith("/");
+    expect(mockNavigate).not.toHaveBeenCalledWith("/onboarding");
   });
 
   it("renders auth error message when provided by context", () => {
