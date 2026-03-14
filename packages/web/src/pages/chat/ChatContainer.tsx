@@ -8,7 +8,12 @@ import {
   completeOnboarding as completeOnboardingApi,
   type OnboardingMessage,
 } from "./onboardingApi";
-import { getAgentStatus, postChatMessage, type ChatMessage } from "./chatApi";
+import {
+  getAgentStatus,
+  postChatMessage,
+  SubscriptionRequiredError,
+  type ChatMessage,
+} from "./chatApi";
 import { ChatPresenter } from "./ChatPresenter";
 
 const toOptimisticOnboardingMessage = (content: string): OnboardingMessage => ({
@@ -188,6 +193,10 @@ export function ChatContainer() {
 
       setMessages((current) => [...current, assistantMessage]);
     } catch (sendError) {
+      if (sendError instanceof SubscriptionRequiredError) {
+        navigate("/subscribe");
+        return;
+      }
       const message =
         sendError instanceof Error
           ? sendError.message
@@ -197,7 +206,7 @@ export function ChatContainer() {
     } finally {
       setIsSending(false);
     }
-  }, [chatMode, input, isSending]);
+  }, [chatMode, input, isSending, navigate]);
 
   const handleSend = useCallback(() => {
     if (chatMode === "onboarding") {

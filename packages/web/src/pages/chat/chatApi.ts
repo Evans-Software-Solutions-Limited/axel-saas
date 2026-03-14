@@ -1,5 +1,12 @@
 import { api } from "@/lib/eden";
-import { getErrorMessage, getResponseError } from "./apiHelpers";
+import { getErrorMessage, getResponseError, getStatusCode } from "./apiHelpers";
+
+export class SubscriptionRequiredError extends Error {
+  constructor() {
+    super("subscription_required");
+    this.name = "SubscriptionRequiredError";
+  }
+}
 
 export interface ChatMessage {
   id: string;
@@ -60,6 +67,10 @@ export async function postChatMessage(
 
   if (data?.success === true && "response" in data) {
     return data as ChatMessageSuccessPayload;
+  }
+
+  if (getStatusCode(response) === 402) {
+    throw new SubscriptionRequiredError();
   }
 
   const responseError = getResponseError(response);
