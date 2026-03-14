@@ -19,7 +19,6 @@ vi.mock("../repositories/userRepository", () => {
   return {
     userRepository: {
       getUserBySupabaseId: vi.fn(),
-      updateOnboardingAnswers: vi.fn(),
       updateUser: vi.fn(),
     },
   };
@@ -65,21 +64,13 @@ describe("UserHandler - Available Methods", () => {
   it("should properly expose routes", async () => {
     const { userHandler } = await import("../userHandler");
     const routes = userHandler.routes;
-    expect(routes.length).toBeGreaterThanOrEqual(2); // At least GET and POST
+    expect(routes.length).toBeGreaterThanOrEqual(1);
   });
 
   it("should have GET /users/me in routes", async () => {
     const { userHandler } = await import("../userHandler");
     const route = userHandler.routes.find(
       (r) => r.method === "GET" && r.path === "/users/me",
-    );
-    expect(route).toBeDefined();
-  });
-
-  it("should have POST /users/onboarding in routes", async () => {
-    const { userHandler } = await import("../userHandler");
-    const route = userHandler.routes.find(
-      (r) => r.method === "POST" && r.path === "/users/onboarding",
     );
     expect(route).toBeDefined();
   });

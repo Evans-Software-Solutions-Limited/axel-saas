@@ -94,15 +94,6 @@ function App() {
               </ProtectedRoute>
             }
           />
-          <Route
-            path="/onboarding"
-            element={
-              <ProtectedRoute>
-                <Navigate to="/dashboard/chat" replace />
-              </ProtectedRoute>
-            }
-          />
-
           {/* Dashboard and sub-routes */}
           <Route
             path="/dashboard"

@@ -9,15 +9,6 @@ vi.mock("@axel-saas/db", () => ({
   onboardingAnswers: {},
 }));
 
-// Mock user repository
-vi.mock("../../repositories/userRepository", () => ({
-  userRepository: {
-    getUserBySupabaseId: vi.fn(),
-    updateUser: vi.fn(),
-    updateOnboardingAnswers: vi.fn(),
-  },
-}));
-
 // Mock the auth utilities before importing the handler
 vi.mock("@axel-saas/api-utils/auth/supabaseAuth", () => {
   return {
@@ -57,9 +48,6 @@ vi.mock("../../repositories/userRepository", () => {
         }
         return null;
       }),
-      updateOnboardingAnswers: vi.fn(async () => {
-        return { success: true };
-      }),
       updateUser: vi.fn(async () => {
         return { id: "db-user-id", onboardingCompleted: true };
       }),
@@ -91,15 +79,6 @@ describe("UserHandler", () => {
       const meRoute = getRoutes.find((r) => r.path === "/users/me");
       expect(meRoute).toBeDefined();
     });
-
-    it("should have POST /users/onboarding route", async () => {
-      const { userHandler } = await import("../userHandler");
-      const postRoutes = userHandler.routes.filter((r) => r.method === "POST");
-      const onboardingRoute = postRoutes.find(
-        (r) => r.path === "/users/onboarding",
-      );
-      expect(onboardingRoute).toBeDefined();
-    });
   });
 
   describe("GET /users/me route", () => {
@@ -126,90 +105,14 @@ describe("UserHandler", () => {
     });
   });
 
-  describe("POST /users/onboarding route", () => {
-    it("should exist and be accessible", async () => {
-      const { userHandler } = await import("../userHandler");
-      const onboardingRoute = userHandler.routes.find(
-        (r) => r.method === "POST" && r.path === "/users/onboarding",
-      );
-      expect(onboardingRoute).toBeDefined();
-    });
-
-    it("should require authentication", async () => {
-      const { userHandler } = await import("../userHandler");
-      const postRoutes = userHandler.routes.filter((r) => r.method === "POST");
-      expect(postRoutes.length).toBeGreaterThan(0);
-    });
-
-    it("should accept onboarding data", async () => {
-      const { userHandler } = await import("../userHandler");
-      const onboardingRoute = userHandler.routes.find(
-        (r) => r.method === "POST" && r.path === "/users/onboarding",
-      );
-      expect(onboardingRoute).toBeDefined();
-      expect(onboardingRoute?.method).toBe("POST");
-    });
-
-    it("should have methods to update user data", async () => {
-      const { userHandler } = await import("../userHandler");
-      expect(userHandler.routes.length).toBeGreaterThan(0);
-    });
-
-    it("should have proper body validation", async () => {
-      const { userHandler } = await import("../userHandler");
-      const onboardingRoute = userHandler.routes.find(
-        (r) => r.method === "POST" && r.path === "/users/onboarding",
-      );
-      // Route should exist with proper configuration
-      expect(onboardingRoute).toBeDefined();
-    });
-
-    it("should validate required onboarding fields", () => {
-      const validData = {
-        name: "Test User",
-        helpWith: ["coding"],
-        channels: ["slack"],
-        morningBrief: false,
-      };
-      expect(validData.name).toBeDefined();
-      expect(validData.helpWith).toBeDefined();
-      expect(validData.channels).toBeDefined();
-      expect(validData.morningBrief).toBeDefined();
-    });
-
-    it("optional fields should be properly typed", () => {
-      const dataWithOptional = {
-        name: "Test User",
-        role: "Engineer",
-        helpWith: ["coding"],
-        typicalDay: "9-5",
-        channels: ["slack"],
-        morningBrief: true,
-        briefTime: "09:00",
-      };
-      expect(dataWithOptional.role).toBeDefined();
-      expect(dataWithOptional.typicalDay).toBeDefined();
-      expect(dataWithOptional.briefTime).toBeDefined();
-    });
-
-    it("should handle user profile retrieval", async () => {
-      const { userHandler } = await import("../userHandler");
-      expect(userHandler).toBeDefined();
-    });
-  });
-
   describe("route configuration", () => {
     it("should have proper route structure", async () => {
       const { userHandler } = await import("../userHandler");
       const getRoute = userHandler.routes.find(
         (r) => r.method === "GET" && r.path === "/users/me",
       );
-      const postRoute = userHandler.routes.find(
-        (r) => r.method === "POST" && r.path === "/users/onboarding",
-      );
 
       expect(getRoute).toBeDefined();
-      expect(postRoute).toBeDefined();
     });
 
     it("should require authentication on all routes", async () => {
@@ -221,10 +124,8 @@ describe("UserHandler", () => {
     it("should have expected number of routes", async () => {
       const { userHandler } = await import("../userHandler");
       const getRoutes = userHandler.routes.filter((r) => r.method === "GET");
-      const postRoutes = userHandler.routes.filter((r) => r.method === "POST");
 
       expect(getRoutes.length).toBeGreaterThanOrEqual(1);
-      expect(postRoutes.length).toBeGreaterThanOrEqual(1);
     });
   });
 
@@ -238,38 +139,6 @@ describe("UserHandler", () => {
 
       try {
         await userRepository.getUserBySupabaseId("user-id");
-      } catch (error) {
-        expect(error).toBeInstanceOf(Error);
-      }
-    });
-
-    it("should handle database errors in POST /users/onboarding", async () => {
-      const { userRepository } =
-        await import("../../repositories/userRepository");
-      vi.mocked(userRepository.updateUser).mockRejectedValueOnce(
-        new Error("Database error"),
-      );
-
-      try {
-        await userRepository.updateUser("user-id", {
-          onboardingCompleted: true,
-        });
-      } catch (error) {
-        expect(error).toBeInstanceOf(Error);
-      }
-    });
-
-    it("should handle errors when updating onboarding answers", async () => {
-      const { userRepository } =
-        await import("../../repositories/userRepository");
-      vi.mocked(userRepository.updateOnboardingAnswers).mockRejectedValueOnce(
-        new Error("Update failed"),
-      );
-
-      try {
-        await userRepository.updateOnboardingAnswers("user-id", {
-          name: "Test",
-        });
       } catch (error) {
         expect(error).toBeInstanceOf(Error);
       }
@@ -302,15 +171,6 @@ describe("UserHandler", () => {
       expect(response.success).toBe(true);
       expect(response.user.id).toBe("user-id");
       expect(response.user.email).toBe("user@example.com");
-    });
-
-    it("should return userId from onboarding response", () => {
-      const response = {
-        success: true,
-        userId: "user-id-123",
-      };
-
-      expect(response.userId).toBe("user-id-123");
     });
 
     it("should return error message on failure", () => {
