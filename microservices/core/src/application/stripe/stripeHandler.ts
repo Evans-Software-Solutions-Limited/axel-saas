@@ -177,20 +177,23 @@ export const stripeHandler = new Elysia({ name: "StripeHandler" })
           });
         }
 
-        // Trigger container launch (best-effort — webhook failure does not
-        // block the payment confirmation response to Stripe)
+        // Trigger container launch. Awaited so Lambda does not return before
+        // the webhook fires and the status is persisted. Failure is best-effort:
+        // we log and continue so Stripe receives 200 and does not retry the event.
         const workspacePath = resolveWorkspacePath(metadata.userId);
 
-        triggerContainerLaunch(provRepo, {
-          userId: metadata.userId,
-          tier: metadata.tier,
-          workspacePath,
-        }).catch((err: unknown) => {
+        try {
+          await triggerContainerLaunch(provRepo, {
+            userId: metadata.userId,
+            tier: metadata.tier,
+            workspacePath,
+          });
+        } catch (err: unknown) {
           console.error(
             `[provisioning] Failed to trigger container launch for user ${metadata.userId}:`,
             err,
           );
-        });
+        }
       } else if (event.type === "customer.subscription.updated") {
         const subscription = event.data.object as Stripe.Subscription;
         const sub = await subRepo.findByStripeCustomerId(

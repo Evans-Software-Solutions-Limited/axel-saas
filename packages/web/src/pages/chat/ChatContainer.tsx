@@ -44,15 +44,28 @@ export function ChatContainer() {
   const [error, setError] = useState<string | null>(null);
   const pollingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mountedRef = useRef(true);
+  // Incremented on every new poll chain start and on unmount cleanup.
+  // Each in-progress poll iteration captures its generation at creation time
+  // and stops if the current value no longer matches, preventing duplicate chains.
+  const pollingGenerationRef = useRef(0);
   const { setOnboardingCompleted, refreshOnboardingStatus } = useAuth();
   const navigate = useNavigate();
 
-  // Poll agent status until it becomes active, then switch to live mode
+  // Poll agent status until it becomes active, then switch to live mode.
+  // A generation counter ensures that only one chain runs at a time: each call
+  // increments the counter, and any in-progress iteration from a prior call
+  // detects the mismatch and stops without rescheduling.
   const startProvisioningPoll = useCallback(() => {
+    pollingGenerationRef.current += 1;
+    const generation = pollingGenerationRef.current;
+
     const poll = async () => {
+      if (!mountedRef.current || pollingGenerationRef.current !== generation)
+        return;
       try {
         const agentStatus = await getAgentStatus();
-        if (!mountedRef.current) return;
+        if (!mountedRef.current || pollingGenerationRef.current !== generation)
+          return;
         if (agentStatus.success && agentStatus.status === "active") {
           setChatMode("live");
           setMessages([]);
@@ -77,7 +90,8 @@ export function ChatContainer() {
       } catch {
         // Ignore poll errors and retry
       }
-      if (!mountedRef.current) return;
+      if (!mountedRef.current || pollingGenerationRef.current !== generation)
+        return;
       pollingTimerRef.current = setTimeout(() => {
         void poll();
       }, PROVISIONING_POLL_INTERVAL_MS);
@@ -227,11 +241,14 @@ export function ChatContainer() {
     void loadState();
   }, [loadState]);
 
-  // Clean up any pending poll timer on unmount and guard async continuations
+  // Clean up any pending poll timer on unmount and guard async continuations.
+  // Incrementing pollingGenerationRef cancels any in-flight poll iteration
+  // that resolves after the component is gone.
   useEffect(() => {
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
+      pollingGenerationRef.current += 1;
       if (pollingTimerRef.current !== null) {
         clearTimeout(pollingTimerRef.current);
       }

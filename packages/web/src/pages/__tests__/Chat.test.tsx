@@ -1,3 +1,4 @@
+import React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
   render,
@@ -1083,6 +1084,63 @@ describe("Chat onboarding integration", () => {
 
         // Only the two calls before unmount should have occurred; no Call 3
         expect(getAgentStatus).toHaveBeenCalledTimes(2);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("cancels the prior poll chain when startProvisioningPoll is called a second time (generation guard)", async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+
+      try {
+        // React StrictMode double-invokes effects in development, causing
+        // startProvisioningPoll to be called twice. Without the generation
+        // counter the first chain survives effect cleanup and polls concurrently
+        // with the second chain.
+        //
+        // Expected call sequence WITH the fix:
+        //   Call 1: loadState #1  → provisioning → chain gen=A starts
+        //   StrictMode cleanup   → gen bumped, chain A invalidated
+        //   Call 2: loadState #2  → provisioning → chain gen=B starts
+        //   Call 3: chain A immediate poll → gen mismatch → STOP (no reschedule)
+        //   Call 4: chain B immediate poll → provisioning → timer scheduled
+        //   timer fires → Call 5: active → live mode
+        //
+        // Without the fix chain A would not stop, leaving a leaked timer that
+        // fires a 6th call (no mock value → undefined/error, breaking the test).
+        vi.mocked(getAgentStatus)
+          .mockResolvedValueOnce({ success: true, status: "provisioning" }) // loadState #1
+          .mockResolvedValueOnce({ success: true, status: "provisioning" }) // loadState #2
+          .mockResolvedValueOnce({ success: true, status: "provisioning" }) // chain A (cancelled)
+          .mockResolvedValueOnce({ success: true, status: "provisioning" }) // chain B immediate
+          .mockResolvedValueOnce({ success: true, status: "active" }); //      chain B timer
+
+        render(
+          <React.StrictMode>
+            <MemoryRouter>
+              <Chat />
+            </MemoryRouter>
+          </React.StrictMode>,
+        );
+
+        await screen.findByText("Setting up");
+
+        await act(async () => {
+          vi.advanceTimersByTime(3000);
+        });
+
+        await waitFor(() => {
+          expect(screen.getByText("Chat")).toBeDefined();
+        });
+
+        // Drain any remaining timers. Without the generation guard a leaked
+        // timer from chain A would fire here and attempt a 6th call.
+        await act(async () => {
+          vi.advanceTimersByTime(10_000);
+        });
+
+        // Exactly 5 calls. A 6th would indicate a duplicate chain survived.
+        expect(getAgentStatus).toHaveBeenCalledTimes(5);
       } finally {
         vi.useRealTimers();
       }
