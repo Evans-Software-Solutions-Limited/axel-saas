@@ -41,14 +41,26 @@ export async function triggerContainerLaunch(
   }
 
   const secret = process.env.PROVISIONING_WEBHOOK_SECRET;
-  const response = await fetch(webhookUrl, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...(secret ? { "X-Provisioning-Secret": secret } : {}),
-    },
-    body: JSON.stringify(params),
-  });
+
+  let response: Response;
+  try {
+    response = await fetch(webhookUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(secret ? { "X-Provisioning-Secret": secret } : {}),
+      },
+      body: JSON.stringify(params),
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    await provisioningRepo.updateStatus(
+      prov.id,
+      "failed",
+      `Webhook fetch error: ${message}`,
+    );
+    throw err;
+  }
 
   if (!response.ok) {
     const errorText = await response.text().catch(() => "unknown error");

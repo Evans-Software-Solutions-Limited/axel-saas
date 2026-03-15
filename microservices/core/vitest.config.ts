@@ -23,7 +23,6 @@ export default defineConfig({
         "**/stripeHandler.ts",
         "**/onboardingHandler.ts",
         "**/chatHandler.ts",
-        "**/provisioningHandler.ts",
       ],
       // Target 90% minimum coverage threshold
       thresholds: {

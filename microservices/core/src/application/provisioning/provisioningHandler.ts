@@ -17,12 +17,14 @@ export const provisioningHandler = new Elysia({
   "/provisioning/register",
   async ({ body, headers, set }) => {
     const secret = process.env.PROVISIONING_SECRET;
-    if (secret) {
-      const provided = headers["x-provisioning-secret"];
-      if (provided !== secret) {
-        set.status = 401;
-        return { success: false, error: "Unauthorized" };
-      }
+    if (!secret) {
+      set.status = 503;
+      return { success: false, error: "Provisioning secret not configured" };
+    }
+    const provided = headers["x-provisioning-secret"];
+    if (provided !== secret) {
+      set.status = 401;
+      return { success: false, error: "Unauthorized" };
     }
 
     const { userId, gatewayUrl } = body;

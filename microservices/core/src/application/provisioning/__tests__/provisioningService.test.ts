@@ -192,5 +192,24 @@ describe("triggerContainerLaunch", () => {
         "Provisioning webhook returned 500: unknown error",
       );
     });
+
+    it("marks provisioning as failed and rethrows on transport-level fetch error", async () => {
+      const repo = makeRepo({
+        findByUserId: vi.fn().mockResolvedValue(PROV),
+      });
+
+      const networkErr = new Error("ECONNREFUSED");
+      global.fetch = vi.fn().mockRejectedValue(networkErr);
+
+      await expect(triggerContainerLaunch(repo, PARAMS)).rejects.toThrow(
+        "ECONNREFUSED",
+      );
+
+      expect(repo.updateStatus).toHaveBeenCalledWith(
+        "prov-id-1",
+        "failed",
+        expect.stringContaining("ECONNREFUSED"),
+      );
+    });
   });
 });
