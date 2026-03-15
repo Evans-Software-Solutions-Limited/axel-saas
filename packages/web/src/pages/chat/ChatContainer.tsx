@@ -71,13 +71,6 @@ export function ChatContainer() {
           setMessages([]);
           return;
         }
-        if (
-          agentStatus.success &&
-          agentStatus.status === "subscription_required"
-        ) {
-          navigate("/subscribe");
-          return;
-        }
         if (agentStatus.success && agentStatus.status === "failed") {
           setChatMode("failed");
           setError(
@@ -95,7 +88,7 @@ export function ChatContainer() {
       }, PROVISIONING_POLL_INTERVAL_MS);
     };
     void poll();
-  }, [navigate]);
+  }, []);
 
   // Call the onboarding complete endpoint and switch to live or provisioning mode
   const handleCompleteOnboarding = useCallback(async () => {
@@ -117,11 +110,6 @@ export function ChatContainer() {
       if (agentStatus?.success && agentStatus.status === "provisioning") {
         setChatMode("provisioning");
         startProvisioningPoll();
-      } else if (
-        agentStatus?.success &&
-        agentStatus.status === "subscription_required"
-      ) {
-        navigate("/subscribe");
       } else if (agentStatus?.success && agentStatus.status === "failed") {
         setChatMode("failed");
         setError(
@@ -138,12 +126,7 @@ export function ChatContainer() {
       setError(message);
       // Don't switch mode; stay in onboarding mode to allow retry
     }
-  }, [
-    navigate,
-    setOnboardingCompleted,
-    refreshOnboardingStatus,
-    startProvisioningPoll,
-  ]);
+  }, [setOnboardingCompleted, refreshOnboardingStatus, startProvisioningPoll]);
 
   // Load initial state - determines if onboarding or live chat
   const loadState = useCallback(async () => {
@@ -159,15 +142,6 @@ export function ChatContainer() {
       } catch {
         // getAgentStatus throws for new users - that's fine, fall through to onboarding
         // This is expected when user hasn't completed onboarding yet
-      }
-
-      // Redirect to subscribe if payment is required
-      if (
-        agentStatus?.success &&
-        agentStatus.status === "subscription_required"
-      ) {
-        navigate("/subscribe");
-        return;
       }
 
       // Determine whether the live agent is already active.
@@ -230,12 +204,7 @@ export function ChatContainer() {
     } finally {
       setIsLoadingState(false);
     }
-  }, [
-    navigate,
-    setOnboardingCompleted,
-    refreshOnboardingStatus,
-    startProvisioningPoll,
-  ]);
+  }, [setOnboardingCompleted, refreshOnboardingStatus, startProvisioningPoll]);
 
   useEffect(() => {
     void loadState();

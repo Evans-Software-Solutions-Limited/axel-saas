@@ -44,7 +44,8 @@ export async function triggerContainerLaunch(
     );
   }
 
-  // Idempotency guard: skip only when a real container is already running.
+  // Idempotency guard: skip when a real container is already running, or when
+  // a previous attempt already failed.
   //
   // A container is "really" active when it has registered a gatewayUrl via
   // POST /provisioning/register (activateGateway sets both fields atomically).
@@ -53,7 +54,15 @@ export async function triggerContainerLaunch(
   // webhook arrived, status will be "active" but gatewayUrl will still be null
   // — the container was never launched. In that case we must proceed so the
   // container is actually started.
-  if (prov.status === "active" && prov.gatewayUrl !== null) {
+  //
+  // "failed" is treated as terminal for replay purposes: a replayed Stripe
+  // webhook must not automatically retry a failed launch. Recovery requires an
+  // explicit admin action so that broken orchestrator state is not re-triggered
+  // indefinitely by Stripe's retry schedule.
+  if (
+    (prov.status === "active" && prov.gatewayUrl !== null) ||
+    prov.status === "failed"
+  ) {
     return;
   }
 

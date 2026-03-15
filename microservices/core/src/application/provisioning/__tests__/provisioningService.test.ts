@@ -107,6 +107,26 @@ describe("triggerContainerLaunch", () => {
       expect(repo.updateStatus).not.toHaveBeenCalled();
     });
 
+    it("no-ops when status is already 'failed' (replay safety — retry requires explicit admin action)", async () => {
+      // A replayed Stripe webhook must not automatically retry a failed launch.
+      // The "failed" state is terminal for webhook replay purposes.
+      const failedProv = {
+        ...PROV,
+        status: "failed" as const,
+        errorMessage: "Webhook fetch error: ECONNREFUSED",
+      };
+      const repo = makeRepo({
+        findByUserId: vi.fn().mockResolvedValue(failedProv),
+      });
+
+      await expect(
+        triggerContainerLaunch(repo, PARAMS),
+      ).resolves.toBeUndefined();
+
+      expect(repo.updateStatus).not.toHaveBeenCalled();
+      expect(global.fetch).not.toHaveBeenCalled();
+    });
+
     it("no-ops when status is active AND gatewayUrl is set (container running — replay safety)", async () => {
       // gatewayUrl is set by activateGateway when the container registers itself.
       // A replayed webhook must not re-fire the orchestrator.
