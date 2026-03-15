@@ -351,8 +351,16 @@ export const onboardingHandler = new Elysia({ name: "OnboardingHandler" })
         // Determine workspace path - in production this would be EFS
         const workspacePath = resolveWorkspacePath(dbUser.id);
 
-        // Write workspace files
+        // Write workspace files — this must succeed before we mark the user complete.
+        // Any exception here will propagate to the catch block, leaving
+        // users.onboardingCompleted = false so the frontend stays on the
+        // onboarding flow rather than opening a workspace that doesn't exist.
         await writeWorkspaceFiles(workspacePath, workspaceFiles);
+
+        // Workspace files are on disk: safe to flip the user flag.
+        await userRepository.updateById(dbUser.id, {
+          onboardingCompleted: true,
+        });
 
         // Update provisioning state to active
         await provisioningRepo.updateProvisioned(
@@ -366,7 +374,7 @@ export const onboardingHandler = new Elysia({ name: "OnboardingHandler" })
           collectedAnswers,
         );
 
-        // Mark onboarding as complete in the database (idempotent - safe to call again)
+        // Stamp the onboardingState row (idempotent — safe to call on re-provisioning)
         await onboardingRepository.markCompleted(dbUser.id);
 
         // Don't leak internal workspacePath to the client
