@@ -29,9 +29,16 @@ export async function triggerContainerLaunch(
     );
   }
 
-  // Idempotency guard: a replayed webhook must not regress an already-active
-  // container back to "provisioning".
-  if (prov.status === "active") {
+  // Idempotency guard: skip only when a real container is already running.
+  //
+  // A container is "really" active when it has registered a gatewayUrl via
+  // POST /provisioning/register (activateGateway sets both fields atomically).
+  //
+  // If onboarding completed and called updateProvisioned() before this Stripe
+  // webhook arrived, status will be "active" but gatewayUrl will still be null
+  // — the container was never launched. In that case we must proceed so the
+  // container is actually started.
+  if (prov.status === "active" && prov.gatewayUrl !== null) {
     return;
   }
 

@@ -83,8 +83,14 @@ describe("triggerContainerLaunch", () => {
       expect(repo.updateStatus).not.toHaveBeenCalled();
     });
 
-    it("no-ops when status is already active (idempotency / webhook replay)", async () => {
-      const activeProv = { ...PROV, status: "active" as const };
+    it("no-ops when status is active AND gatewayUrl is set (container running — replay safety)", async () => {
+      // gatewayUrl is set by activateGateway when the container registers itself.
+      // A replayed webhook must not re-fire the orchestrator.
+      const activeProv = {
+        ...PROV,
+        status: "active" as const,
+        gatewayUrl: "https://container.internal/gw",
+      };
       const repo = makeRepo({
         findByUserId: vi.fn().mockResolvedValue(activeProv),
       });
@@ -95,6 +101,39 @@ describe("triggerContainerLaunch", () => {
 
       expect(repo.updateStatus).not.toHaveBeenCalled();
       expect(global.fetch).not.toHaveBeenCalled();
+    });
+
+    it("triggers launch when status is active but gatewayUrl is null (onboarding completed before Stripe webhook)", async () => {
+      // Race: onboarding called updateProvisioned() which sets status="active"
+      // but no container has registered yet (gatewayUrl is null).
+      // The Stripe checkout.session.completed webhook must still launch the container.
+      vi.stubEnv(
+        "PROVISIONING_WEBHOOK_URL",
+        "https://provisioner.internal/launch",
+      );
+      const onboardingActiveProv = {
+        ...PROV,
+        status: "active" as const,
+        gatewayUrl: null,
+      };
+      const repo = makeRepo({
+        findByUserId: vi.fn().mockResolvedValue(onboardingActiveProv),
+      });
+      global.fetch = vi.fn().mockResolvedValue({ ok: true });
+
+      await expect(
+        triggerContainerLaunch(repo, PARAMS),
+      ).resolves.toBeUndefined();
+
+      // Status must have advanced to "provisioning" (webhook was fired)
+      expect(repo.updateStatus).toHaveBeenCalledWith(
+        "prov-id-1",
+        "provisioning",
+      );
+      expect(global.fetch).toHaveBeenCalledWith(
+        "https://provisioner.internal/launch",
+        expect.objectContaining({ method: "POST" }),
+      );
     });
   });
 
