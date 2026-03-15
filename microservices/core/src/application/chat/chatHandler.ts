@@ -24,7 +24,12 @@ export interface ChatMessageResponse {
 
 export interface AgentStatusResponse {
   success: boolean;
-  status: "active" | "provisioning" | "not_found" | "subscription_required";
+  status:
+    | "active"
+    | "provisioning"
+    | "failed"
+    | "not_found"
+    | "subscription_required";
   gatewayUrl?: string;
 }
 
@@ -190,6 +195,10 @@ export const chatHandler = new Elysia({ name: "ChatHandler" })
             success: true,
             status: "not_found",
           };
+        }
+
+        if (container.status === "failed") {
+          return { success: true, status: "failed" as const };
         }
 
         return {

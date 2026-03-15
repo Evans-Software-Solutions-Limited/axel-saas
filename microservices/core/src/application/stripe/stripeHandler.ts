@@ -9,6 +9,10 @@ import {
 import { SubscriptionRepository } from "../repositories/subscriptionRepository";
 import { ProvisioningRepository } from "../repositories/provisioningRepository";
 import { userRepository } from "../repositories/userRepository";
+import {
+  triggerContainerLaunch,
+  resolveWorkspacePath,
+} from "../provisioning/provisioningService";
 
 function getStripeInstance() {
   const secretKey = process.env.STRIPE_SECRET_KEY;
@@ -164,13 +168,31 @@ export const stripeHandler = new Elysia({ name: "StripeHandler" })
             : undefined,
         });
 
-        // Create provisioning state
+        // Create provisioning state if it doesn't exist
         const existingProv = await provRepo.findByUserId(metadata.userId);
         if (!existingProv) {
           await provRepo.create({
             userId: metadata.userId,
             status: "pending",
           });
+        }
+
+        // Trigger container launch. Awaited so Lambda does not return before
+        // the webhook fires and the status is persisted. Failure is best-effort:
+        // we log and continue so Stripe receives 200 and does not retry the event.
+        const workspacePath = resolveWorkspacePath(metadata.userId);
+
+        try {
+          await triggerContainerLaunch(provRepo, {
+            userId: metadata.userId,
+            tier: metadata.tier,
+            workspacePath,
+          });
+        } catch (err: unknown) {
+          console.error(
+            `[provisioning] Failed to trigger container launch for user ${metadata.userId}:`,
+            err,
+          );
         }
       } else if (event.type === "customer.subscription.updated") {
         const subscription = event.data.object as Stripe.Subscription;

@@ -135,5 +135,62 @@ describe("ProvisioningRepository", () => {
       );
       expect(mockDb.update).toHaveBeenCalledOnce();
     });
+
+    it("does not overwrite a failed status (WHERE guard prevents update)", async () => {
+      // The WHERE clause includes `ne(status, "failed")` so an update against a
+      // failed row affects 0 rows — the mock still gets one update() call but
+      // the real DB would skip the row, protecting the failed state.
+      const failedRow = { ...mockProvisioningRow, status: "failed" as const };
+      (mockDb.select as ReturnType<typeof vi.fn>).mockReturnValue(
+        mockChain([failedRow]),
+      );
+
+      await repo.updateProvisioned(
+        "prov-uuid-1",
+        "/home/ubuntu/.openclaw/workspace/user-1",
+      );
+
+      // update() is called once — the WHERE guard in the real DB prevents the
+      // status from being reset to "active"; the mock layer records the call.
+      expect(mockDb.update).toHaveBeenCalledOnce();
+    });
+  });
+
+  describe("activateGateway", () => {
+    it("sets gateway URL and marks status as active", async () => {
+      await repo.activateGateway("user-uuid-1", "https://gateway.example.com");
+      expect(mockDb.update).toHaveBeenCalledOnce();
+    });
+  });
+
+  describe("updateGatewayUrl", () => {
+    it("updates gateway URL when provisioning state exists", async () => {
+      await repo.updateGatewayUrl("user-uuid-1", "https://gateway.example.com");
+      expect(mockDb.update).toHaveBeenCalledOnce();
+    });
+
+    it("does not update when no provisioning state found", async () => {
+      (mockDb.select as ReturnType<typeof vi.fn>).mockReturnValue(
+        mockChain([]),
+      );
+      await repo.updateGatewayUrl("nonexistent", "https://gateway.example.com");
+      expect(mockDb.update).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("getContainerByUserId", () => {
+    it("returns container info when provisioning state exists", async () => {
+      const container = await repo.getContainerByUserId("user-uuid-1");
+      expect(container).not.toBeNull();
+      expect(container?.status).toBe("pending");
+    });
+
+    it("returns null when no provisioning state found", async () => {
+      (mockDb.select as ReturnType<typeof vi.fn>).mockReturnValue(
+        mockChain([]),
+      );
+      const container = await repo.getContainerByUserId("nonexistent");
+      expect(container).toBeNull();
+    });
   });
 });

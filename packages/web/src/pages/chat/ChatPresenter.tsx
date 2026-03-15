@@ -13,6 +13,8 @@ interface ChatPresenterProps {
   isLoadingState: boolean;
   isSending: boolean;
   isOnboardingMode: boolean;
+  isProvisioningMode: boolean;
+  isFailedMode: boolean;
   nextQuestion: string | null;
   error: string | null;
   onInputChange: (value: string) => void;
@@ -25,6 +27,8 @@ export function ChatPresenter({
   isLoadingState,
   isSending,
   isOnboardingMode,
+  isProvisioningMode,
+  isFailedMode,
   nextQuestion,
   error,
   onInputChange,
@@ -36,7 +40,12 @@ export function ChatPresenter({
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  const canSend = input.trim().length > 0 && !isLoadingState && !isSending;
+  const canSend =
+    input.trim().length > 0 &&
+    !isLoadingState &&
+    !isSending &&
+    !isProvisioningMode &&
+    !isFailedMode;
 
   // Only show nextQuestion banner if the same question isn't already in the transcript.
   // Extract the core question from nextQuestion to handle cases where the transcript wraps
@@ -65,19 +74,36 @@ export function ChatPresenter({
       return msgContent.includes(coreNextQuestion);
     });
 
-  // Input is disabled during loading, when already sending, or when there's an error
-  const inputDisabled = isLoadingState || isSending || error !== null;
+  // Input is disabled during loading, when already sending, when provisioning, failed, or when there's an error
+  const inputDisabled =
+    isLoadingState ||
+    isSending ||
+    isProvisioningMode ||
+    isFailedMode ||
+    error !== null;
 
   return (
     <div className="h-full flex flex-col p-6">
       <div className="mb-4">
         <p className="text-xs uppercase tracking-wide text-muted">
-          {isOnboardingMode ? "Onboarding mode" : "Chat"}
+          {isOnboardingMode
+            ? "Onboarding mode"
+            : isProvisioningMode
+              ? "Setting up"
+              : isFailedMode
+                ? "Setup failed"
+                : "Chat"}
         </p>
       </div>
 
       <div className="flex-1 overflow-y-auto mb-4 space-y-4">
         {isLoadingState && <p className="text-sm text-muted">Loading...</p>}
+
+        {isProvisioningMode && (
+          <p className="text-sm text-muted">
+            Your agent is being set up. This usually takes just a moment...
+          </p>
+        )}
 
         {error && <p className="text-sm text-red-400">{error}</p>}
 
@@ -125,7 +151,11 @@ export function ChatPresenter({
           placeholder={
             isOnboardingMode
               ? "Answer Axel's question..."
-              : "Ask Axel to help..."
+              : isProvisioningMode
+                ? "Setting up your agent..."
+                : isFailedMode
+                  ? "Agent setup failed — chat unavailable"
+                  : "Ask Axel to help..."
           }
           className="bg-surface-raised border-border text-text"
           disabled={inputDisabled}

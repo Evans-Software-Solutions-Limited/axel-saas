@@ -15,9 +15,12 @@ import {
   writeWorkspaceFiles,
 } from "../workspace/workspaceGenerator";
 import { ProvisioningRepository } from "../repositories/provisioningRepository";
+import { SubscriptionRepository } from "../repositories/subscriptionRepository";
+import { resolveWorkspacePath } from "../provisioning/provisioningService";
 
-// Create instance for use in handler
+// Create instances for use in handler
 const provisioningRepo = new ProvisioningRepository();
+const subscriptionRepo = new SubscriptionRepository();
 
 // Types for API responses
 export interface OnboardingStateResponse {
@@ -331,7 +334,8 @@ export const onboardingHandler = new Elysia({ name: "OnboardingHandler" })
 
         // Generate workspace files from collected answers
         const collectedAnswers = onboardingState.collectedAnswers;
-        const tier = "starter"; // TODO: Get tier from subscription
+        const subscription = await subscriptionRepo.findByUserId(dbUser.id);
+        const tier = subscription?.tier ?? "starter";
 
         const workspaceFiles = generateWorkspaceFiles(collectedAnswers, tier);
 
@@ -345,9 +349,7 @@ export const onboardingHandler = new Elysia({ name: "OnboardingHandler" })
         }
 
         // Determine workspace path - in production this would be EFS
-        const workspacePath = process.env.WORKSPACE_PATH
-          ? `${process.env.WORKSPACE_PATH}/${dbUser.id}/workspace`
-          : `/tmp/workspace/${dbUser.id}/workspace`;
+        const workspacePath = resolveWorkspacePath(dbUser.id);
 
         // Write workspace files
         await writeWorkspaceFiles(workspacePath, workspaceFiles);

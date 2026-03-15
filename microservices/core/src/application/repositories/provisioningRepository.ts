@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq, ne } from "drizzle-orm";
 import {
   type Db,
   type ProvisioningState,
@@ -64,6 +64,9 @@ export class ProvisioningRepository {
     provisioningId: string,
     workspacePath: string,
   ): Promise<void> {
+    // Never overwrite a "failed" status back to "active": doing so leaves no
+    // running container behind and strands the user in permanent provisioning
+    // (the Stripe webhook that triggers container launch fires only once).
     await this.db
       .update(provisioningState)
       .set({
@@ -72,7 +75,12 @@ export class ProvisioningRepository {
         provisionedAt: new Date(),
         updatedAt: new Date(),
       })
-      .where(eq(provisioningState.id, provisioningId));
+      .where(
+        and(
+          eq(provisioningState.id, provisioningId),
+          ne(provisioningState.status, "failed" as const),
+        ),
+      );
   }
 
   /**
@@ -86,6 +94,22 @@ export class ProvisioningRepository {
         .set({ gatewayUrl, updatedAt: new Date() })
         .where(eq(provisioningState.userId, userId));
     }
+  }
+
+  /**
+   * Atomically set gateway URL and mark provisioning as active.
+   * Called when a container reports it is ready to serve traffic.
+   */
+  async activateGateway(userId: string, gatewayUrl: string): Promise<void> {
+    await this.db
+      .update(provisioningState)
+      .set({
+        gatewayUrl,
+        status: "active" as const,
+        provisionedAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(eq(provisioningState.userId, userId));
   }
 
   /**
