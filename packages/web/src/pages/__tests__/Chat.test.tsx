@@ -72,6 +72,12 @@ vi.mock("../chat/chatApi", () => ({
   },
 }));
 
+vi.mock("../subscribeApi", () => ({
+  createCheckoutSession: vi
+    .fn()
+    .mockResolvedValue({ url: "https://checkout.stripe.com/pay/cs_test" }),
+}));
+
 describe("Chat onboarding integration", () => {
   const setOnboardingCompleted = vi.fn();
   const refreshOnboardingStatus = vi.fn().mockResolvedValue(undefined);
@@ -1670,7 +1676,7 @@ describe("Chat onboarding integration", () => {
       expect(await screen.findByText("Failed to send message")).toBeDefined();
     });
 
-    it("redirects to /subscribe when postChatMessage returns 402", async () => {
+    it("shows discovery mode when postChatMessage returns 402 mid-chat", async () => {
       vi.mocked(getAgentStatus).mockResolvedValue({
         success: true,
         status: "active",
@@ -1694,7 +1700,7 @@ describe("Chat onboarding integration", () => {
       fireEvent.click(screen.getByRole("button"));
 
       await waitFor(() => {
-        expect(navigateMock).toHaveBeenCalledWith("/subscribe");
+        expect(screen.getByText("Choose your plan")).toBeDefined();
       });
 
       // Should not show an error banner
@@ -1702,8 +1708,8 @@ describe("Chat onboarding integration", () => {
     });
   });
 
-  describe("subscription_required redirect", () => {
-    it("redirects to /subscribe when agent status is subscription_required", async () => {
+  describe("subscription discovery mode", () => {
+    it("shows discovery panel when agent status is subscription_required", async () => {
       vi.mocked(getAgentStatus).mockResolvedValue({
         success: true,
         status: "subscription_required",
@@ -1715,14 +1721,33 @@ describe("Chat onboarding integration", () => {
         </MemoryRouter>,
       );
 
-      await waitFor(() => {
-        expect(navigateMock).toHaveBeenCalledWith("/subscribe");
-      });
+      expect(await screen.findByText("Choose your plan")).toBeDefined();
+      // Should NOT navigate away — user stays in chat
+      expect(navigateMock).not.toHaveBeenCalled();
     });
-  });
 
-  describe("subscription_required redirect", () => {
-    it("redirects to /subscribe when postChatMessage returns 402", async () => {
+    it("shows plan cards with recommendation in discovery mode", async () => {
+      vi.mocked(getAgentStatus).mockResolvedValue({
+        success: true,
+        status: "subscription_required",
+      });
+
+      render(
+        <MemoryRouter>
+          <Chat />
+        </MemoryRouter>,
+      );
+
+      expect(await screen.findByText("Choose your plan")).toBeDefined();
+      // Recommendation badge with explicit reason is shown
+      expect(screen.getByText("Best starting point")).toBeDefined();
+      // All plan tiers are visible
+      expect(screen.getByText("Starter")).toBeDefined();
+      expect(screen.getByText("Pro")).toBeDefined();
+      expect(screen.getByText("Business")).toBeDefined();
+    });
+
+    it("shows discovery panel when postChatMessage returns 402", async () => {
       vi.mocked(getAgentStatus).mockResolvedValue({
         success: true,
         status: "active",
@@ -1746,9 +1771,11 @@ describe("Chat onboarding integration", () => {
       fireEvent.click(screen.getByRole("button"));
 
       await waitFor(() => {
-        expect(navigateMock).toHaveBeenCalledWith("/subscribe");
+        expect(screen.getByText("Choose your plan")).toBeDefined();
       });
 
+      // Should NOT navigate away
+      expect(navigateMock).not.toHaveBeenCalledWith("/subscribe");
       // Should not show an error banner for subscription errors
       expect(screen.queryByText("subscription_required")).toBeNull();
     });
