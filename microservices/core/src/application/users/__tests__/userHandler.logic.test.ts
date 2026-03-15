@@ -10,7 +10,6 @@ vi.mock("@axel-saas/api-utils/auth/supabaseAuth", () => ({
 vi.mock("../../repositories/userRepository", () => ({
   userRepository: {
     getUserBySupabaseId: vi.fn(),
-    updateOnboardingAnswers: vi.fn(),
     updateUser: vi.fn(),
   },
 }));
@@ -93,158 +92,6 @@ describe("UserHandler Logic Tests", () => {
     });
   });
 
-  describe("Onboarding data validation", () => {
-    it("should validate onboarding data structure", () => {
-      const data = {
-        name: "John Doe",
-        role: "Engineer",
-        helpWith: ["coding", "debugging"],
-        typicalDay: "Work on features",
-        channels: ["slack", "email"],
-        morningBrief: true,
-        briefTime: "08:00",
-      };
-      expect(data.name).toBeDefined();
-      expect(Array.isArray(data.helpWith)).toBe(true);
-      expect(Array.isArray(data.channels)).toBe(true);
-      expect(typeof data.morningBrief).toBe("boolean");
-    });
-
-    it("should require name field", () => {
-      const data = {
-        name: "John Doe",
-        helpWith: [],
-        channels: [],
-        morningBrief: true,
-      };
-      expect(data.name).toBeDefined();
-      expect(typeof data.name).toBe("string");
-    });
-
-    it("should require helpWith array", () => {
-      const data = {
-        name: "John",
-        helpWith: ["task1"],
-        channels: [],
-        morningBrief: true,
-      };
-      expect(Array.isArray(data.helpWith)).toBe(true);
-      expect(data.helpWith.length).toBeGreaterThan(0);
-    });
-
-    it("should require channels array", () => {
-      const data = {
-        name: "John",
-        helpWith: [],
-        channels: ["slack"],
-        morningBrief: true,
-      };
-      expect(Array.isArray(data.channels)).toBe(true);
-      expect(data.channels.length).toBeGreaterThan(0);
-    });
-
-    it("should require morningBrief boolean", () => {
-      const data = {
-        name: "John",
-        helpWith: [],
-        channels: [],
-        morningBrief: true,
-      };
-      expect(typeof data.morningBrief).toBe("boolean");
-      expect(data.morningBrief).toBe(true);
-    });
-
-    it("should allow optional role field", () => {
-      const dataWithRole: {
-        name: string;
-        role?: string;
-        helpWith: string[];
-        channels: string[];
-        morningBrief: boolean;
-      } = {
-        name: "John",
-        role: "Engineer",
-        helpWith: [],
-        channels: [],
-        morningBrief: true,
-      };
-      const dataWithoutRole: {
-        name: string;
-        role?: string;
-        helpWith: string[];
-        channels: string[];
-        morningBrief: boolean;
-      } = {
-        name: "John",
-        helpWith: [],
-        channels: [],
-        morningBrief: true,
-      };
-      expect(dataWithRole.role).toBe("Engineer");
-      expect(dataWithoutRole.role).toBeUndefined();
-    });
-
-    it("should allow optional typicalDay field", () => {
-      const dataWithDay: {
-        name: string;
-        helpWith: string[];
-        channels: string[];
-        morningBrief: boolean;
-        typicalDay?: string;
-      } = {
-        name: "John",
-        helpWith: [],
-        channels: [],
-        morningBrief: true,
-        typicalDay: "Code all day",
-      };
-      const dataWithoutDay: {
-        name: string;
-        helpWith: string[];
-        channels: string[];
-        morningBrief: boolean;
-        typicalDay?: string;
-      } = {
-        name: "John",
-        helpWith: [],
-        channels: [],
-        morningBrief: true,
-      };
-      expect(dataWithDay.typicalDay).toBe("Code all day");
-      expect(dataWithoutDay.typicalDay).toBeUndefined();
-    });
-
-    it("should allow optional briefTime field", () => {
-      const dataWithTime: {
-        name: string;
-        helpWith: string[];
-        channels: string[];
-        morningBrief: boolean;
-        briefTime?: string;
-      } = {
-        name: "John",
-        helpWith: [],
-        channels: [],
-        morningBrief: true,
-        briefTime: "09:00",
-      };
-      const dataWithoutTime: {
-        name: string;
-        helpWith: string[];
-        channels: string[];
-        morningBrief: boolean;
-        briefTime?: string;
-      } = {
-        name: "John",
-        helpWith: [],
-        channels: [],
-        morningBrief: true,
-      };
-      expect(dataWithTime.briefTime).toBe("09:00");
-      expect(dataWithoutTime.briefTime).toBeUndefined();
-    });
-  });
-
   describe("Error handling", () => {
     it("should set 404 status when user not found", () => {
       const ctx = { set: { status: 200 } };
@@ -283,15 +130,6 @@ describe("UserHandler Logic Tests", () => {
       expect(response.user).toBeDefined();
     });
 
-    it("should return success flag on successful onboarding", () => {
-      const response = {
-        success: true,
-        userId: "user-123",
-      };
-      expect(response.success).toBe(true);
-      expect(response.userId).toBe("user-123");
-    });
-
     it("should return error message on failure", () => {
       const response = {
         success: false,
@@ -308,13 +146,6 @@ describe("UserHandler Logic Tests", () => {
       // This simulates what the handler does
       expect(supabaseId).toBeDefined();
       expect(typeof supabaseId).toBe("string");
-    });
-
-    it("should call updateOnboardingAnswers with userId and data", () => {
-      const userId = "user-123";
-      const data = { name: "John", channels: [] };
-      expect(userId).toBeDefined();
-      expect(data).toBeDefined();
     });
 
     it("should call updateUser with userId and updates", () => {

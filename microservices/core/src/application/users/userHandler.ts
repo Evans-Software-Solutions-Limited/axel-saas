@@ -1,4 +1,4 @@
-import Elysia, { t } from "elysia";
+import Elysia from "elysia";
 import {
   getAuthUser,
   requireAuth,
@@ -44,47 +44,6 @@ export const userHandler = new Elysia({ name: "UserHandler" })
     {
       detail: {
         description: "Get current user profile",
-        tags: ["Users"],
-      },
-    },
-  )
-  .post(
-    "/users/onboarding",
-    async (ctx) => {
-      const { body, set } = ctx;
-      try {
-        const dbUser = await userRepository.getUserBySupabaseId(
-          getUser(ctx).sub,
-        );
-        if (!dbUser) {
-          set.status = 404;
-          return { success: false, error: "User not found" };
-        }
-
-        await userRepository.updateOnboardingAnswers(dbUser.id, body);
-        await userRepository.updateUser(dbUser.id, {
-          onboardingCompleted: true,
-        });
-
-        return { success: true, userId: dbUser.id };
-      } catch (error) {
-        console.error("Onboarding error:", error);
-        set.status = 500;
-        return { success: false, error: "Failed to complete onboarding" };
-      }
-    },
-    {
-      body: t.Object({
-        name: t.String(),
-        role: t.Optional(t.String()),
-        helpWith: t.Array(t.String()),
-        typicalDay: t.Optional(t.String()),
-        channels: t.Array(t.String()),
-        morningBrief: t.Boolean(),
-        briefTime: t.Optional(t.String()),
-      }),
-      detail: {
-        description: "Complete user onboarding",
         tags: ["Users"],
       },
     },
