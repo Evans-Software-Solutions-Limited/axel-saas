@@ -1,5 +1,5 @@
 import "./App.css";
-import { Routes, Route, Navigate } from "react-router";
+import { Routes, Route, Navigate, useLocation } from "react-router";
 import { ThemeProvider } from "./components/theme-provider";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
@@ -18,6 +18,17 @@ import { Tasks } from "./pages/Tasks";
 import { Integrations } from "./pages/Integrations";
 
 const queryClient = new QueryClient();
+
+// Preserves query string (e.g. ?checkout=success) when redirecting from /dashboard index.
+function DashboardIndexRedirect({
+  onboardingCompleted,
+}: Readonly<{ onboardingCompleted: boolean }>) {
+  const location = useLocation();
+  const target = onboardingCompleted ? "/dashboard/office" : "/dashboard/chat";
+  return (
+    <Navigate to={{ pathname: target, search: location.search }} replace />
+  );
+}
 
 function ProtectedRoute({ children }: Readonly<{ children: React.ReactNode }>) {
   const { isAuthenticated } = useAuth();
@@ -106,11 +117,9 @@ function App() {
             <Route
               index
               element={
-                onboardingCompleted ? (
-                  <Navigate to="/dashboard/office" replace />
-                ) : (
-                  <Navigate to="/dashboard/chat" replace />
-                )
+                <DashboardIndexRedirect
+                  onboardingCompleted={onboardingCompleted}
+                />
               }
             />
             <Route path="office" element={<Office />} />

@@ -1812,4 +1812,133 @@ describe("Chat onboarding integration", () => {
       expect(screen.queryByText("Hello")).toBeNull();
     });
   });
+
+  describe("post-payment confirming-payment flow", () => {
+    // Ensure fake timers never bleed into subsequent tests, even on test failure.
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("enters confirming-payment mode (not discovery) when ?checkout=success and subscription_required", async () => {
+      // getAgentStatus always returns subscription_required so no poll transition fires.
+      vi.mocked(getAgentStatus).mockResolvedValue({
+        success: true,
+        status: "subscription_required",
+      });
+
+      render(
+        <MemoryRouter initialEntries={["/dashboard/chat?checkout=success"]}>
+          <Chat />
+        </MemoryRouter>,
+      );
+
+      // Should show confirming-payment UI, not the discovery plan picker
+      expect(await screen.findByText("Payment confirmed")).toBeDefined();
+      expect(screen.getByText(/activating your workspace/i)).toBeDefined();
+      // Discovery panel must NOT appear
+      expect(screen.queryByText("Choose your plan")).toBeNull();
+      // Input placeholder shows activation state
+      expect(
+        screen.getByPlaceholderText(/activating your workspace/i),
+      ).toBeDefined();
+    });
+
+    it("shows discovery mode normally when subscription_required without checkout param", async () => {
+      vi.mocked(getAgentStatus).mockResolvedValue({
+        success: true,
+        status: "subscription_required",
+      });
+
+      render(
+        <MemoryRouter>
+          <Chat />
+        </MemoryRouter>,
+      );
+
+      // No checkout param → normal discovery panel
+      expect(await screen.findByText("Choose your plan")).toBeDefined();
+      expect(screen.queryByText("Payment confirmed")).toBeNull();
+    });
+
+    it("transitions to onboarding once the subscription activates", async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+
+      vi.mocked(getAgentStatus)
+        // Call 1 (loadState): subscription still pending → confirming-payment
+        .mockResolvedValueOnce({
+          success: true,
+          status: "subscription_required",
+        })
+        // Call 2 (first confirming poll, runs immediately): subscription resolved
+        .mockResolvedValueOnce({ success: true, status: "not_found" })
+        // Call 3 (loadState re-run by poll): still no active agent → onboarding
+        .mockResolvedValueOnce({ success: true, status: "not_found" });
+
+      vi.mocked(getOnboardingState).mockResolvedValue({
+        state: {
+          id: "state-1",
+          status: "in_progress",
+          outstandingQuestions: ["role"],
+          collectedAnswers: {},
+          completedAt: null,
+          lastMessageAt: "2026-03-15T10:00:00.000Z",
+        },
+        messages: [
+          {
+            id: "m1",
+            role: "assistant",
+            content: "What should I call you?",
+            createdAt: "2026-03-15T10:00:00.000Z",
+          },
+        ],
+        nextQuestion: "What should I call you?",
+      });
+
+      render(
+        <MemoryRouter initialEntries={["/dashboard/chat?checkout=success"]}>
+          <Chat />
+        </MemoryRouter>,
+      );
+
+      // The first confirming poll fires immediately (no delay), so the component
+      // transitions through confirming-payment and lands in onboarding quickly.
+      await waitFor(() => {
+        expect(screen.getByText("Onboarding mode")).toBeDefined();
+      });
+    });
+
+    it("shows failure message after max poll retries exceeded", async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+
+      // Always return subscription_required so every poll cycle increments retries
+      vi.mocked(getAgentStatus).mockResolvedValue({
+        success: true,
+        status: "subscription_required",
+      });
+
+      render(
+        <MemoryRouter initialEntries={["/dashboard/chat?checkout=success"]}>
+          <Chat />
+        </MemoryRouter>,
+      );
+
+      // Wait for confirming-payment mode to be visible
+      expect(await screen.findByText("Payment confirmed")).toBeDefined();
+
+      // Advance one poll cycle at a time so each async poll resolves before the
+      // next timer fires (avoids a race between bulk timer flush and microtasks).
+      for (let i = 0; i < 21; i++) {
+        await act(async () => {
+          vi.advanceTimersByTime(3000);
+        });
+      }
+
+      await waitFor(() => {
+        expect(screen.getByText("Setup failed")).toBeDefined();
+        expect(
+          screen.getByText(/could not confirm your payment/i),
+        ).toBeDefined();
+      });
+    });
+  });
 });
