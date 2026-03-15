@@ -14,6 +14,7 @@ interface ChatPresenterProps {
   isSending: boolean;
   isOnboardingMode: boolean;
   isProvisioningMode: boolean;
+  isFailedMode: boolean;
   nextQuestion: string | null;
   error: string | null;
   onInputChange: (value: string) => void;
@@ -27,6 +28,7 @@ export function ChatPresenter({
   isSending,
   isOnboardingMode,
   isProvisioningMode,
+  isFailedMode,
   nextQuestion,
   error,
   onInputChange,
@@ -42,7 +44,8 @@ export function ChatPresenter({
     input.trim().length > 0 &&
     !isLoadingState &&
     !isSending &&
-    !isProvisioningMode;
+    !isProvisioningMode &&
+    !isFailedMode;
 
   // Only show nextQuestion banner if the same question isn't already in the transcript.
   // Extract the core question from nextQuestion to handle cases where the transcript wraps
@@ -71,9 +74,13 @@ export function ChatPresenter({
       return msgContent.includes(coreNextQuestion);
     });
 
-  // Input is disabled during loading, when already sending, when provisioning, or when there's an error
+  // Input is disabled during loading, when already sending, when provisioning, failed, or when there's an error
   const inputDisabled =
-    isLoadingState || isSending || isProvisioningMode || error !== null;
+    isLoadingState ||
+    isSending ||
+    isProvisioningMode ||
+    isFailedMode ||
+    error !== null;
 
   return (
     <div className="h-full flex flex-col p-6">
@@ -83,7 +90,9 @@ export function ChatPresenter({
             ? "Onboarding mode"
             : isProvisioningMode
               ? "Setting up"
-              : "Chat"}
+              : isFailedMode
+                ? "Setup failed"
+                : "Chat"}
         </p>
       </div>
 

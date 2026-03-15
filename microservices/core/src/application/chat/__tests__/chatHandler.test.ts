@@ -399,6 +399,73 @@ describe("ChatHandler", () => {
 
       expect(container).toBeNull();
     });
+
+    it("should return failed status when container status is failed", async () => {
+      const mockUser = {
+        id: "db-user-123",
+        supabaseUserId: "supabase-123",
+        email: "test@example.com",
+        fullName: "Test User",
+        onboardingCompleted: true,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      const mockContainer = {
+        taskArn: null,
+        status: "failed",
+        gatewayUrl: null,
+        workspacePath: null,
+      };
+
+      vi.mocked(userRepository.getUserBySupabaseId).mockResolvedValue(mockUser);
+      mockGetContainerByUserId.mockResolvedValue(mockContainer);
+
+      const result = await chatHandler.handle(
+        new Request("http://localhost/users/me/agent", {
+          method: "GET",
+          headers: { Authorization: "Bearer test-token" },
+        }),
+      );
+
+      expect(result.status).toBe(200);
+      await expect(result.json()).resolves.toMatchObject({
+        success: true,
+        status: "failed",
+      });
+    });
+
+    it("should not return provisioning status when container status is failed", async () => {
+      const mockUser = {
+        id: "db-user-123",
+        supabaseUserId: "supabase-123",
+        email: "test@example.com",
+        fullName: "Test User",
+        onboardingCompleted: true,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      const mockContainer = {
+        taskArn: null,
+        status: "failed",
+        gatewayUrl: null,
+        workspacePath: null,
+      };
+
+      vi.mocked(userRepository.getUserBySupabaseId).mockResolvedValue(mockUser);
+      mockGetContainerByUserId.mockResolvedValue(mockContainer);
+
+      const result = await chatHandler.handle(
+        new Request("http://localhost/users/me/agent", {
+          method: "GET",
+          headers: { Authorization: "Bearer test-token" },
+        }),
+      );
+
+      const body = (await result.json()) as { status: string };
+      expect(body.status).not.toBe("provisioning");
+    });
   });
 
   describe("POST /users/chat/message endpoint logic", () => {

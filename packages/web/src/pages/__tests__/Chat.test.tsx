@@ -1277,6 +1277,102 @@ describe("Chat onboarding integration", () => {
       }
     });
 
+    it("shows failed state and stops polling when agent status is failed on load", async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+
+      try {
+        vi.mocked(getAgentStatus).mockResolvedValue({
+          success: true,
+          status: "failed",
+        });
+
+        render(
+          <MemoryRouter>
+            <Chat />
+          </MemoryRouter>,
+        );
+
+        expect(await screen.findByText("Setup failed")).toBeDefined();
+        expect(await screen.findByText(/agent setup failed/i)).toBeDefined();
+
+        // Advance well past poll interval — no poll should be running
+        await act(async () => {
+          vi.advanceTimersByTime(10000);
+        });
+
+        // Only the single loadState call — no poll chain started
+        expect(getAgentStatus).toHaveBeenCalledTimes(1);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("disables input and send button in failed mode", async () => {
+      vi.mocked(getAgentStatus).mockResolvedValue({
+        success: true,
+        status: "failed",
+      });
+
+      render(
+        <MemoryRouter>
+          <Chat />
+        </MemoryRouter>,
+      );
+
+      await screen.findByText("Setup failed");
+
+      const input = screen.getByRole("textbox");
+      const button = screen.getByRole("button");
+
+      expect((input as HTMLInputElement).disabled).toBe(true);
+      expect((button as HTMLButtonElement).disabled).toBe(true);
+    });
+
+    it("stops polling and shows error when poll returns failed during provisioning", async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+
+      try {
+        // Call 1 (loadState): provisioning → start polling
+        // Call 2 (immediate poll): provisioning (so "Setting up" renders stably)
+        // Call 3 (poll after timer): failed → stop, set error
+        vi.mocked(getAgentStatus)
+          .mockResolvedValueOnce({ success: true, status: "provisioning" })
+          .mockResolvedValueOnce({ success: true, status: "provisioning" })
+          .mockResolvedValueOnce({ success: true, status: "failed" });
+
+        render(
+          <MemoryRouter>
+            <Chat />
+          </MemoryRouter>,
+        );
+
+        // Should enter provisioning mode
+        await screen.findByText("Setting up");
+
+        // Advance timer to trigger the poll that returns failed
+        await act(async () => {
+          vi.advanceTimersByTime(3000);
+        });
+
+        // Should switch to failed mode and display error
+        await waitFor(() => {
+          expect(screen.getByText("Setup failed")).toBeDefined();
+        });
+
+        expect(await screen.findByText(/agent setup failed/i)).toBeDefined();
+
+        // Advance well past the poll interval — no further poll should fire
+        await act(async () => {
+          vi.advanceTimersByTime(10000);
+        });
+
+        // Exactly 3 calls: loadState + immediate poll + one timed poll iteration
+        expect(getAgentStatus).toHaveBeenCalledTimes(3);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
     it("falls back to live mode when agent status check fails after completing onboarding", async () => {
       // Initial: not_found
       vi.mocked(getAgentStatus)

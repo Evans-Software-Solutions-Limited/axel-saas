@@ -30,7 +30,7 @@ const toOptimisticChatMessage = (content: string): ChatMessage => ({
   createdAt: new Date().toISOString(),
 });
 
-type ChatMode = "loading" | "onboarding" | "provisioning" | "live";
+type ChatMode = "loading" | "onboarding" | "provisioning" | "live" | "failed";
 
 const PROVISIONING_POLL_INTERVAL_MS = 3000;
 
@@ -79,12 +79,10 @@ export function ChatContainer() {
           return;
         }
         if (agentStatus.success && agentStatus.status === "failed") {
-          // Container launch failed — stop polling and surface the error so
-          // the user isn't silently stuck on the provisioning spinner forever.
+          setChatMode("failed");
           setError(
             "Agent setup failed. Please contact support or try again later.",
           );
-          setChatMode("live");
           return;
         }
       } catch {
@@ -179,15 +177,12 @@ export function ChatContainer() {
         return;
       }
 
-      // If a prior container launch failed, surface the error immediately rather
-      // than showing the provisioning spinner indefinitely.
+      // If provisioning failed, show the error state — do not poll
       if (agentStatus?.success && agentStatus.status === "failed") {
-        setOnboardingCompleted(true);
-        await refreshOnboardingStatus();
+        setChatMode("failed");
         setError(
           "Agent setup failed. Please contact support or try again later.",
         );
-        setChatMode("live");
         return;
       }
 
@@ -340,6 +335,7 @@ export function ChatContainer() {
 
   const isOnboardingMode = chatMode === "onboarding";
   const isProvisioningMode = chatMode === "provisioning";
+  const isFailedMode = chatMode === "failed";
 
   return (
     <ChatPresenter
@@ -349,6 +345,7 @@ export function ChatContainer() {
       isSending={isSending}
       isOnboardingMode={isOnboardingMode}
       isProvisioningMode={isProvisioningMode}
+      isFailedMode={isFailedMode}
       nextQuestion={nextQuestion}
       error={error}
       onInputChange={setInput}
