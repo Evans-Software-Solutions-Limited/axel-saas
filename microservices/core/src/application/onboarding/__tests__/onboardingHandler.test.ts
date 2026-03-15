@@ -20,6 +20,7 @@ vi.mock("../onboardingRepository", () => {
       getOrCreateState: vi.fn(),
       ensureTranscript: vi.fn(),
       processMessage: vi.fn(),
+      getState: vi.fn(),
     },
     QUESTION_PROMPTS: {
       name: "What should I call you?",

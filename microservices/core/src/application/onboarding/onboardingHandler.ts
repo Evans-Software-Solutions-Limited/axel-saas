@@ -193,6 +193,22 @@ export const onboardingHandler = new Elysia({ name: "OnboardingHandler" })
           };
         }
 
+        // Guard the window between processMessage returning isComplete=true
+        // (which stamps onboardingState.status="completed" via markCompleted)
+        // and the client calling /users/onboarding/complete (which sets
+        // users.onboardingCompleted=true after writing workspace files).
+        // In that window dbUser.onboardingCompleted is still false, so without
+        // this check a duplicate message would reach processMessage, throw an
+        // Error, and degrade from a clean 409 into a generic 500.
+        const existingState = await onboardingRepository.getState(dbUser.id);
+        if (existingState?.status === "completed") {
+          set.status = 409;
+          return {
+            success: false,
+            error: "Onboarding already completed for this user",
+          };
+        }
+
         const result = await onboardingRepository.processMessage(
           dbUser.id,
           body.message,
@@ -351,8 +367,16 @@ export const onboardingHandler = new Elysia({ name: "OnboardingHandler" })
         // Determine workspace path - in production this would be EFS
         const workspacePath = resolveWorkspacePath(dbUser.id);
 
-        // Write workspace files
+        // Write workspace files — this must succeed before we mark the user complete.
+        // Any exception here will propagate to the catch block, leaving
+        // users.onboardingCompleted = false so the frontend stays on the
+        // onboarding flow rather than opening a workspace that doesn't exist.
         await writeWorkspaceFiles(workspacePath, workspaceFiles);
+
+        // Workspace files are on disk: safe to flip the user flag.
+        await userRepository.updateById(dbUser.id, {
+          onboardingCompleted: true,
+        });
 
         // Update provisioning state to active
         await provisioningRepo.updateProvisioned(
@@ -366,7 +390,7 @@ export const onboardingHandler = new Elysia({ name: "OnboardingHandler" })
           collectedAnswers,
         );
 
-        // Mark onboarding as complete in the database (idempotent - safe to call again)
+        // Stamp the onboardingState row (idempotent — safe to call on re-provisioning)
         await onboardingRepository.markCompleted(dbUser.id);
 
         // Don't leak internal workspacePath to the client

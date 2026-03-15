@@ -405,7 +405,7 @@ describe("OnboardingRepository Methods", () => {
   });
 
   describe("markCompleted", () => {
-    it("should mark state as completed and update user", async () => {
+    it("should mark onboardingState as completed", async () => {
       const completedState = {
         ...mockState,
         status: "completed" as const,
@@ -421,9 +421,29 @@ describe("OnboardingRepository Methods", () => {
       );
 
       const result = await repo.markCompleted(userId);
-      expect(mockDb.update).toHaveBeenCalled();
+      expect(mockDb.update).toHaveBeenCalledTimes(1); // onboardingState only
       expect(result.status).toBe("completed");
       expect(result.outstandingQuestions.length).toBe(0);
+    });
+
+    it("should NOT update the users table (users.onboardingCompleted is set by the handler after file write)", async () => {
+      const completedState = {
+        ...mockState,
+        status: "completed" as const,
+        outstandingQuestions: [],
+        completedAt: NOW,
+      };
+
+      const updateMock = vi.fn().mockReturnValue(mockChain([]));
+      (mockDb.update as ReturnType<typeof vi.fn>) = updateMock;
+      (mockDb.select as ReturnType<typeof vi.fn>).mockReturnValue(
+        mockChain([completedState]),
+      );
+
+      await repo.markCompleted(userId);
+
+      // Only one update call (to onboardingState), not two (which would include users)
+      expect(updateMock).toHaveBeenCalledTimes(1);
     });
   });
 

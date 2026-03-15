@@ -6,7 +6,6 @@ import {
   getDb,
   onboardingState,
   onboardingMessages,
-  users,
 } from "@axel-saas/db";
 
 // Required onboarding questions - backend owns these
@@ -288,7 +287,12 @@ export class OnboardingRepository {
   }
 
   /**
-   * Mark onboarding as completed
+   * Mark onboarding conversation as completed.
+   *
+   * This stamps the onboardingState row only. It intentionally does NOT update
+   * users.onboardingCompleted — that flag is set by the /complete handler
+   * after workspace files have been successfully written to disk, ensuring the
+   * user is never seen as "complete" before their workspace actually exists.
    */
   async markCompleted(userId: string): Promise<OnboardingState> {
     const completedAt = new Date();
@@ -302,12 +306,6 @@ export class OnboardingRepository {
         updatedAt: new Date(),
       })
       .where(eq(onboardingState.userId, userId));
-
-    // Also update the main users table
-    await this.db
-      .update(users)
-      .set({ onboardingCompleted: true, updatedAt: new Date() })
-      .where(eq(users.id, userId));
 
     // Get the updated state
     const [updated] = await this.db

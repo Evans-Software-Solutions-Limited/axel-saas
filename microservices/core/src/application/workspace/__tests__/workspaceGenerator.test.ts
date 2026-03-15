@@ -1,6 +1,10 @@
 import { describe, it, expect } from "vitest";
+import { promises as fs } from "fs";
+import path from "path";
+import { tmpdir } from "os";
 import {
   generateWorkspaceFiles,
+  writeWorkspaceFiles,
   generateSoulContent,
   generateUserContent,
   generateMemoryContent,
@@ -222,4 +226,89 @@ describe("workspaceGenerator", () => {
       expect(files.agents).toContain("Tier: Pro");
     });
   });
+});
+
+describe("writeWorkspaceFiles", () => {
+  it("should write all required files to disk", async () => {
+    const tmpDir = await fs.mkdtemp(path.join(tmpdir(), "axel-ws-test-"));
+    try {
+      const files = generateWorkspaceFiles(sampleAnswers, "starter");
+      await writeWorkspaceFiles(tmpDir, files);
+
+      const [soul, user, memory, agents, tools] = await Promise.all([
+        fs.readFile(path.join(tmpDir, "SOUL.md"), "utf-8"),
+        fs.readFile(path.join(tmpDir, "USER.md"), "utf-8"),
+        fs.readFile(path.join(tmpDir, "MEMORY.md"), "utf-8"),
+        fs.readFile(path.join(tmpDir, "AGENTS.md"), "utf-8"),
+        fs.readFile(path.join(tmpDir, "TOOLS.md"), "utf-8"),
+      ]);
+
+      expect(soul).toContain("I'm Axel");
+      expect(user).toContain("Bradley");
+      expect(memory).toContain("Facts Learned from Onboarding");
+      expect(agents).toContain("Tier: Starter");
+      expect(tools).toContain("No integrations configured yet");
+    } finally {
+      await fs.rm(tmpDir, { recursive: true });
+    }
+  });
+
+  it("should write HEARTBEAT.md when briefing is requested", async () => {
+    const tmpDir = await fs.mkdtemp(path.join(tmpdir(), "axel-ws-test-"));
+    try {
+      const files = generateWorkspaceFiles(sampleAnswers, "starter");
+      expect(files.heartbeat).not.toBeNull();
+      await writeWorkspaceFiles(tmpDir, files);
+
+      const heartbeat = await fs.readFile(
+        path.join(tmpDir, "HEARTBEAT.md"),
+        "utf-8",
+      );
+      expect(heartbeat).toContain("Morning Brief");
+    } finally {
+      await fs.rm(tmpDir, { recursive: true });
+    }
+  });
+
+  it("should not create HEARTBEAT.md when briefing was not requested", async () => {
+    const tmpDir = await fs.mkdtemp(path.join(tmpdir(), "axel-ws-test-"));
+    try {
+      const files = generateWorkspaceFiles({ name: "Jane" }, "starter");
+      expect(files.heartbeat).toBeNull();
+      await writeWorkspaceFiles(tmpDir, files);
+
+      const heartbeatExists = await fs
+        .access(path.join(tmpDir, "HEARTBEAT.md"))
+        .then(() => true)
+        .catch(() => false);
+      expect(heartbeatExists).toBe(false);
+    } finally {
+      await fs.rm(tmpDir, { recursive: true });
+    }
+  });
+
+  it("should create nested workspace directory if it does not exist", async () => {
+    const tmpDir = await fs.mkdtemp(path.join(tmpdir(), "axel-ws-test-"));
+    const nestedPath = path.join(tmpDir, "user-abc", "workspace");
+    try {
+      const files = generateWorkspaceFiles({}, "starter");
+      await writeWorkspaceFiles(nestedPath, files);
+
+      const soul = await fs.readFile(path.join(nestedPath, "SOUL.md"), "utf-8");
+      expect(soul).toBeTruthy();
+    } finally {
+      await fs.rm(tmpDir, { recursive: true });
+    }
+  });
+
+  const sampleAnswers = {
+    name: "Bradley",
+    role: "Software Engineer",
+    typicalDay: "Coding, meetings, code reviews",
+    helpWith: "Coding tasks, debugging, technical writing",
+    proactiveAreas: "Deadline tracking, code review follow-ups",
+    tonePreference: "Casual and direct",
+    channels: "Slack and Email",
+    briefing: "Yes, daily briefings would be helpful",
+  };
 });
