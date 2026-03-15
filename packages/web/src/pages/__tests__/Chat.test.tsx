@@ -1437,6 +1437,71 @@ describe("Chat onboarding integration", () => {
         expect(screen.getByText("Chat")).toBeDefined();
       });
     });
+
+    it("shows failed state when getAgentStatus returns failed after completing onboarding", async () => {
+      // Call 1 (loadState): not_found — fall through to onboarding
+      // Call 2 (handleCompleteOnboarding status check): failed → set failed mode
+      vi.mocked(getAgentStatus)
+        .mockRejectedValueOnce(new Error("not found"))
+        .mockResolvedValueOnce({ success: true, status: "failed" });
+
+      vi.mocked(getOnboardingState).mockResolvedValue({
+        state: {
+          id: "state-1",
+          status: "in_progress",
+          outstandingQuestions: ["channels"],
+          collectedAnswers: { name: "Bradley", role: "Founder" },
+          completedAt: null,
+          lastMessageAt: "2026-03-11T10:00:00.000Z",
+        },
+        messages: [
+          {
+            id: "m0",
+            role: "assistant",
+            content: "Which channels do you want?",
+            createdAt: "2026-03-11T10:00:00.000Z",
+          },
+        ],
+        nextQuestion: "Which channels do you want?",
+      });
+
+      vi.mocked(postOnboardingMessage).mockResolvedValue({
+        state: {
+          id: "state-1",
+          status: "completed",
+          outstandingQuestions: [],
+          collectedAnswers: {
+            name: "Bradley",
+            role: "Founder",
+            channels: "Telegram",
+          },
+          completedAt: "2026-03-11T10:10:00.000Z",
+          lastMessageAt: "2026-03-11T10:10:00.000Z",
+        },
+        messages: [],
+        assistantResponse: "All set.",
+        isComplete: true,
+        nextQuestion: null,
+      });
+
+      render(
+        <MemoryRouter>
+          <Chat />
+        </MemoryRouter>,
+      );
+
+      await screen.findByText("Which channels do you want?");
+
+      fireEvent.change(screen.getByPlaceholderText(/answer axel's question/i), {
+        target: { value: "Telegram" },
+      });
+      fireEvent.click(screen.getByRole("button"));
+
+      // Should show failed state, not live chat
+      expect(await screen.findByText("Setup failed")).toBeDefined();
+      expect(await screen.findByText(/agent setup failed/i)).toBeDefined();
+      expect(screen.queryByText("Chat")).toBeNull();
+    });
   });
 
   describe("Live chat mode", () => {

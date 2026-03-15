@@ -122,6 +122,11 @@ export function ChatContainer() {
         agentStatus.status === "subscription_required"
       ) {
         navigate("/subscribe");
+      } else if (agentStatus?.success && agentStatus.status === "failed") {
+        setChatMode("failed");
+        setError(
+          "Agent setup failed. Please contact support or try again later.",
+        );
       } else {
         setChatMode("live");
       }
