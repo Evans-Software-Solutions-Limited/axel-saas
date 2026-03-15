@@ -1,7 +1,8 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { Subscribe } from "../Subscribe";
+import { createCheckoutSession } from "../subscribeApi";
 
 vi.mock("../subscribeApi", () => ({
   createCheckoutSession: vi
@@ -74,6 +75,33 @@ describe("Subscribe", () => {
     expect(() =>
       fireEvent.click(screen.getByRole("button", { name: "Contact sales" })),
     ).not.toThrow();
+  });
+
+  it("clicking Get started calls createCheckoutSession with the plan tier", async () => {
+    render(
+      <MemoryRouter>
+        <Subscribe />
+      </MemoryRouter>,
+    );
+    fireEvent.click(screen.getAllByRole("button", { name: "Get started" })[0]);
+    await waitFor(() => {
+      expect(createCheckoutSession).toHaveBeenCalledWith("starter");
+    });
+  });
+
+  it("shows error message when createCheckoutSession rejects", async () => {
+    vi.mocked(createCheckoutSession).mockRejectedValueOnce(
+      new Error("Stripe unavailable"),
+    );
+    render(
+      <MemoryRouter>
+        <Subscribe />
+      </MemoryRouter>,
+    );
+    fireEvent.click(screen.getAllByRole("button", { name: "Get started" })[0]);
+    await waitFor(() => {
+      expect(screen.getByText("Stripe unavailable")).toBeDefined();
+    });
   });
 
   it("renders FAQ section", () => {
