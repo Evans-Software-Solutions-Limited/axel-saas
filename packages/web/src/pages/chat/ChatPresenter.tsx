@@ -153,7 +153,9 @@ export function ChatPresenter({
               ? "Answer Axel's question..."
               : isProvisioningMode
                 ? "Setting up your agent..."
-                : "Ask Axel to help..."
+                : isFailedMode
+                  ? "Agent setup failed — chat unavailable"
+                  : "Ask Axel to help..."
           }
           className="bg-surface-raised border-border text-text"
           disabled={inputDisabled}

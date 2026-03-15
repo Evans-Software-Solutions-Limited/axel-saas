@@ -1289,6 +1289,9 @@ describe("Chat onboarding integration", () => {
 
       expect((input as HTMLInputElement).disabled).toBe(true);
       expect((button as HTMLButtonElement).disabled).toBe(true);
+      expect((input as HTMLInputElement).placeholder).toMatch(
+        /agent setup failed/i,
+      );
     });
 
     it("stops polling and shows error when poll returns failed during provisioning", async () => {
