@@ -50,17 +50,16 @@ async function getStripeCustomerIdForUser(
 
 export const stripeHandler = new Elysia({ name: "StripeHandler" })
   .post("/stripe/create-checkout-session", async ({ body, headers, set }) => {
-    // Get user from context (injected by supabaseAuth middleware)
     const authHeader = headers.authorization;
     if (!authHeader?.startsWith("Bearer ")) {
       set.status = 401;
-      return { received: false };
+      return { error: "Unauthorized" };
     }
 
     const { tier } = body as { tier: string };
     if (!["starter", "pro", "business", "developer"].includes(tier)) {
       set.status = 400;
-      return { received: false };
+      return { error: "Invalid tier" };
     }
 
     const priceMap: Record<string, string> = {
@@ -73,11 +72,53 @@ export const stripeHandler = new Elysia({ name: "StripeHandler" })
     const priceId = priceMap[tier];
     if (!priceId) {
       set.status = 500;
-      return { received: false };
+      return { error: "Price not configured for tier" };
     }
 
-    set.status = 500;
-    return { received: false };
+    const authUser = await getAuthUser(authHeader);
+    if (!authUser) {
+      set.status = 401;
+      return { error: "Unauthorized" };
+    }
+
+    const dbUser = await userRepository.getUserBySupabaseId(authUser.sub);
+    if (!dbUser) {
+      set.status = 404;
+      return { error: "User not found" };
+    }
+
+    const stripe = getStripeInstance();
+    const db = getDb();
+    const subRepo = new SubscriptionRepository(db);
+
+    const existingSub = await subRepo.findByUserId(dbUser.id);
+    let stripeCustomerId = existingSub?.stripeCustomerId ?? null;
+
+    if (!stripeCustomerId) {
+      const customer = await stripe.customers.create({
+        email: dbUser.email,
+        ...(dbUser.fullName && { name: dbUser.fullName }),
+        metadata: { userId: dbUser.id, supabaseUserId: authUser.sub },
+      });
+      stripeCustomerId = customer.id;
+    }
+
+    const webUrl = process.env.VITE_WEB_URL || "http://localhost:5173";
+    const session = await stripe.checkout.sessions.create({
+      mode: "subscription",
+      customer: stripeCustomerId,
+      line_items: [{ price: priceId, quantity: 1 }],
+      metadata: { userId: dbUser.id, tier },
+      success_url: `${webUrl}/dashboard?checkout=success`,
+      cancel_url: `${webUrl}/subscribe?checkout=cancelled`,
+    });
+
+    if (!session.url) {
+      set.status = 500;
+      return { error: "Checkout session URL unavailable" };
+    }
+
+    return { url: session.url };
   })
   .post("/stripe/webhook", async ({ body, headers, set }) => {
     const sig = headers["stripe-signature"];

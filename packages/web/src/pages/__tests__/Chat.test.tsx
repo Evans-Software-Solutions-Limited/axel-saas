@@ -14,7 +14,11 @@ import {
   postOnboardingMessage,
   OnboardingAlreadyCompleteError,
 } from "../chat/onboardingApi";
-import { getAgentStatus, postChatMessage } from "../chat/chatApi";
+import {
+  getAgentStatus,
+  postChatMessage,
+  SubscriptionRequiredError,
+} from "../chat/chatApi";
 import { useAuth } from "@/hooks/useAuth";
 
 const navigateMock = vi.fn();
@@ -59,6 +63,12 @@ vi.mock("../chat/onboardingApi", () => ({
 vi.mock("../chat/chatApi", () => ({
   getAgentStatus: vi.fn(),
   postChatMessage: vi.fn(),
+  SubscriptionRequiredError: class SubscriptionRequiredError extends Error {
+    constructor() {
+      super("subscription_required");
+      this.name = "SubscriptionRequiredError";
+    }
+  },
 }));
 
 describe("Chat onboarding integration", () => {
@@ -1054,6 +1064,56 @@ describe("Chat onboarding integration", () => {
 
       // Should show generic error
       expect(await screen.findByText("Failed to send message")).toBeDefined();
+    });
+
+    it("redirects to /subscribe when postChatMessage returns 402", async () => {
+      vi.mocked(getAgentStatus).mockResolvedValue({
+        success: true,
+        status: "active",
+      });
+
+      vi.mocked(postChatMessage).mockRejectedValue(
+        new SubscriptionRequiredError(),
+      );
+
+      render(
+        <MemoryRouter>
+          <Chat />
+        </MemoryRouter>,
+      );
+
+      expect(await screen.findByText("Chat")).toBeDefined();
+
+      fireEvent.change(screen.getByPlaceholderText(/ask axel to help/i), {
+        target: { value: "Hello" },
+      });
+      fireEvent.click(screen.getByRole("button"));
+
+      await waitFor(() => {
+        expect(navigateMock).toHaveBeenCalledWith("/subscribe");
+      });
+
+      // Should not show an error banner
+      expect(screen.queryByText("subscription_required")).toBeNull();
+    });
+  });
+
+  describe("subscription_required redirect", () => {
+    it("redirects to /subscribe when agent status is subscription_required", async () => {
+      vi.mocked(getAgentStatus).mockResolvedValue({
+        success: true,
+        status: "subscription_required",
+      });
+
+      render(
+        <MemoryRouter>
+          <Chat />
+        </MemoryRouter>,
+      );
+
+      await waitFor(() => {
+        expect(navigateMock).toHaveBeenCalledWith("/subscribe");
+      });
     });
   });
 });

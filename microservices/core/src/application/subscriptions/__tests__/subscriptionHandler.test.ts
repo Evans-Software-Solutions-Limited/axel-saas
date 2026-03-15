@@ -27,6 +27,58 @@ vi.mock("@axel-saas/api-utils/auth/supabaseAuth", () => {
   };
 });
 
+// Mock Stripe
+const mockSessionCreate = vi
+  .fn()
+  .mockResolvedValue({ url: "https://checkout.stripe.com/pay/cs_test_sub" });
+const mockCustomerCreate = vi.fn().mockResolvedValue({ id: "cus_sub_test" });
+
+vi.mock("stripe", () => ({
+  default: vi.fn().mockImplementation(() => ({
+    checkout: { sessions: { create: mockSessionCreate } },
+    customers: { create: mockCustomerCreate },
+  })),
+}));
+
+vi.mock("@axel-saas/db", () => ({
+  getDb: vi.fn(() => ({})),
+  subscriptionStatusEnum: {
+    enumValues: ["active", "trialing", "past_due", "cancelled", "incomplete"],
+  },
+}));
+
+const { mockFindByUserId, mockFindBySupabaseId } = vi.hoisted(() => ({
+  mockFindByUserId: vi.fn().mockResolvedValue(null),
+  mockFindBySupabaseId: vi.fn().mockResolvedValue({
+    id: "db-user-id",
+    email: "test@example.com",
+    fullName: "Test User",
+    supabaseUserId: "test-user-id",
+  }),
+}));
+
+vi.mock("../../repositories/subscriptionRepository", () => ({
+  SubscriptionRepository: vi.fn().mockImplementation(() => ({
+    findByUserId: mockFindByUserId,
+  })),
+}));
+
+vi.mock("../../repositories/userRepository", () => ({
+  UserRepository: vi.fn().mockImplementation(() => ({
+    findBySupabaseId: mockFindBySupabaseId,
+  })),
+  userRepository: {
+    getUserBySupabaseId: vi.fn(),
+  },
+}));
+
+vi.stubEnv("STRIPE_SECRET_KEY", "sk_test_sub_123");
+vi.stubEnv("STRIPE_PRICE_STARTER", "price_starter_sub");
+vi.stubEnv("STRIPE_PRICE_PRO", "price_pro_sub");
+vi.stubEnv("STRIPE_PRICE_BUSINESS", "price_business_sub");
+vi.stubEnv("STRIPE_PRICE_DEVELOPER", "price_developer_sub");
+vi.stubEnv("VITE_WEB_URL", "http://localhost:5173");
+
 import {
   subscriptionHandler,
   subscriptionPublicHandler,
@@ -35,6 +87,17 @@ import {
 describe("SubscriptionHandler", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockSessionCreate.mockResolvedValue({
+      url: "https://checkout.stripe.com/pay/cs_test_sub",
+    });
+    mockCustomerCreate.mockResolvedValue({ id: "cus_sub_test" });
+    mockFindByUserId.mockResolvedValue(null);
+    mockFindBySupabaseId.mockResolvedValue({
+      id: "db-user-id",
+      email: "test@example.com",
+      fullName: "Test User",
+      supabaseUserId: "test-user-id",
+    });
   });
 
   describe("subscriptionPublicHandler instance", () => {
@@ -215,9 +278,7 @@ describe("SubscriptionHandler", () => {
       const result = await subscriptionHandler.handle(
         new Request("http://localhost/subscriptions/checkout", {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ tierId: "starter" }),
         }),
       );
@@ -225,7 +286,7 @@ describe("SubscriptionHandler", () => {
       expect(result.status).toBe(401);
     });
 
-    it("should accept checkout request with valid tier", async () => {
+    it("should create a Stripe checkout session and return URL for starter tier", async () => {
       const result = await subscriptionHandler.handle(
         new Request("http://localhost/subscriptions/checkout", {
           method: "POST",
@@ -238,17 +299,12 @@ describe("SubscriptionHandler", () => {
       );
 
       expect(result.status).toBe(200);
-      const json = (await result.json()) as {
-        success: boolean;
-        tierId: string;
-        userId: string;
-      };
+      const json = (await result.json()) as { success: boolean; url: string };
       expect(json.success).toBe(true);
-      expect(json.tierId).toBe("starter");
-      expect(json.userId).toBe("test-user-id");
+      expect(json.url).toBe("https://checkout.stripe.com/pay/cs_test_sub");
     });
 
-    it("should accept pro tier", async () => {
+    it("should create a Stripe checkout session and return URL for pro tier", async () => {
       const result = await subscriptionHandler.handle(
         new Request("http://localhost/subscriptions/checkout", {
           method: "POST",
@@ -260,11 +316,13 @@ describe("SubscriptionHandler", () => {
         }),
       );
 
-      const json = (await result.json()) as { tierId: string };
-      expect(json.tierId).toBe("pro");
+      expect(result.status).toBe(200);
+      const json = (await result.json()) as { success: boolean; url: string };
+      expect(json.success).toBe(true);
+      expect(typeof json.url).toBe("string");
     });
 
-    it("should accept business tier", async () => {
+    it("should create a Stripe checkout session and return URL for business tier", async () => {
       const result = await subscriptionHandler.handle(
         new Request("http://localhost/subscriptions/checkout", {
           method: "POST",
@@ -276,11 +334,13 @@ describe("SubscriptionHandler", () => {
         }),
       );
 
-      const json = (await result.json()) as { tierId: string };
-      expect(json.tierId).toBe("business");
+      expect(result.status).toBe(200);
+      const json = (await result.json()) as { success: boolean; url: string };
+      expect(json.success).toBe(true);
+      expect(typeof json.url).toBe("string");
     });
 
-    it("should accept developer tier", async () => {
+    it("should create a Stripe checkout session and return URL for developer tier", async () => {
       const result = await subscriptionHandler.handle(
         new Request("http://localhost/subscriptions/checkout", {
           method: "POST",
@@ -292,11 +352,33 @@ describe("SubscriptionHandler", () => {
         }),
       );
 
-      const json = (await result.json()) as { tierId: string };
-      expect(json.tierId).toBe("developer");
+      expect(result.status).toBe(200);
+      const json = (await result.json()) as { success: boolean; url: string };
+      expect(json.success).toBe(true);
+      expect(typeof json.url).toBe("string");
     });
 
-    it("should include user sub in response", async () => {
+    it("should return 400 for an invalid tier", async () => {
+      const result = await subscriptionHandler.handle(
+        new Request("http://localhost/subscriptions/checkout", {
+          method: "POST",
+          headers: {
+            authorization: "Bearer test_token",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ tierId: "invalid_tier" }),
+        }),
+      );
+
+      expect(result.status).toBe(400);
+    });
+
+    it("should reuse existing Stripe customer when subscription exists", async () => {
+      mockFindByUserId.mockResolvedValue({
+        id: "sub-id",
+        stripeCustomerId: "cus_existing_456",
+      });
+
       const result = await subscriptionHandler.handle(
         new Request("http://localhost/subscriptions/checkout", {
           method: "POST",
@@ -308,9 +390,11 @@ describe("SubscriptionHandler", () => {
         }),
       );
 
-      const json = (await result.json()) as { userId: string };
-      expect(json.userId).toBeDefined();
-      expect(typeof json.userId).toBe("string");
+      expect(result.status).toBe(200);
+      expect(mockCustomerCreate).not.toHaveBeenCalled();
+      expect(mockSessionCreate).toHaveBeenCalledWith(
+        expect.objectContaining({ customer: "cus_existing_456" }),
+      );
     });
   });
 
@@ -339,6 +423,145 @@ describe("SubscriptionHandler", () => {
       expect(subscriptionPublicHandler).toBeDefined();
       expect(subscriptionHandler).toBeDefined();
       expect(subscriptionPublicHandler).not.toEqual(subscriptionHandler);
+    });
+
+    it("should have GET /subscriptions/status route", () => {
+      const statusRoute = subscriptionHandler.routes.find(
+        (r) => r.method === "GET" && r.path === "/subscriptions/status",
+      );
+      expect(statusRoute).toBeDefined();
+    });
+  });
+
+  describe("GET /subscriptions/status (protected)", () => {
+    it("should return 401 without authorization", async () => {
+      const result = await subscriptionHandler.handle(
+        new Request("http://localhost/subscriptions/status", {
+          method: "GET",
+        }),
+      );
+      expect(result.status).toBe(401);
+    });
+
+    it("should return null subscription when user has no subscription", async () => {
+      mockFindByUserId.mockResolvedValue(null);
+
+      const result = await subscriptionHandler.handle(
+        new Request("http://localhost/subscriptions/status", {
+          method: "GET",
+          headers: { authorization: "Bearer test_token" },
+        }),
+      );
+
+      expect(result.status).toBe(200);
+      const json = (await result.json()) as {
+        success: boolean;
+        subscription: null;
+      };
+      expect(json.success).toBe(true);
+      expect(json.subscription).toBeNull();
+    });
+
+    it("should return subscription data when subscription exists", async () => {
+      const mockSub = {
+        id: "sub-123",
+        userId: "db-user-id",
+        stripeCustomerId: "cus_test",
+        stripeSubscriptionId: "sub_test",
+        tier: "pro" as const,
+        status: "active" as const,
+        currentPeriodEnd: new Date("2026-04-01"),
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      mockFindByUserId.mockResolvedValue(mockSub);
+
+      const result = await subscriptionHandler.handle(
+        new Request("http://localhost/subscriptions/status", {
+          method: "GET",
+          headers: { authorization: "Bearer test_token" },
+        }),
+      );
+
+      expect(result.status).toBe(200);
+      const json = (await result.json()) as {
+        success: boolean;
+        subscription: { tier: string; status: string };
+      };
+      expect(json.success).toBe(true);
+      expect(json.subscription?.tier).toBe("pro");
+      expect(json.subscription?.status).toBe("active");
+    });
+
+    it("should return 404 when user not found", async () => {
+      mockFindBySupabaseId.mockResolvedValue(null);
+
+      const result = await subscriptionHandler.handle(
+        new Request("http://localhost/subscriptions/status", {
+          method: "GET",
+          headers: { authorization: "Bearer test_token" },
+        }),
+      );
+
+      expect(result.status).toBe(404);
+    });
+  });
+
+  describe("POST /subscriptions/checkout error branches", () => {
+    it("should return 500 when price is not configured for tier", async () => {
+      // Simulate missing price env var
+      vi.stubEnv("STRIPE_PRICE_PRO", "");
+
+      const result = await subscriptionHandler.handle(
+        new Request("http://localhost/subscriptions/checkout", {
+          method: "POST",
+          headers: {
+            authorization: "Bearer test_token",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ tierId: "pro" }),
+        }),
+      );
+
+      expect(result.status).toBe(500);
+      vi.stubEnv("STRIPE_PRICE_PRO", "price_pro_sub");
+    });
+
+    it("should return 404 when user not found in checkout", async () => {
+      mockFindBySupabaseId.mockResolvedValue(null);
+
+      const result = await subscriptionHandler.handle(
+        new Request("http://localhost/subscriptions/checkout", {
+          method: "POST",
+          headers: {
+            authorization: "Bearer test_token",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ tierId: "pro" }),
+        }),
+      );
+
+      expect(result.status).toBe(404);
+    });
+
+    it("should return 500 when Stripe returns null session URL", async () => {
+      mockSessionCreate.mockResolvedValue({ url: null });
+
+      const result = await subscriptionHandler.handle(
+        new Request("http://localhost/subscriptions/checkout", {
+          method: "POST",
+          headers: {
+            authorization: "Bearer test_token",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ tierId: "starter" }),
+        }),
+      );
+
+      expect(result.status).toBe(500);
+      const json = (await result.json()) as { success: boolean; error: string };
+      expect(json.success).toBe(false);
+      expect(json.error).toMatch(/checkout URL/i);
     });
   });
 });

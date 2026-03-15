@@ -1,18 +1,16 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { describe, it, expect, vi } from "vitest";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { Subscribe } from "../Subscribe";
+import { createCheckoutSession } from "../subscribeApi";
 
-const mockNavigate = vi.fn();
-vi.mock("react-router", async (importActual) => {
-  const actual = await importActual<typeof import("react-router")>();
-  return { ...actual, useNavigate: () => mockNavigate };
-});
+vi.mock("../subscribeApi", () => ({
+  createCheckoutSession: vi
+    .fn()
+    .mockResolvedValue({ url: "https://checkout.stripe.com/pay/cs_test" }),
+}));
 
 describe("Subscribe", () => {
-  beforeEach(() => {
-    mockNavigate.mockClear();
-  });
   it("renders pricing plans", () => {
     render(
       <MemoryRouter>
@@ -20,7 +18,7 @@ describe("Subscribe", () => {
       </MemoryRouter>,
     );
     expect(screen.getByText("Starter")).toBeDefined();
-    expect(screen.getByText("Professional")).toBeDefined();
+    expect(screen.getByText("Pro")).toBeDefined();
     expect(screen.getByText("Business")).toBeDefined();
     expect(screen.getByText("Enterprise")).toBeDefined();
   });
@@ -31,12 +29,13 @@ describe("Subscribe", () => {
         <Subscribe />
       </MemoryRouter>,
     );
-    expect(screen.getByText(/£29/)).toBeDefined();
-    expect(screen.getByText(/£79/)).toBeDefined();
+    expect(screen.getByText(/£19/)).toBeDefined();
+    expect(screen.getByText(/£49/)).toBeDefined();
+    expect(screen.getByText(/£99/)).toBeDefined();
     expect(screen.getByText(/£149/)).toBeDefined();
   });
 
-  it("shows Recommended badge on Professional plan", () => {
+  it("shows Recommended badge on Pro plan", () => {
     render(
       <MemoryRouter>
         <Subscribe />
@@ -66,30 +65,43 @@ describe("Subscribe", () => {
     expect(screen.getByRole("button", { name: "Contact sales" })).toBeDefined();
   });
 
-  it("navigates to root redirect when a non-Enterprise plan is selected", () => {
+  it("Contact sales button is clickable without error", () => {
     render(
       <MemoryRouter>
         <Subscribe />
       </MemoryRouter>,
     );
-    const getStarted = screen.getAllByRole("button", {
-      name: "Get started",
-    })[0];
-    fireEvent.click(getStarted);
-    expect(mockNavigate).toHaveBeenCalledWith("/");
-    expect(mockNavigate).not.toHaveBeenCalledWith("/onboarding");
+    // Clicking Contact sales should not throw; jsdom doesn't support window.location.assign spying
+    expect(() =>
+      fireEvent.click(screen.getByRole("button", { name: "Contact sales" })),
+    ).not.toThrow();
   });
 
-  it("calls handleSelectPlan when Contact sales is clicked", () => {
-    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+  it("clicking Get started calls createCheckoutSession with the plan tier", async () => {
     render(
       <MemoryRouter>
         <Subscribe />
       </MemoryRouter>,
     );
-    fireEvent.click(screen.getByRole("button", { name: "Contact sales" }));
-    expect(logSpy).toHaveBeenCalledWith("Enterprise plan inquiry");
-    logSpy.mockRestore();
+    fireEvent.click(screen.getAllByRole("button", { name: "Get started" })[0]);
+    await waitFor(() => {
+      expect(createCheckoutSession).toHaveBeenCalledWith("starter");
+    });
+  });
+
+  it("shows error message when createCheckoutSession rejects", async () => {
+    vi.mocked(createCheckoutSession).mockRejectedValueOnce(
+      new Error("Stripe unavailable"),
+    );
+    render(
+      <MemoryRouter>
+        <Subscribe />
+      </MemoryRouter>,
+    );
+    fireEvent.click(screen.getAllByRole("button", { name: "Get started" })[0]);
+    await waitFor(() => {
+      expect(screen.getByText("Stripe unavailable")).toBeDefined();
+    });
   });
 
   it("renders FAQ section", () => {

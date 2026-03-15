@@ -5,6 +5,28 @@ interface MockAuthContext {
   set: { status?: number };
 }
 
+// Mock db before any imports that use it
+vi.mock("@axel-saas/db", () => ({
+  getDb: vi.fn(() => ({})),
+  subscriptionStatusEnum: {
+    enumValues: ["active", "trialing", "past_due", "cancelled", "incomplete"],
+  },
+}));
+
+// Mock repositories to prevent getDb() call at module load
+vi.mock("../../repositories/userRepository", () => ({
+  UserRepository: vi.fn().mockImplementation(() => ({
+    findBySupabaseId: vi.fn().mockResolvedValue(null),
+  })),
+  userRepository: { getUserBySupabaseId: vi.fn() },
+}));
+
+vi.mock("../../repositories/subscriptionRepository", () => ({
+  SubscriptionRepository: vi.fn().mockImplementation(() => ({
+    findByUserId: vi.fn().mockResolvedValue(null),
+  })),
+}));
+
 // Mock auth
 vi.mock("@axel-saas/api-utils/auth/supabaseAuth", () => ({
   getAuthUser: vi.fn(async (authHeader: string | undefined) => {

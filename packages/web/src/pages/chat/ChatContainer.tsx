@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { useNavigate } from "react-router";
 import { useAuth } from "@/hooks/useAuth";
 import {
   getOnboardingState,
@@ -7,7 +8,12 @@ import {
   completeOnboarding as completeOnboardingApi,
   type OnboardingMessage,
 } from "./onboardingApi";
-import { getAgentStatus, postChatMessage, type ChatMessage } from "./chatApi";
+import {
+  getAgentStatus,
+  postChatMessage,
+  SubscriptionRequiredError,
+  type ChatMessage,
+} from "./chatApi";
 import { ChatPresenter } from "./ChatPresenter";
 
 const toOptimisticOnboardingMessage = (content: string): OnboardingMessage => ({
@@ -35,6 +41,7 @@ export function ChatContainer() {
   const [nextQuestion, setNextQuestion] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const { setOnboardingCompleted, refreshOnboardingStatus } = useAuth();
+  const navigate = useNavigate();
 
   // Call the onboarding complete endpoint and switch to live mode
   const handleCompleteOnboarding = useCallback(async () => {
@@ -70,6 +77,15 @@ export function ChatContainer() {
       } catch {
         // getAgentStatus throws for new users - that's fine, fall through to onboarding
         // This is expected when user hasn't completed onboarding yet
+      }
+
+      // Redirect to subscribe if payment is required
+      if (
+        agentStatus?.success &&
+        agentStatus.status === "subscription_required"
+      ) {
+        navigate("/subscribe");
+        return;
       }
 
       // Determine whether the live agent is already active.
@@ -111,7 +127,7 @@ export function ChatContainer() {
     } finally {
       setIsLoadingState(false);
     }
-  }, [setOnboardingCompleted, refreshOnboardingStatus]);
+  }, [navigate, setOnboardingCompleted, refreshOnboardingStatus]);
 
   useEffect(() => {
     void loadState();
@@ -177,6 +193,10 @@ export function ChatContainer() {
 
       setMessages((current) => [...current, assistantMessage]);
     } catch (sendError) {
+      if (sendError instanceof SubscriptionRequiredError) {
+        navigate("/subscribe");
+        return;
+      }
       const message =
         sendError instanceof Error
           ? sendError.message
@@ -186,7 +206,7 @@ export function ChatContainer() {
     } finally {
       setIsSending(false);
     }
-  }, [chatMode, input, isSending]);
+  }, [chatMode, input, isSending, navigate]);
 
   const handleSend = useCallback(() => {
     if (chatMode === "onboarding") {

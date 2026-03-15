@@ -114,10 +114,6 @@ jobs:
       - name: Unit tests with coverage
         run: bun run test:unit
 
-      - name: Check coverage thresholds
-        run: |
-          # Check if coverage meets minimum thresholds
-          echo "Checking coverage thresholds..."
-          # For now, we'll just ensure tests pass
-          # In future, we can add specific coverage threshold checks
-          echo "✓ Coverage check passed"
+      # Coverage thresholds (90% lines/functions/branches/statements) are
+      # enforced by vitest itself via microservices/core/vitest.config.ts.
+      # The test:unit step above exits non-zero if any threshold is missed.
