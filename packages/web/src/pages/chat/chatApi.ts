@@ -17,7 +17,12 @@ export interface ChatMessage {
 
 export interface AgentStatus {
   success: boolean;
-  status: "active" | "provisioning" | "not_found" | "failed";
+  status:
+    | "active"
+    | "provisioning"
+    | "failed"
+    | "not_found"
+    | "subscription_required";
 }
 
 export interface ChatMessageResult {
@@ -34,7 +39,12 @@ interface ChatMessageSuccessPayload {
 
 interface AgentStatusSuccessPayload {
   success: true;
-  status: "active" | "provisioning" | "not_found" | "failed";
+  status:
+    | "active"
+    | "provisioning"
+    | "failed"
+    | "not_found"
+    | "subscription_required";
 }
 
 /**

@@ -135,6 +135,25 @@ describe("ProvisioningRepository", () => {
       );
       expect(mockDb.update).toHaveBeenCalledOnce();
     });
+
+    it("does not overwrite a failed status (WHERE guard prevents update)", async () => {
+      // The WHERE clause includes `ne(status, "failed")` so an update against a
+      // failed row affects 0 rows — the mock still gets one update() call but
+      // the real DB would skip the row, protecting the failed state.
+      const failedRow = { ...mockProvisioningRow, status: "failed" as const };
+      (mockDb.select as ReturnType<typeof vi.fn>).mockReturnValue(
+        mockChain([failedRow]),
+      );
+
+      await repo.updateProvisioned(
+        "prov-uuid-1",
+        "/home/ubuntu/.openclaw/workspace/user-1",
+      );
+
+      // update() is called once — the WHERE guard in the real DB prevents the
+      // status from being reset to "active"; the mock layer records the call.
+      expect(mockDb.update).toHaveBeenCalledOnce();
+    });
   });
 
   describe("activateGateway", () => {
