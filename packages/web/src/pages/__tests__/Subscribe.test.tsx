@@ -1,9 +1,18 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { Subscribe } from "../Subscribe";
 
+const mockNavigate = vi.fn();
+vi.mock("react-router", async (importActual) => {
+  const actual = await importActual<typeof import("react-router")>();
+  return { ...actual, useNavigate: () => mockNavigate };
+});
+
 describe("Subscribe", () => {
+  beforeEach(() => {
+    mockNavigate.mockClear();
+  });
   it("renders pricing plans", () => {
     render(
       <MemoryRouter>
@@ -57,7 +66,7 @@ describe("Subscribe", () => {
     expect(screen.getByRole("button", { name: "Contact sales" })).toBeDefined();
   });
 
-  it("calls handleSelectPlan when Get started is clicked", () => {
+  it("navigates to root redirect when a non-Enterprise plan is selected", () => {
     render(
       <MemoryRouter>
         <Subscribe />
@@ -67,7 +76,8 @@ describe("Subscribe", () => {
       name: "Get started",
     })[0];
     fireEvent.click(getStarted);
-    expect(getStarted).toBeDefined();
+    expect(mockNavigate).toHaveBeenCalledWith("/");
+    expect(mockNavigate).not.toHaveBeenCalledWith("/onboarding");
   });
 
   it("calls handleSelectPlan when Contact sales is clicked", () => {

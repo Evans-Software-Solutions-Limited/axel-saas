@@ -78,8 +78,8 @@ export function Subscribe() {
       // Handle Enterprise inquiry
       console.log("Enterprise plan inquiry");
     } else {
-      // Proceed to onboarding after selecting plan
-      navigate("/onboarding");
+      // Proceed to root redirect after selecting plan (routes to chat or dashboard based on onboarding state)
+      navigate("/");
     }
   };
 
