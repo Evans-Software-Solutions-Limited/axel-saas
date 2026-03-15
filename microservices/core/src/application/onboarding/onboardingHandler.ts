@@ -193,6 +193,22 @@ export const onboardingHandler = new Elysia({ name: "OnboardingHandler" })
           };
         }
 
+        // Guard the window between processMessage returning isComplete=true
+        // (which stamps onboardingState.status="completed" via markCompleted)
+        // and the client calling /users/onboarding/complete (which sets
+        // users.onboardingCompleted=true after writing workspace files).
+        // In that window dbUser.onboardingCompleted is still false, so without
+        // this check a duplicate message would reach processMessage, throw an
+        // Error, and degrade from a clean 409 into a generic 500.
+        const existingState = await onboardingRepository.getState(dbUser.id);
+        if (existingState?.status === "completed") {
+          set.status = 409;
+          return {
+            success: false,
+            error: "Onboarding already completed for this user",
+          };
+        }
+
         const result = await onboardingRepository.processMessage(
           dbUser.id,
           body.message,
