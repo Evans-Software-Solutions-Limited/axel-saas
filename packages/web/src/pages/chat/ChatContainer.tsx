@@ -13,8 +13,8 @@ import {
   SubscriptionRequiredError,
   type ChatMessage,
 } from "./chatApi";
-import { createCheckoutSession } from "../subscribeApi";
 import { getRecommendedPlan, type Recommendation } from "../planRecommendation";
+import { useCheckoutSelection } from "@/hooks/useCheckoutSelection";
 import { ChatPresenter } from "./ChatPresenter";
 
 const toOptimisticOnboardingMessage = (content: string): OnboardingMessage => ({
@@ -49,11 +49,12 @@ export function ChatContainer() {
   const [chatMode, setChatMode] = useState<ChatMode>("loading");
   const [nextQuestion, setNextQuestion] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [discoveryLoadingTier, setDiscoveryLoadingTier] = useState<
-    string | null
-  >(null);
-  const [discoveryError, setDiscoveryError] = useState<string | null>(null);
   const [recommendation] = useState<Recommendation>(getRecommendedPlan);
+  const {
+    loadingTier: discoveryLoadingTier,
+    error: discoveryError,
+    handleSelectPlan: handleDiscoverySelectPlan,
+  } = useCheckoutSelection();
   const pollingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mountedRef = useRef(true);
   // Incremented on every new poll chain start and on unmount cleanup.
@@ -331,27 +332,6 @@ export function ChatContainer() {
       void handleLiveSend();
     }
   }, [chatMode, handleOnboardingSend, handleLiveSend]);
-
-  const handleDiscoverySelectPlan = useCallback(
-    async (tierId: string | null) => {
-      if (!tierId) {
-        window.location.assign("mailto:sales@axel.ai");
-        return;
-      }
-      setDiscoveryError(null);
-      setDiscoveryLoadingTier(tierId);
-      try {
-        const { url } = await createCheckoutSession(tierId);
-        window.location.assign(url);
-      } catch (err) {
-        setDiscoveryError(
-          err instanceof Error ? err.message : "Failed to start checkout",
-        );
-        setDiscoveryLoadingTier(null);
-      }
-    },
-    [],
-  );
 
   const isDiscoveryMode = chatMode === "discovery";
   const isOnboardingMode = chatMode === "onboarding";

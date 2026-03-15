@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -9,32 +8,13 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { IconCheck } from "@tabler/icons-react";
-import { createCheckoutSession } from "./subscribeApi";
 import { PLANS, getRecommendedPlan } from "./planRecommendation";
+import { useCheckoutSelection } from "@/hooks/useCheckoutSelection";
 
 const recommendation = getRecommendedPlan();
 
 export function Subscribe() {
-  const [loadingTier, setLoadingTier] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  const handleSelectPlan = async (tierId: string | null) => {
-    if (!tierId) {
-      // Enterprise — contact sales
-      window.location.assign("mailto:sales@axel.ai");
-      return;
-    }
-
-    setError(null);
-    setLoadingTier(tierId);
-    try {
-      const { url } = await createCheckoutSession(tierId);
-      window.location.assign(url);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to start checkout");
-      setLoadingTier(null);
-    }
-  };
+  const { loadingTier, error, handleSelectPlan } = useCheckoutSelection();
 
   return (
     <div className="min-h-screen bg-surface p-6">
