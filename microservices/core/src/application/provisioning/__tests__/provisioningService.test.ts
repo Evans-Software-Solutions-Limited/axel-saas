@@ -54,18 +54,33 @@ describe("triggerContainerLaunch", () => {
   });
 
   describe("status progression", () => {
-    it("advances provisioning_state status to 'provisioning'", async () => {
+    it("advances provisioning_state status to 'provisioning' when webhook URL is set", async () => {
+      vi.stubEnv(
+        "PROVISIONING_WEBHOOK_URL",
+        "https://provisioner.internal/launch",
+      );
       const repo = makeRepo({
         findByUserId: vi.fn().mockResolvedValue(PROV),
       });
+      global.fetch = vi.fn().mockResolvedValue({ ok: true });
 
-      // No webhook URL set — no-op after status update
       await triggerContainerLaunch(repo, PARAMS);
 
       expect(repo.updateStatus).toHaveBeenCalledWith(
         "prov-id-1",
         "provisioning",
       );
+    });
+
+    it("does NOT advance status when PROVISIONING_WEBHOOK_URL is unset (dev no-webhook mode)", async () => {
+      const repo = makeRepo({
+        findByUserId: vi.fn().mockResolvedValue(PROV),
+      });
+
+      await triggerContainerLaunch(repo, PARAMS);
+
+      // Status must remain "pending" — never gets stuck at "provisioning"
+      expect(repo.updateStatus).not.toHaveBeenCalled();
     });
 
     it("no-ops when status is already active (idempotency / webhook replay)", async () => {
@@ -84,7 +99,7 @@ describe("triggerContainerLaunch", () => {
   });
 
   describe("when PROVISIONING_WEBHOOK_URL is not set", () => {
-    it("no-ops without calling fetch", async () => {
+    it("no-ops without calling fetch or mutating status", async () => {
       const repo = makeRepo({
         findByUserId: vi.fn().mockResolvedValue(PROV),
       });
@@ -92,6 +107,7 @@ describe("triggerContainerLaunch", () => {
       await triggerContainerLaunch(repo, PARAMS);
 
       expect(global.fetch).not.toHaveBeenCalled();
+      expect(repo.updateStatus).not.toHaveBeenCalled();
     });
 
     it("resolves successfully", async () => {

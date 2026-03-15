@@ -35,16 +35,19 @@ export async function triggerContainerLaunch(
     return;
   }
 
-  // Advance status to "provisioning" so the UI can show a loading state
-  await provisioningRepo.updateStatus(prov.id, "provisioning");
-
   const webhookUrl = process.env.PROVISIONING_WEBHOOK_URL;
   if (!webhookUrl) {
+    // Dev/test: no orchestrator configured. Leave status at "pending" so the
+    // state is inspectable and never gets stuck at "provisioning" indefinitely.
     console.log(
       `[provisioning] PROVISIONING_WEBHOOK_URL not set — skipping container launch for user ${params.userId}`,
     );
     return;
   }
+
+  // Advance status to "provisioning" so the UI can show a loading state.
+  // Only do this when we are actually about to fire the webhook.
+  await provisioningRepo.updateStatus(prov.id, "provisioning");
 
   const secret = process.env.PROVISIONING_WEBHOOK_SECRET;
 
