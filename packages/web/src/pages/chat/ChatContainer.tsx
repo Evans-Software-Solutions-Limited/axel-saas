@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router";
 import { useAuth } from "@/hooks/useAuth";
 import {
   getOnboardingState,
@@ -14,6 +13,8 @@ import {
   SubscriptionRequiredError,
   type ChatMessage,
 } from "./chatApi";
+import { getRecommendedPlan, type Recommendation } from "../planRecommendation";
+import { useCheckoutSelection } from "@/hooks/useCheckoutSelection";
 import { ChatPresenter } from "./ChatPresenter";
 
 const toOptimisticOnboardingMessage = (content: string): OnboardingMessage => ({
@@ -30,7 +31,13 @@ const toOptimisticChatMessage = (content: string): ChatMessage => ({
   createdAt: new Date().toISOString(),
 });
 
-type ChatMode = "loading" | "onboarding" | "provisioning" | "live" | "failed";
+type ChatMode =
+  | "loading"
+  | "discovery"
+  | "onboarding"
+  | "provisioning"
+  | "live"
+  | "failed";
 
 const PROVISIONING_POLL_INTERVAL_MS = 3000;
 
@@ -42,6 +49,12 @@ export function ChatContainer() {
   const [chatMode, setChatMode] = useState<ChatMode>("loading");
   const [nextQuestion, setNextQuestion] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [recommendation] = useState<Recommendation>(getRecommendedPlan);
+  const {
+    loadingTier: discoveryLoadingTier,
+    error: discoveryError,
+    handleSelectPlan: handleDiscoverySelectPlan,
+  } = useCheckoutSelection();
   const pollingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mountedRef = useRef(true);
   // Incremented on every new poll chain start and on unmount cleanup.
@@ -49,7 +62,6 @@ export function ChatContainer() {
   // and stops if the current value no longer matches, preventing duplicate chains.
   const pollingGenerationRef = useRef(0);
   const { setOnboardingCompleted, refreshOnboardingStatus } = useAuth();
-  const navigate = useNavigate();
 
   // Poll agent status until it becomes active, then switch to live mode.
   // A generation counter ensures that only one chain runs at a time: each call
@@ -144,14 +156,16 @@ export function ChatContainer() {
         // This is expected when user hasn't completed onboarding yet
       }
 
-      // Redirect to subscribe if payment is required.
+      // Show the discovery panel if subscription is required.
       // GET /users/me/agent returns this when the subscription is missing or
       // in a non-active/trialing state — it is not a phantom value.
+      // We keep the user in chat rather than navigating away so the plan
+      // recommendation can be shown with context.
       if (
         agentStatus?.success &&
         agentStatus.status === "subscription_required"
       ) {
-        navigate("/subscribe");
+        setChatMode("discovery");
         return;
       }
 
@@ -215,12 +229,7 @@ export function ChatContainer() {
     } finally {
       setIsLoadingState(false);
     }
-  }, [
-    navigate,
-    setOnboardingCompleted,
-    refreshOnboardingStatus,
-    startProvisioningPoll,
-  ]);
+  }, [setOnboardingCompleted, refreshOnboardingStatus, startProvisioningPoll]);
 
   useEffect(() => {
     void loadState();
@@ -301,7 +310,8 @@ export function ChatContainer() {
       setMessages((current) => [...current, assistantMessage]);
     } catch (sendError) {
       if (sendError instanceof SubscriptionRequiredError) {
-        navigate("/subscribe");
+        setMessages((current) => current.slice(0, -1));
+        setChatMode("discovery");
         return;
       }
       const message =
@@ -313,7 +323,7 @@ export function ChatContainer() {
     } finally {
       setIsSending(false);
     }
-  }, [chatMode, input, isSending, navigate]);
+  }, [chatMode, input, isSending]);
 
   const handleSend = useCallback(() => {
     if (chatMode === "onboarding") {
@@ -323,6 +333,7 @@ export function ChatContainer() {
     }
   }, [chatMode, handleOnboardingSend, handleLiveSend]);
 
+  const isDiscoveryMode = chatMode === "discovery";
   const isOnboardingMode = chatMode === "onboarding";
   const isProvisioningMode = chatMode === "provisioning";
   const isFailedMode = chatMode === "failed";
@@ -333,11 +344,16 @@ export function ChatContainer() {
       input={input}
       isLoadingState={isLoadingState}
       isSending={isSending}
+      isDiscoveryMode={isDiscoveryMode}
       isOnboardingMode={isOnboardingMode}
       isProvisioningMode={isProvisioningMode}
       isFailedMode={isFailedMode}
       nextQuestion={nextQuestion}
       error={error}
+      discoveryRecommendation={recommendation}
+      discoveryLoadingTier={discoveryLoadingTier}
+      discoveryError={discoveryError}
+      onDiscoverySelectPlan={handleDiscoverySelectPlan}
       onInputChange={setInput}
       onSend={() => {
         void handleSend();

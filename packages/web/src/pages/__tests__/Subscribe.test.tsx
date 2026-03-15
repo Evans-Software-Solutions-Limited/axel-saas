@@ -35,13 +35,18 @@ describe("Subscribe", () => {
     expect(screen.getByText(/£149/)).toBeDefined();
   });
 
-  it("shows Recommended badge on Pro plan", () => {
+  it("shows recommendation badge with explicit reason on Pro plan", () => {
     render(
       <MemoryRouter>
         <Subscribe />
       </MemoryRouter>,
     );
-    expect(screen.getByText("Recommended")).toBeDefined();
+    // Badge shows a short, meaningful label — never just "Recommended"
+    expect(screen.getByText("Best starting point")).toBeDefined();
+    // Full reason text is shown below the badge
+    expect(
+      screen.getByText(/covers calendar, email, and task automation/i),
+    ).toBeDefined();
   });
 
   it("renders Get started for non-Enterprise plans", () => {

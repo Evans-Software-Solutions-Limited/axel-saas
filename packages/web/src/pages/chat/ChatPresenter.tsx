@@ -3,6 +3,8 @@ import { IconSend } from "@tabler/icons-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { OnboardingMessage } from "./onboardingApi";
+import { DiscoveryPanel } from "./DiscoveryPanel";
+import type { Recommendation } from "../planRecommendation";
 
 // Support both onboarding and live chat messages
 type Message = OnboardingMessage;
@@ -12,11 +14,16 @@ interface ChatPresenterProps {
   input: string;
   isLoadingState: boolean;
   isSending: boolean;
+  isDiscoveryMode: boolean;
   isOnboardingMode: boolean;
   isProvisioningMode: boolean;
   isFailedMode: boolean;
   nextQuestion: string | null;
   error: string | null;
+  discoveryRecommendation: Recommendation;
+  discoveryLoadingTier: string | null;
+  discoveryError: string | null;
+  onDiscoverySelectPlan: (tierId: string | null) => void;
   onInputChange: (value: string) => void;
   onSend: () => void;
 }
@@ -26,11 +33,16 @@ export function ChatPresenter({
   input,
   isLoadingState,
   isSending,
+  isDiscoveryMode,
   isOnboardingMode,
   isProvisioningMode,
   isFailedMode,
   nextQuestion,
   error,
+  discoveryRecommendation,
+  discoveryLoadingTier,
+  discoveryError,
+  onDiscoverySelectPlan,
   onInputChange,
   onSend,
 }: ChatPresenterProps) {
@@ -44,6 +56,7 @@ export function ChatPresenter({
     input.trim().length > 0 &&
     !isLoadingState &&
     !isSending &&
+    !isDiscoveryMode &&
     !isProvisioningMode &&
     !isFailedMode;
 
@@ -74,10 +87,11 @@ export function ChatPresenter({
       return msgContent.includes(coreNextQuestion);
     });
 
-  // Input is disabled during loading, when already sending, when provisioning, failed, or when there's an error
+  // Input is disabled during loading, when already sending, when in discovery/provisioning/failed, or when there's an error
   const inputDisabled =
     isLoadingState ||
     isSending ||
+    isDiscoveryMode ||
     isProvisioningMode ||
     isFailedMode ||
     error !== null;
@@ -86,18 +100,29 @@ export function ChatPresenter({
     <div className="h-full flex flex-col p-6">
       <div className="mb-4">
         <p className="text-xs uppercase tracking-wide text-muted">
-          {isOnboardingMode
-            ? "Onboarding mode"
-            : isProvisioningMode
-              ? "Setting up"
-              : isFailedMode
-                ? "Setup failed"
-                : "Chat"}
+          {isDiscoveryMode
+            ? "Choose your plan"
+            : isOnboardingMode
+              ? "Onboarding mode"
+              : isProvisioningMode
+                ? "Setting up"
+                : isFailedMode
+                  ? "Setup failed"
+                  : "Chat"}
         </p>
       </div>
 
       <div className="flex-1 overflow-y-auto mb-4 space-y-4">
         {isLoadingState && <p className="text-sm text-muted">Loading...</p>}
+
+        {isDiscoveryMode && (
+          <DiscoveryPanel
+            recommendation={discoveryRecommendation}
+            onSelectPlan={onDiscoverySelectPlan}
+            loadingTier={discoveryLoadingTier}
+            error={discoveryError}
+          />
+        )}
 
         {isProvisioningMode && (
           <p className="text-sm text-muted">
@@ -149,13 +174,15 @@ export function ChatPresenter({
             if (e.key === "Enter") onSend();
           }}
           placeholder={
-            isOnboardingMode
-              ? "Answer Axel's question..."
-              : isProvisioningMode
-                ? "Setting up your agent..."
-                : isFailedMode
-                  ? "Agent setup failed — chat unavailable"
-                  : "Ask Axel to help..."
+            isDiscoveryMode
+              ? "Pick a plan above to get started"
+              : isOnboardingMode
+                ? "Answer Axel's question..."
+                : isProvisioningMode
+                  ? "Setting up your agent..."
+                  : isFailedMode
+                    ? "Agent setup failed — chat unavailable"
+                    : "Ask Axel to help..."
           }
           className="bg-surface-raised border-border text-text"
           disabled={inputDisabled}
