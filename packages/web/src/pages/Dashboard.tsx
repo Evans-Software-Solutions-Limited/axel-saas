@@ -67,12 +67,16 @@ export function Dashboard() {
   const location = useLocation();
   const { onboardingCompleted } = useAuth();
 
-  // Pre-onboarding users are locked to Chat tab only
+  // Pre-onboarding users are locked to Chat tab only.
+  // Preserve the query string so post-checkout params (?checkout=success) survive.
   useEffect(() => {
     if (!onboardingCompleted && location.pathname !== "/dashboard/chat") {
-      navigate("/dashboard/chat", { replace: true });
+      navigate(
+        { pathname: "/dashboard/chat", search: location.search },
+        { replace: true },
+      );
     }
-  }, [onboardingCompleted, location.pathname, navigate]);
+  }, [onboardingCompleted, location.pathname, location.search, navigate]);
 
   const handleLogout = () => {
     // In a real app, this would call the auth logout

@@ -14,6 +14,7 @@ interface ChatPresenterProps {
   input: string;
   isLoadingState: boolean;
   isSending: boolean;
+  isConfirmingPaymentMode: boolean;
   isDiscoveryMode: boolean;
   isOnboardingMode: boolean;
   isProvisioningMode: boolean;
@@ -33,6 +34,7 @@ export function ChatPresenter({
   input,
   isLoadingState,
   isSending,
+  isConfirmingPaymentMode,
   isDiscoveryMode,
   isOnboardingMode,
   isProvisioningMode,
@@ -56,6 +58,7 @@ export function ChatPresenter({
     input.trim().length > 0 &&
     !isLoadingState &&
     !isSending &&
+    !isConfirmingPaymentMode &&
     !isDiscoveryMode &&
     !isProvisioningMode &&
     !isFailedMode;
@@ -87,10 +90,11 @@ export function ChatPresenter({
       return msgContent.includes(coreNextQuestion);
     });
 
-  // Input is disabled during loading, when already sending, when in discovery/provisioning/failed, or when there's an error
+  // Input is disabled during loading, when already sending, when in confirming-payment/discovery/provisioning/failed, or when there's an error
   const inputDisabled =
     isLoadingState ||
     isSending ||
+    isConfirmingPaymentMode ||
     isDiscoveryMode ||
     isProvisioningMode ||
     isFailedMode ||
@@ -100,20 +104,29 @@ export function ChatPresenter({
     <div className="h-full flex flex-col p-6">
       <div className="mb-4">
         <p className="text-xs uppercase tracking-wide text-muted">
-          {isDiscoveryMode
-            ? "Choose your plan"
-            : isOnboardingMode
-              ? "Onboarding mode"
-              : isProvisioningMode
-                ? "Setting up"
-                : isFailedMode
-                  ? "Setup failed"
-                  : "Chat"}
+          {isConfirmingPaymentMode
+            ? "Payment confirmed"
+            : isDiscoveryMode
+              ? "Choose your plan"
+              : isOnboardingMode
+                ? "Onboarding mode"
+                : isProvisioningMode
+                  ? "Setting up"
+                  : isFailedMode
+                    ? "Setup failed"
+                    : "Chat"}
         </p>
       </div>
 
       <div className="flex-1 overflow-y-auto mb-4 space-y-4">
         {isLoadingState && <p className="text-sm text-muted">Loading...</p>}
+
+        {isConfirmingPaymentMode && (
+          <p className="text-sm text-muted">
+            Payment confirmed. Activating your workspace — this usually takes
+            just a moment...
+          </p>
+        )}
 
         {isDiscoveryMode && (
           <DiscoveryPanel
@@ -174,15 +187,17 @@ export function ChatPresenter({
             if (e.key === "Enter") onSend();
           }}
           placeholder={
-            isDiscoveryMode
-              ? "Pick a plan above to get started"
-              : isOnboardingMode
-                ? "Answer Axel's question..."
-                : isProvisioningMode
-                  ? "Setting up your agent..."
-                  : isFailedMode
-                    ? "Agent setup failed — chat unavailable"
-                    : "Ask Axel to help..."
+            isConfirmingPaymentMode
+              ? "Activating your workspace..."
+              : isDiscoveryMode
+                ? "Pick a plan above to get started"
+                : isOnboardingMode
+                  ? "Answer Axel's question..."
+                  : isProvisioningMode
+                    ? "Setting up your agent..."
+                    : isFailedMode
+                      ? "Agent setup failed — chat unavailable"
+                      : "Ask Axel to help..."
           }
           className="bg-surface-raised border-border text-text"
           disabled={inputDisabled}

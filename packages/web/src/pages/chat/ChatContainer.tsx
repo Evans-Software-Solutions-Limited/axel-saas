@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useSearchParams } from "react-router";
 import { useAuth } from "@/hooks/useAuth";
 import {
   getOnboardingState,
@@ -33,6 +34,7 @@ const toOptimisticChatMessage = (content: string): ChatMessage => ({
 
 type ChatMode =
   | "loading"
+  | "confirming-payment"
   | "discovery"
   | "onboarding"
   | "provisioning"
@@ -40,6 +42,8 @@ type ChatMode =
   | "failed";
 
 const PROVISIONING_POLL_INTERVAL_MS = 3000;
+// How many times to retry before giving up while confirming payment (~60 s total)
+const CONFIRMING_PAYMENT_MAX_RETRIES = 20;
 
 export function ChatContainer() {
   const [messages, setMessages] = useState<OnboardingMessage[]>([]);
@@ -55,8 +59,15 @@ export function ChatContainer() {
     error: discoveryError,
     handleSelectPlan: handleDiscoverySelectPlan,
   } = useCheckoutSelection();
+  const [searchParams, setSearchParams] = useSearchParams();
+  // Captured once on mount — true when user just returned from Stripe checkout.
+  // Using a ref avoids re-renders and ensures the flag is consumed exactly once.
+  const postCheckoutRef = useRef(searchParams.get("checkout") === "success");
   const pollingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mountedRef = useRef(true);
+  // Always points to the latest loadState — used by startConfirmingPaymentPoll
+  // to call back into loadState without creating a circular useCallback dependency.
+  const loadStateRef = useRef<() => Promise<void>>(async () => {});
   // Incremented on every new poll chain start and on unmount cleanup.
   // Each in-progress poll iteration captures its generation at creation time
   // and stops if the current value no longer matches, preventing duplicate chains.
@@ -92,6 +103,53 @@ export function ChatContainer() {
         }
       } catch {
         // Ignore poll errors and retry
+      }
+      if (!mountedRef.current || pollingGenerationRef.current !== generation)
+        return;
+      pollingTimerRef.current = setTimeout(() => {
+        void poll();
+      }, PROVISIONING_POLL_INTERVAL_MS);
+    };
+    void poll();
+  }, []);
+
+  // Poll after checkout success: wait until the Stripe webhook has activated the
+  // subscription (i.e. status is no longer "subscription_required"), then re-run
+  // the normal loadState flow to hand off into onboarding / provisioning / live.
+  const startConfirmingPaymentPoll = useCallback(() => {
+    pollingGenerationRef.current += 1;
+    const generation = pollingGenerationRef.current;
+    let retries = 0;
+
+    const poll = async () => {
+      if (!mountedRef.current || pollingGenerationRef.current !== generation)
+        return;
+      try {
+        const agentStatus = await getAgentStatus();
+        if (!mountedRef.current || pollingGenerationRef.current !== generation)
+          return;
+        if (
+          agentStatus.success &&
+          agentStatus.status !== "subscription_required"
+        ) {
+          // Subscription is now active — re-run the full state load via ref
+          // to avoid a circular useCallback dependency on loadState.
+          // postCheckoutRef is already false so we won't loop back here.
+          void loadStateRef.current();
+          return;
+        }
+      } catch {
+        // Ignore transient errors and retry
+      }
+      retries += 1;
+      if (retries >= CONFIRMING_PAYMENT_MAX_RETRIES) {
+        if (mountedRef.current && pollingGenerationRef.current === generation) {
+          setChatMode("failed");
+          setError(
+            "We could not confirm your payment. Please refresh the page or contact support.",
+          );
+        }
+        return;
       }
       if (!mountedRef.current || pollingGenerationRef.current !== generation)
         return;
@@ -165,6 +223,17 @@ export function ChatContainer() {
         agentStatus?.success &&
         agentStatus.status === "subscription_required"
       ) {
+        // If the user just returned from Stripe checkout, the webhook may not
+        // have processed yet. Poll silently until the subscription activates
+        // instead of dropping them back into the plan-selection discovery panel.
+        if (postCheckoutRef.current) {
+          postCheckoutRef.current = false;
+          // Strip the ?checkout=success param so refresh doesn't re-trigger.
+          setSearchParams({}, { replace: true });
+          setChatMode("confirming-payment");
+          startConfirmingPaymentPoll();
+          return;
+        }
         setChatMode("discovery");
         return;
       }
@@ -229,7 +298,17 @@ export function ChatContainer() {
     } finally {
       setIsLoadingState(false);
     }
-  }, [setOnboardingCompleted, refreshOnboardingStatus, startProvisioningPoll]);
+  }, [
+    setOnboardingCompleted,
+    refreshOnboardingStatus,
+    startProvisioningPoll,
+    startConfirmingPaymentPoll,
+    setSearchParams,
+  ]);
+
+  // Keep the ref current on every render so startConfirmingPaymentPoll always
+  // calls back into the latest version of loadState without a circular dep.
+  loadStateRef.current = loadState;
 
   useEffect(() => {
     void loadState();
@@ -333,6 +412,7 @@ export function ChatContainer() {
     }
   }, [chatMode, handleOnboardingSend, handleLiveSend]);
 
+  const isConfirmingPaymentMode = chatMode === "confirming-payment";
   const isDiscoveryMode = chatMode === "discovery";
   const isOnboardingMode = chatMode === "onboarding";
   const isProvisioningMode = chatMode === "provisioning";
@@ -344,6 +424,7 @@ export function ChatContainer() {
       input={input}
       isLoadingState={isLoadingState}
       isSending={isSending}
+      isConfirmingPaymentMode={isConfirmingPaymentMode}
       isDiscoveryMode={isDiscoveryMode}
       isOnboardingMode={isOnboardingMode}
       isProvisioningMode={isProvisioningMode}
