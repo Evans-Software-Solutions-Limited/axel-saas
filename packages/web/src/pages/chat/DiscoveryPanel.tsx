@@ -36,7 +36,7 @@ export function DiscoveryPanel({
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {PLANS.map((plan) => {
           const isRecommended = plan.tierId === recommendation.tierId;
-          const isLoading = loadingTier === plan.tierId;
+          const isLoading = plan.tierId !== null && loadingTier === plan.tierId;
 
           return (
             <div

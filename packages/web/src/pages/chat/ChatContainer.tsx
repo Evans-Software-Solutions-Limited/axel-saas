@@ -309,6 +309,7 @@ export function ChatContainer() {
       setMessages((current) => [...current, assistantMessage]);
     } catch (sendError) {
       if (sendError instanceof SubscriptionRequiredError) {
+        setMessages((current) => current.slice(0, -1));
         setChatMode("discovery");
         return;
       }

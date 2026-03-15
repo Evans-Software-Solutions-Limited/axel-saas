@@ -124,6 +124,20 @@ describe("DiscoveryPanel", () => {
     expect(screen.getByText("Checkout failed")).toBeDefined();
   });
 
+  it("does not show Redirecting on Enterprise button when loadingTier is null", () => {
+    render(
+      <DiscoveryPanel
+        recommendation={recommendation}
+        onSelectPlan={vi.fn()}
+        loadingTier={null}
+        error={null}
+      />,
+    );
+    // Enterprise has tierId: null — its button must never say "Redirecting..."
+    expect(screen.queryByText("Redirecting...")).toBeNull();
+    expect(screen.getByRole("button", { name: "Contact sales" })).toBeDefined();
+  });
+
   it("calls onSelectPlan with null for Enterprise Contact sales", () => {
     const onSelectPlan = vi.fn();
     render(

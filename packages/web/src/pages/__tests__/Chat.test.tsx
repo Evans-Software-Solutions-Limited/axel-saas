@@ -1779,5 +1779,37 @@ describe("Chat onboarding integration", () => {
       // Should not show an error banner for subscription errors
       expect(screen.queryByText("subscription_required")).toBeNull();
     });
+
+    it("removes the optimistic user message when SubscriptionRequiredError is thrown", async () => {
+      vi.mocked(getAgentStatus).mockResolvedValue({
+        success: true,
+        status: "active",
+      });
+
+      vi.mocked(postChatMessage).mockRejectedValue(
+        new SubscriptionRequiredError(),
+      );
+
+      render(
+        <MemoryRouter>
+          <Chat />
+        </MemoryRouter>,
+      );
+
+      expect(await screen.findByText("Chat")).toBeDefined();
+
+      fireEvent.change(screen.getByPlaceholderText(/ask axel to help/i), {
+        target: { value: "Hello" },
+      });
+      fireEvent.click(screen.getByRole("button"));
+
+      // Discovery panel appears
+      await waitFor(() => {
+        expect(screen.getByText("Choose your plan")).toBeDefined();
+      });
+
+      // The unsent optimistic message must NOT appear in the transcript
+      expect(screen.queryByText("Hello")).toBeNull();
+    });
   });
 });
