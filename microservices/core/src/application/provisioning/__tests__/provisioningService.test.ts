@@ -1,5 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { triggerContainerLaunch } from "../provisioningService";
+import {
+  triggerContainerLaunch,
+  resolveWorkspacePath,
+} from "../provisioningService";
 import type { ProvisioningRepository } from "../../repositories/provisioningRepository";
 
 // Minimal mock of ProvisioningRepository
@@ -40,6 +43,27 @@ const PARAMS = {
 beforeEach(() => {
   vi.unstubAllEnvs();
   global.fetch = vi.fn();
+});
+
+describe("resolveWorkspacePath", () => {
+  it("uses /tmp/workspace root when WORKSPACE_PATH is not set", () => {
+    expect(resolveWorkspacePath("user-abc")).toBe(
+      "/tmp/workspace/user-abc/workspace",
+    );
+  });
+
+  it("uses WORKSPACE_PATH env var as root when set", () => {
+    vi.stubEnv("WORKSPACE_PATH", "/mnt/efs");
+    expect(resolveWorkspacePath("user-abc")).toBe(
+      "/mnt/efs/user-abc/workspace",
+    );
+  });
+
+  it("produces the same path for the same userId regardless of call site", () => {
+    vi.stubEnv("WORKSPACE_PATH", "/mnt/efs");
+    const userId = "user-123";
+    expect(resolveWorkspacePath(userId)).toBe(resolveWorkspacePath(userId));
+  });
 });
 
 describe("triggerContainerLaunch", () => {

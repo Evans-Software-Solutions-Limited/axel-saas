@@ -1,5 +1,20 @@
 import { ProvisioningRepository } from "../repositories/provisioningRepository";
 
+/**
+ * Derive the workspace path for a user.
+ *
+ * Production: uses WORKSPACE_PATH env var as the root (e.g. an EFS mount).
+ * Development/test: falls back to /tmp/workspace so the stack can run without
+ * a real mount.
+ *
+ * Both onboarding and Stripe checkout paths must use this function so the path
+ * is always constructed identically.
+ */
+export function resolveWorkspacePath(userId: string): string {
+  const root = process.env.WORKSPACE_PATH ?? "/tmp/workspace";
+  return `${root}/${userId}/workspace`;
+}
+
 export interface ContainerLaunchParams {
   userId: string;
   tier: string;

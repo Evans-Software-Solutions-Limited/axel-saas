@@ -9,7 +9,10 @@ import {
 import { SubscriptionRepository } from "../repositories/subscriptionRepository";
 import { ProvisioningRepository } from "../repositories/provisioningRepository";
 import { userRepository } from "../repositories/userRepository";
-import { triggerContainerLaunch } from "../provisioning/provisioningService";
+import {
+  triggerContainerLaunch,
+  resolveWorkspacePath,
+} from "../provisioning/provisioningService";
 
 function getStripeInstance() {
   const secretKey = process.env.STRIPE_SECRET_KEY;
@@ -176,9 +179,7 @@ export const stripeHandler = new Elysia({ name: "StripeHandler" })
 
         // Trigger container launch (best-effort — webhook failure does not
         // block the payment confirmation response to Stripe)
-        const workspacePath = process.env.WORKSPACE_PATH
-          ? `${process.env.WORKSPACE_PATH}/${metadata.userId}/workspace`
-          : `/tmp/workspace/${metadata.userId}/workspace`;
+        const workspacePath = resolveWorkspacePath(metadata.userId);
 
         triggerContainerLaunch(provRepo, {
           userId: metadata.userId,

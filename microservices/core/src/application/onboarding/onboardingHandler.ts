@@ -16,6 +16,7 @@ import {
 } from "../workspace/workspaceGenerator";
 import { ProvisioningRepository } from "../repositories/provisioningRepository";
 import { SubscriptionRepository } from "../repositories/subscriptionRepository";
+import { resolveWorkspacePath } from "../provisioning/provisioningService";
 
 // Create instances for use in handler
 const provisioningRepo = new ProvisioningRepository();
@@ -348,9 +349,7 @@ export const onboardingHandler = new Elysia({ name: "OnboardingHandler" })
         }
 
         // Determine workspace path - in production this would be EFS
-        const workspacePath = process.env.WORKSPACE_PATH
-          ? `${process.env.WORKSPACE_PATH}/${dbUser.id}/workspace`
-          : `/tmp/workspace/${dbUser.id}/workspace`;
+        const workspacePath = resolveWorkspacePath(dbUser.id);
 
         // Write workspace files
         await writeWorkspaceFiles(workspacePath, workspaceFiles);
