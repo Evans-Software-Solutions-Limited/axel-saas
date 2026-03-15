@@ -58,6 +58,13 @@ export function ChatContainer() {
           setMessages([]);
           return;
         }
+        if (
+          agentStatus.success &&
+          agentStatus.status === "subscription_required"
+        ) {
+          navigate("/subscribe");
+          return;
+        }
       } catch {
         // Ignore poll errors and retry
       }
@@ -67,7 +74,7 @@ export function ChatContainer() {
       }, PROVISIONING_POLL_INTERVAL_MS);
     };
     void poll();
-  }, []);
+  }, [navigate]);
 
   // Call the onboarding complete endpoint and switch to live or provisioning mode
   const handleCompleteOnboarding = useCallback(async () => {

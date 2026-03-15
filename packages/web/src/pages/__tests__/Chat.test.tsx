@@ -1088,6 +1088,43 @@ describe("Chat onboarding integration", () => {
       }
     });
 
+    it("redirects to /subscribe and stops polling when subscription_required is returned during poll", async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+
+      try {
+        // Call 1 (loadState): provisioning
+        // Call 2 (immediate poll): subscription_required → should redirect and stop
+        vi.mocked(getAgentStatus)
+          .mockResolvedValueOnce({ success: true, status: "provisioning" })
+          .mockResolvedValueOnce({
+            success: true,
+            status: "subscription_required",
+          });
+
+        render(
+          <MemoryRouter>
+            <Chat />
+          </MemoryRouter>,
+        );
+
+        await screen.findByText("Setting up");
+
+        await waitFor(() => {
+          expect(navigateMock).toHaveBeenCalledWith("/subscribe");
+        });
+
+        // Advance well past the poll interval to confirm no further polling
+        await act(async () => {
+          vi.advanceTimersByTime(10000);
+        });
+
+        // Only the two calls before the terminal status should have occurred
+        expect(getAgentStatus).toHaveBeenCalledTimes(2);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
     it("enters provisioning mode after completing onboarding when agent is provisioning", async () => {
       vi.useFakeTimers({ shouldAdvanceTime: true });
 
