@@ -144,6 +144,17 @@ export function ChatContainer() {
         // This is expected when user hasn't completed onboarding yet
       }
 
+      // Redirect to subscribe if payment is required.
+      // GET /users/me/agent returns this when the subscription is missing or
+      // in a non-active/trialing state — it is not a phantom value.
+      if (
+        agentStatus?.success &&
+        agentStatus.status === "subscription_required"
+      ) {
+        navigate("/subscribe");
+        return;
+      }
+
       // Determine whether the live agent is already active.
       const agentActive =
         agentStatus?.success && agentStatus.status === "active";
@@ -204,7 +215,12 @@ export function ChatContainer() {
     } finally {
       setIsLoadingState(false);
     }
-  }, [setOnboardingCompleted, refreshOnboardingStatus, startProvisioningPoll]);
+  }, [
+    navigate,
+    setOnboardingCompleted,
+    refreshOnboardingStatus,
+    startProvisioningPoll,
+  ]);
 
   useEffect(() => {
     void loadState();
