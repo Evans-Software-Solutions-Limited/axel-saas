@@ -29,6 +29,12 @@ export async function triggerContainerLaunch(
     );
   }
 
+  // Idempotency guard: a replayed webhook must not regress an already-active
+  // container back to "provisioning".
+  if (prov.status === "active") {
+    return;
+  }
+
   // Advance status to "provisioning" so the UI can show a loading state
   await provisioningRepo.updateStatus(prov.id, "provisioning");
 

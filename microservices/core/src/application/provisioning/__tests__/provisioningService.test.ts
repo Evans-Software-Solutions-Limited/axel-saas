@@ -67,6 +67,20 @@ describe("triggerContainerLaunch", () => {
         "provisioning",
       );
     });
+
+    it("no-ops when status is already active (idempotency / webhook replay)", async () => {
+      const activeProv = { ...PROV, status: "active" as const };
+      const repo = makeRepo({
+        findByUserId: vi.fn().mockResolvedValue(activeProv),
+      });
+
+      await expect(
+        triggerContainerLaunch(repo, PARAMS),
+      ).resolves.toBeUndefined();
+
+      expect(repo.updateStatus).not.toHaveBeenCalled();
+      expect(global.fetch).not.toHaveBeenCalled();
+    });
   });
 
   describe("when PROVISIONING_WEBHOOK_URL is not set", () => {

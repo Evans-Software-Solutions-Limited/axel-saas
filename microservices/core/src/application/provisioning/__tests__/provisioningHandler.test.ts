@@ -47,12 +47,25 @@ describe("provisioningHandler POST /provisioning/register", () => {
   });
 
   describe("auth checks", () => {
-    it("returns 503 when PROVISIONING_SECRET env var is not set", async () => {
+    it("returns 503 when PROVISIONING_SECRET is unset and NODE_ENV=production", async () => {
+      vi.stubEnv("NODE_ENV", "production");
       const res = await provisioningHandler.handle(makeRequest(VALID_BODY));
       expect(res.status).toBe(503);
       const data = (await res.json()) as Record<string, unknown>;
       expect(data.success).toBe(false);
       expect(data.error).toMatch(/not configured/i);
+    });
+
+    it("skips secret check when PROVISIONING_SECRET is unset and NODE_ENV is not production", async () => {
+      vi.stubEnv("NODE_ENV", "development");
+      mockFindByUserId.mockResolvedValue({ id: "prov-1", userId: "user-1" });
+      mockActivateGateway.mockResolvedValue(undefined);
+
+      // No secret header — should still reach business logic and succeed
+      const res = await provisioningHandler.handle(makeRequest(VALID_BODY));
+      expect(res.status).toBe(200);
+      const data = (await res.json()) as Record<string, unknown>;
+      expect(data.success).toBe(true);
     });
 
     it("returns 401 when X-Provisioning-Secret header is absent", async () => {
