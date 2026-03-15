@@ -12,6 +12,7 @@ import {
   getAgentStatus,
   postChatMessage,
   SubscriptionRequiredError,
+  type AgentStatus,
   type ChatMessage,
 } from "./chatApi";
 import { getRecommendedPlan, type Recommendation } from "../planRecommendation";
@@ -31,6 +32,22 @@ const toOptimisticChatMessage = (content: string): ChatMessage => ({
   content,
   createdAt: new Date().toISOString(),
 });
+
+// Wraps the backend handoff greeting in a message object so the first thing the
+// user sees in live mode is Axel introducing the transition, not an empty window.
+const buildHandoffMessages = (
+  greeting: string | undefined,
+): OnboardingMessage[] => {
+  if (!greeting) return [];
+  return [
+    {
+      id: `handoff-${Date.now()}`,
+      role: "assistant",
+      content: greeting,
+      createdAt: new Date().toISOString(),
+    },
+  ];
+};
 
 type ChatMode =
   | "loading"
@@ -90,8 +107,8 @@ export function ChatContainer() {
         if (!mountedRef.current || pollingGenerationRef.current !== generation)
           return;
         if (agentStatus.success && agentStatus.status === "active") {
+          setMessages(buildHandoffMessages(agentStatus.handoffGreeting));
           setChatMode("live");
-          setMessages([]);
           return;
         }
         if (agentStatus.success && agentStatus.status === "failed") {
@@ -170,7 +187,7 @@ export function ChatContainer() {
       await refreshOnboardingStatus();
 
       // Check whether the agent is already active or still provisioning
-      let agentStatus: { success: boolean; status: string } | null = null;
+      let agentStatus: AgentStatus | null = null;
       try {
         agentStatus = await getAgentStatus();
       } catch {
@@ -186,6 +203,13 @@ export function ChatContainer() {
           "Agent setup failed. Please contact support or try again later.",
         );
       } else {
+        // Only inject the greeting when the dedicated Axel is confirmed active.
+        // For not_found or error fallbacks, start with an empty chat window.
+        const greeting =
+          agentStatus?.success && agentStatus.status === "active"
+            ? agentStatus.handoffGreeting
+            : undefined;
+        setMessages(buildHandoffMessages(greeting));
         setChatMode("live");
       }
     } catch (err) {
@@ -206,7 +230,7 @@ export function ChatContainer() {
     try {
       // First check if we should be in live mode
       // Note: getAgentStatus throws for new users - we catch and fall through to onboarding
-      let agentStatus: { success: boolean; status: string } | null = null;
+      let agentStatus: AgentStatus | null = null;
       try {
         agentStatus = await getAgentStatus();
       } catch {
@@ -243,10 +267,11 @@ export function ChatContainer() {
         agentStatus?.success && agentStatus.status === "active";
 
       if (agentActive) {
-        // User has completed onboarding and has an active agent
+        // User has completed onboarding and has an active agent.
+        // Seed the chat with a handoff greeting so the transition feels
+        // intentional rather than presenting an unexplained blank window.
+        setMessages(buildHandoffMessages(agentStatus?.handoffGreeting));
         setChatMode("live");
-        // Initialize with empty messages for live chat
-        setMessages([]);
         return;
       }
 

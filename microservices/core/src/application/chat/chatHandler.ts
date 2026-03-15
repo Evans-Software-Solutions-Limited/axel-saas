@@ -31,6 +31,22 @@ export interface AgentStatusResponse {
     | "not_found"
     | "subscription_required";
   gatewayUrl?: string;
+  handoffGreeting?: string;
+}
+
+/**
+ * Generate a handoff greeting for when the user's dedicated Axel first becomes active.
+ * Uses onboarding context so Axel doesn't re-ask what it already knows.
+ */
+export function generateHandoffGreeting(
+  name: string | null,
+  goals: string | null,
+): string {
+  const addressee = name ? name : "there";
+  if (goals) {
+    return `Hey ${addressee}! Your dedicated Axel is ready. I've read your setup and I know you're working on ${goals} — what would you like to tackle first?`;
+  }
+  return `Hey ${addressee}! Your dedicated Axel is set up and ready to help. What would you like to work on?`;
 }
 
 /**
@@ -201,12 +217,28 @@ export const chatHandler = new Elysia({ name: "ChatHandler" })
           return { success: true, status: "failed" as const };
         }
 
+        const isActive =
+          container.status === "active" && !!container.gatewayUrl;
+
+        if (!isActive) {
+          return { success: true, status: "provisioning" as const };
+        }
+
+        // Build a personalised handoff greeting so the frontend can signal the
+        // transition from setup into real chat without re-asking known context.
+        const onboardingAnswers = await userRepository.getOnboardingAnswers(
+          dbUser.id,
+        );
+        const handoffName = (onboardingAnswers?.name as string | null) ?? null;
+        const handoffGoals =
+          (onboardingAnswers?.helpWith as string | null) ??
+          (onboardingAnswers?.proactiveAreas as string | null) ??
+          null;
+
         return {
           success: true,
-          status:
-            container.status === "active" && container.gatewayUrl
-              ? "active"
-              : "provisioning",
+          status: "active" as const,
+          handoffGreeting: generateHandoffGreeting(handoffName, handoffGoals),
         };
       } catch (error) {
         console.error("Get agent status error:", error);

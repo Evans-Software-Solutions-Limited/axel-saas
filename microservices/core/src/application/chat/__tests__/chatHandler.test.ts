@@ -87,8 +87,42 @@ function resetAuthMocks() {
 global.fetch = vi.fn();
 
 // Import after mocks
-import { chatHandler, generateContextualResponse } from "../chatHandler";
+import {
+  chatHandler,
+  generateContextualResponse,
+  generateHandoffGreeting,
+} from "../chatHandler";
 import { userRepository } from "../../repositories/userRepository";
+
+describe("generateHandoffGreeting", () => {
+  it("should address user by name when name is provided", () => {
+    const result = generateHandoffGreeting("Bradley", "scaling the company");
+    expect(result).toContain("Bradley");
+  });
+
+  it("should fall back to 'there' when name is null", () => {
+    const result = generateHandoffGreeting(null, "managing properties");
+    expect(result).toContain("there");
+  });
+
+  it("should include goals when provided", () => {
+    const result = generateHandoffGreeting("Alice", "growing the product");
+    expect(result).toContain("growing the product");
+  });
+
+  it("should return generic ready message when goals are null", () => {
+    const result = generateHandoffGreeting("Alice", null);
+    expect(result).toContain("Alice");
+    expect(result).not.toContain("undefined");
+    expect(result).not.toContain("null");
+  });
+
+  it("should return non-empty string for all-null inputs", () => {
+    const result = generateHandoffGreeting(null, null);
+    expect(result.length).toBeGreaterThan(0);
+    expect(result).not.toContain("null");
+  });
+});
 
 describe("generateContextualResponse", () => {
   describe("greeting responses", () => {
@@ -398,6 +432,87 @@ describe("ChatHandler", () => {
       const container = await mockGetContainerByUserId("db-user-123");
 
       expect(container).toBeNull();
+    });
+
+    it("should include handoffGreeting in active status response", async () => {
+      const mockUser = {
+        id: "db-user-123",
+        supabaseUserId: "supabase-123",
+        email: "test@example.com",
+        fullName: "Test User",
+        onboardingCompleted: true,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      const mockContainer = {
+        taskArn: "arn:aws:ecs:region:account:task/task-id",
+        status: "active",
+        gatewayUrl: "https://gateway.example.com",
+        workspacePath: "/workspace/user123",
+      };
+
+      vi.mocked(userRepository.getUserBySupabaseId).mockResolvedValue(mockUser);
+      vi.mocked(userRepository.getOnboardingAnswers).mockResolvedValue({
+        name: "Bradley",
+        helpWith: "scaling the company",
+      });
+      mockGetContainerByUserId.mockResolvedValue(mockContainer);
+
+      const result = await chatHandler.handle(
+        new Request("http://localhost/users/me/agent", {
+          method: "GET",
+          headers: { Authorization: "Bearer test-token" },
+        }),
+      );
+
+      expect(result.status).toBe(200);
+      const body = (await result.json()) as {
+        status: string;
+        handoffGreeting?: string;
+      };
+      expect(body.status).toBe("active");
+      expect(body.handoffGreeting).toBeDefined();
+      expect(typeof body.handoffGreeting).toBe("string");
+      expect(body.handoffGreeting).toContain("Bradley");
+      expect(body.handoffGreeting).toContain("scaling the company");
+    });
+
+    it("should not include handoffGreeting when status is provisioning", async () => {
+      const mockUser = {
+        id: "db-user-123",
+        supabaseUserId: "supabase-123",
+        email: "test@example.com",
+        fullName: "Test User",
+        onboardingCompleted: true,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      const mockContainer = {
+        taskArn: "arn:aws:ecs:region:account:task/task-id",
+        status: "pending",
+        gatewayUrl: null,
+        workspacePath: null,
+      };
+
+      vi.mocked(userRepository.getUserBySupabaseId).mockResolvedValue(mockUser);
+      mockGetContainerByUserId.mockResolvedValue(mockContainer);
+
+      const result = await chatHandler.handle(
+        new Request("http://localhost/users/me/agent", {
+          method: "GET",
+          headers: { Authorization: "Bearer test-token" },
+        }),
+      );
+
+      expect(result.status).toBe(200);
+      const body = (await result.json()) as {
+        status: string;
+        handoffGreeting?: string;
+      };
+      expect(body.status).toBe("provisioning");
+      expect(body.handoffGreeting).toBeUndefined();
     });
 
     it("should return failed status when container status is failed", async () => {

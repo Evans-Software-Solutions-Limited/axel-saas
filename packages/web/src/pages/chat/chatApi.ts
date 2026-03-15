@@ -23,6 +23,7 @@ export interface AgentStatus {
     | "failed"
     | "not_found"
     | "subscription_required";
+  handoffGreeting?: string;
 }
 
 export interface ChatMessageResult {
@@ -45,6 +46,7 @@ interface AgentStatusSuccessPayload {
     | "failed"
     | "not_found"
     | "subscription_required";
+  handoffGreeting?: string;
 }
 
 /**
