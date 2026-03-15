@@ -478,6 +478,92 @@ describe("ChatHandler", () => {
       expect(body.handoffGreeting).toContain("scaling the company");
     });
 
+    it("should fall through to proactiveAreas when helpWith is an empty string", async () => {
+      const mockUser = {
+        id: "db-user-123",
+        supabaseUserId: "supabase-123",
+        email: "test@example.com",
+        fullName: "Test User",
+        onboardingCompleted: true,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      const mockContainer = {
+        taskArn: "arn:aws:ecs:region:account:task/task-id",
+        status: "active",
+        gatewayUrl: "https://gateway.example.com",
+        workspacePath: "/workspace/user123",
+      };
+
+      vi.mocked(userRepository.getUserBySupabaseId).mockResolvedValue(mockUser);
+      // helpWith is empty string — should fall through to proactiveAreas
+      vi.mocked(userRepository.getOnboardingAnswers).mockResolvedValue({
+        name: "Sam",
+        helpWith: "",
+        proactiveAreas: "closing more deals",
+      });
+      mockGetContainerByUserId.mockResolvedValue(mockContainer);
+
+      const result = await chatHandler.handle(
+        new Request("http://localhost/users/me/agent", {
+          method: "GET",
+          headers: { Authorization: "Bearer test-token" },
+        }),
+      );
+
+      expect(result.status).toBe(200);
+      const body = (await result.json()) as {
+        status: string;
+        handoffGreeting?: string;
+      };
+      expect(body.status).toBe("active");
+      expect(body.handoffGreeting).toContain("closing more deals");
+    });
+
+    it("should return active status with generic greeting when onboarding lookup throws", async () => {
+      const mockUser = {
+        id: "db-user-123",
+        supabaseUserId: "supabase-123",
+        email: "test@example.com",
+        fullName: "Test User",
+        onboardingCompleted: true,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      const mockContainer = {
+        taskArn: "arn:aws:ecs:region:account:task/task-id",
+        status: "active",
+        gatewayUrl: "https://gateway.example.com",
+        workspacePath: "/workspace/user123",
+      };
+
+      vi.mocked(userRepository.getUserBySupabaseId).mockResolvedValue(mockUser);
+      vi.mocked(userRepository.getOnboardingAnswers).mockRejectedValue(
+        new Error("DB connection failed"),
+      );
+      mockGetContainerByUserId.mockResolvedValue(mockContainer);
+
+      const result = await chatHandler.handle(
+        new Request("http://localhost/users/me/agent", {
+          method: "GET",
+          headers: { Authorization: "Bearer test-token" },
+        }),
+      );
+
+      // Must not degrade to 500 — onboarding lookup is non-essential
+      expect(result.status).toBe(200);
+      const body = (await result.json()) as {
+        success: boolean;
+        status: string;
+        handoffGreeting?: string;
+      };
+      expect(body.success).toBe(true);
+      expect(body.status).toBe("active");
+      expect(typeof body.handoffGreeting).toBe("string");
+    });
+
     it("should not include handoffGreeting when status is provisioning", async () => {
       const mockUser = {
         id: "db-user-123",
