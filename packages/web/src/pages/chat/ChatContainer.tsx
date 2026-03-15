@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import { useAuth } from "@/hooks/useAuth";
 import {
@@ -30,7 +30,9 @@ const toOptimisticChatMessage = (content: string): ChatMessage => ({
   createdAt: new Date().toISOString(),
 });
 
-type ChatMode = "loading" | "onboarding" | "live";
+type ChatMode = "loading" | "onboarding" | "provisioning" | "live";
+
+const PROVISIONING_POLL_INTERVAL_MS = 3000;
 
 export function ChatContainer() {
   const [messages, setMessages] = useState<OnboardingMessage[]>([]);
@@ -40,19 +42,77 @@ export function ChatContainer() {
   const [chatMode, setChatMode] = useState<ChatMode>("loading");
   const [nextQuestion, setNextQuestion] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const pollingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const mountedRef = useRef(true);
   const { setOnboardingCompleted, refreshOnboardingStatus } = useAuth();
   const navigate = useNavigate();
 
-  // Call the onboarding complete endpoint and switch to live mode
+  // Poll agent status until it becomes active, then switch to live mode
+  const startProvisioningPoll = useCallback(() => {
+    const poll = async () => {
+      try {
+        const agentStatus = await getAgentStatus();
+        if (!mountedRef.current) return;
+        if (agentStatus.success && agentStatus.status === "active") {
+          setChatMode("live");
+          setMessages([]);
+          return;
+        }
+        if (
+          agentStatus.success &&
+          agentStatus.status === "subscription_required"
+        ) {
+          navigate("/subscribe");
+          return;
+        }
+        if (agentStatus.success && agentStatus.status === "failed") {
+          // Container launch failed — stop polling and surface the error so
+          // the user isn't silently stuck on the provisioning spinner forever.
+          setError(
+            "Agent setup failed. Please contact support or try again later.",
+          );
+          setChatMode("live");
+          return;
+        }
+      } catch {
+        // Ignore poll errors and retry
+      }
+      if (!mountedRef.current) return;
+      pollingTimerRef.current = setTimeout(() => {
+        void poll();
+      }, PROVISIONING_POLL_INTERVAL_MS);
+    };
+    void poll();
+  }, [navigate]);
+
+  // Call the onboarding complete endpoint and switch to live or provisioning mode
   const handleCompleteOnboarding = useCallback(async () => {
     try {
       // Call the backend to complete onboarding and generate workspace files
       await completeOnboardingApi();
 
-      // Switch to live mode instead of navigating away
       setOnboardingCompleted(true);
       await refreshOnboardingStatus();
-      setChatMode("live");
+
+      // Check whether the agent is already active or still provisioning
+      let agentStatus: { success: boolean; status: string } | null = null;
+      try {
+        agentStatus = await getAgentStatus();
+      } catch {
+        // If status check fails, fall back to live mode
+      }
+
+      if (agentStatus?.success && agentStatus.status === "provisioning") {
+        setChatMode("provisioning");
+        startProvisioningPoll();
+      } else if (
+        agentStatus?.success &&
+        agentStatus.status === "subscription_required"
+      ) {
+        navigate("/subscribe");
+      } else {
+        setChatMode("live");
+      }
     } catch (err) {
       // If onboarding completion fails, do NOT mark it as complete
       // The user should retry or contact support
@@ -61,7 +121,12 @@ export function ChatContainer() {
       setError(message);
       // Don't switch mode; stay in onboarding mode to allow retry
     }
-  }, [setOnboardingCompleted, refreshOnboardingStatus]);
+  }, [
+    navigate,
+    setOnboardingCompleted,
+    refreshOnboardingStatus,
+    startProvisioningPoll,
+  ]);
 
   // Load initial state - determines if onboarding or live chat
   const loadState = useCallback(async () => {
@@ -100,6 +165,30 @@ export function ChatContainer() {
         return;
       }
 
+      // If a prior container launch failed, surface the error immediately rather
+      // than showing the provisioning spinner indefinitely.
+      if (agentStatus?.success && agentStatus.status === "failed") {
+        setOnboardingCompleted(true);
+        await refreshOnboardingStatus();
+        setError(
+          "Agent setup failed. Please contact support or try again later.",
+        );
+        setChatMode("live");
+        return;
+      }
+
+      // If the agent is provisioning, show the provisioning state and poll until active
+      const agentProvisioning =
+        agentStatus?.success && agentStatus.status === "provisioning";
+
+      if (agentProvisioning) {
+        setOnboardingCompleted(true);
+        await refreshOnboardingStatus();
+        setChatMode("provisioning");
+        startProvisioningPoll();
+        return;
+      }
+
       // Check if onboarding is completed on the backend
       const result = await getOnboardingState();
 
@@ -127,11 +216,27 @@ export function ChatContainer() {
     } finally {
       setIsLoadingState(false);
     }
-  }, [navigate, setOnboardingCompleted, refreshOnboardingStatus]);
+  }, [
+    navigate,
+    setOnboardingCompleted,
+    refreshOnboardingStatus,
+    startProvisioningPoll,
+  ]);
 
   useEffect(() => {
     void loadState();
   }, [loadState]);
+
+  // Clean up any pending poll timer on unmount and guard async continuations
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      if (pollingTimerRef.current !== null) {
+        clearTimeout(pollingTimerRef.current);
+      }
+    };
+  }, []);
 
   // Handle sending messages in onboarding mode
   const handleOnboardingSend = useCallback(async () => {
@@ -217,6 +322,7 @@ export function ChatContainer() {
   }, [chatMode, handleOnboardingSend, handleLiveSend]);
 
   const isOnboardingMode = chatMode === "onboarding";
+  const isProvisioningMode = chatMode === "provisioning";
 
   return (
     <ChatPresenter
@@ -225,6 +331,7 @@ export function ChatContainer() {
       isLoadingState={isLoadingState}
       isSending={isSending}
       isOnboardingMode={isOnboardingMode}
+      isProvisioningMode={isProvisioningMode}
       nextQuestion={nextQuestion}
       error={error}
       onInputChange={setInput}
