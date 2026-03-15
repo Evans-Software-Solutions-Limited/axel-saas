@@ -96,6 +96,11 @@ export function ChatContainer() {
       if (agentStatus?.success && agentStatus.status === "provisioning") {
         setChatMode("provisioning");
         startProvisioningPoll();
+      } else if (
+        agentStatus?.success &&
+        agentStatus.status === "subscription_required"
+      ) {
+        navigate("/subscribe");
       } else {
         setChatMode("live");
       }
@@ -107,7 +112,12 @@ export function ChatContainer() {
       setError(message);
       // Don't switch mode; stay in onboarding mode to allow retry
     }
-  }, [setOnboardingCompleted, refreshOnboardingStatus, startProvisioningPoll]);
+  }, [
+    navigate,
+    setOnboardingCompleted,
+    refreshOnboardingStatus,
+    startProvisioningPoll,
+  ]);
 
   // Load initial state - determines if onboarding or live chat
   const loadState = useCallback(async () => {
