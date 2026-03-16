@@ -11,10 +11,11 @@ import { IconCheck } from "@tabler/icons-react";
 import { PLANS, getRecommendedPlan } from "./planRecommendation";
 import { useCheckoutSelection } from "@/hooks/useCheckoutSelection";
 
-const recommendation = getRecommendedPlan();
-
 export function Subscribe() {
   const { loadingTier, error, handleSelectPlan } = useCheckoutSelection();
+  // No onboarding signals available on the generic pricing page — recommendation
+  // is only shown when real user signals (from discovery/onboarding chat) exist.
+  const recommendation = getRecommendedPlan();
 
   return (
     <div className="min-h-screen bg-surface p-6">
@@ -34,12 +35,13 @@ export function Subscribe() {
       {/* Pricing Cards */}
       <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
         {PLANS.map((plan) => {
-          const isRecommended = plan.tierId === recommendation.tierId;
+          const isRecommended =
+            recommendation !== null && plan.tierId === recommendation.tierId;
 
           return (
             <Card
               key={plan.name}
-              className={`border-2 relative flex flex-col transition-all ${
+              className={`border-2 relative flex flex-col transition-all overflow-visible ${
                 isRecommended
                   ? "border-accent bg-surface-elevated"
                   : "border-border"

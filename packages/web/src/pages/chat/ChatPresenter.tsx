@@ -21,7 +21,7 @@ interface ChatPresenterProps {
   isFailedMode: boolean;
   nextQuestion: string | null;
   error: string | null;
-  discoveryRecommendation: Recommendation;
+  discoveryRecommendation: Recommendation | null;
   discoveryLoadingTier: string | null;
   discoveryError: string | null;
   onDiscoverySelectPlan: (tierId: string | null) => void;

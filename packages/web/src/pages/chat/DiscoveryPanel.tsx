@@ -4,7 +4,7 @@ import { IconCheck } from "@tabler/icons-react";
 import { PLANS, type Recommendation } from "../planRecommendation";
 
 interface DiscoveryPanelProps {
-  recommendation: Recommendation;
+  recommendation: Recommendation | null;
   onSelectPlan: (tierId: string | null) => void;
   loadingTier: string | null;
   error: string | null;
@@ -35,7 +35,8 @@ export function DiscoveryPanel({
       {/* Plan cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {PLANS.map((plan) => {
-          const isRecommended = plan.tierId === recommendation.tierId;
+          const isRecommended =
+            recommendation !== null && plan.tierId === recommendation.tierId;
           const isLoading = plan.tierId !== null && loadingTier === plan.tierId;
 
           return (

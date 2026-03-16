@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router";
 import { useAuth } from "@/hooks/useAuth";
 import {
@@ -15,7 +15,7 @@ import {
   type AgentStatus,
   type ChatMessage,
 } from "./chatApi";
-import { getRecommendedPlan, type Recommendation } from "../planRecommendation";
+import { getRecommendedPlan } from "../planRecommendation";
 import { useCheckoutSelection } from "@/hooks/useCheckoutSelection";
 import { ChatPresenter } from "./ChatPresenter";
 
@@ -70,7 +70,12 @@ export function ChatContainer() {
   const [chatMode, setChatMode] = useState<ChatMode>("loading");
   const [nextQuestion, setNextQuestion] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [recommendation] = useState<Recommendation>(getRecommendedPlan);
+  // Derive recommendation from real onboarding/chat signals. When messages is
+  // empty (new user in discovery mode) this returns null — no badge is shown.
+  const recommendation = useMemo(
+    () => getRecommendedPlan({ messages }),
+    [messages],
+  );
   const {
     loadingTier: discoveryLoadingTier,
     error: discoveryError,

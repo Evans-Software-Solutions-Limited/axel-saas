@@ -1870,7 +1870,7 @@ describe("Chat onboarding integration", () => {
       expect(navigateMock).not.toHaveBeenCalled();
     });
 
-    it("shows plan cards with recommendation in discovery mode", async () => {
+    it("shows plan cards without recommendation badge when no signals exist", async () => {
       vi.mocked(getAgentStatus).mockResolvedValue({
         success: true,
         status: "subscription_required",
@@ -1883,9 +1883,10 @@ describe("Chat onboarding integration", () => {
       );
 
       expect(await screen.findByText("Choose your plan")).toBeDefined();
-      // Recommendation badge with explicit reason is shown
-      expect(screen.getByText("Best starting point")).toBeDefined();
-      // All plan tiers are visible
+      // No prior messages → no signal-driven recommendation badge
+      expect(screen.queryByText("Best starting point")).toBeNull();
+      expect(screen.queryByText(/based on your needs/i)).toBeNull();
+      // All plan tiers are still visible
       expect(screen.getByText("Starter")).toBeDefined();
       expect(screen.getByText("Pro")).toBeDefined();
       expect(screen.getByText("Business")).toBeDefined();

@@ -16,6 +16,11 @@ export type Recommendation = {
   shortReason: string;
 };
 
+export type UserSignals = {
+  /** Messages from onboarding or chat used to derive a recommendation. */
+  messages?: { role: string; content: string }[];
+};
+
 export const PLANS: Plan[] = [
   {
     name: "Starter",
@@ -98,20 +103,101 @@ export const PLANS: Plan[] = [
   },
 ];
 
-/**
- * Returns a deterministic plan recommendation.
- *
- * Currently defaults to Pro — the tier that covers the most common use cases
- * (calendar + email + task automation) without over-specifying.
- *
- * Future: accept user signals (role, team size, feature interest) for a
- * personalised recommendation without needing AI inference.
- */
-export function getRecommendedPlan(): Recommendation {
-  return {
+// Tiers checked in priority order (most specific / highest-value first).
+const TIER_KEYWORDS: Array<{ tierId: string; keywords: string[] }> = [
+  {
+    tierId: "developer",
+    keywords: [
+      "api",
+      "code",
+      "coding",
+      "developer",
+      "script",
+      "technical",
+      "programming",
+      "exec",
+      "build",
+    ],
+  },
+  {
+    tierId: "business",
+    keywords: [
+      "team",
+      "company",
+      "organisation",
+      "organization",
+      "employees",
+      "custom channel",
+      "multiple agent",
+    ],
+  },
+  {
     tierId: "pro",
-    reason:
-      "Covers calendar, email, and task automation — the features most users need from day one.",
-    shortReason: "Best starting point",
-  };
+    keywords: [
+      "calendar",
+      "email",
+      "integration",
+      "meeting",
+      "schedule",
+      "sub-agent",
+    ],
+  },
+  {
+    tierId: "starter",
+    keywords: [
+      "simple",
+      "basic",
+      "telegram",
+      "daily brief",
+      "organised",
+      "organized",
+    ],
+  },
+];
+
+const TIER_REASONS: Record<string, { reason: string; shortReason: string }> = {
+  developer: {
+    reason: "Based on your interest in API access and code automation.",
+    shortReason: "Based on your needs",
+  },
+  business: {
+    reason: "Based on your team-scale needs.",
+    shortReason: "Based on your needs",
+  },
+  pro: {
+    reason: "Based on your calendar, email, and task automation needs.",
+    shortReason: "Based on your needs",
+  },
+  starter: {
+    reason: "A great starting point based on what you described.",
+    shortReason: "Based on your needs",
+  },
+};
+
+/**
+ * Returns a plan recommendation derived from user signals, or null when no
+ * meaningful signals are available.
+ *
+ * Accepts optional onboarding/chat messages and matches tier keywords against
+ * user message content to produce a signal-driven recommendation without AI
+ * inference. Returns null when there are no user messages to draw from — the
+ * recommendation badge is only shown when it has real context behind it.
+ */
+export function getRecommendedPlan(
+  signals?: UserSignals,
+): Recommendation | null {
+  const userMessages =
+    signals?.messages?.filter((m) => m.role === "user") ?? [];
+  if (userMessages.length === 0) return null;
+
+  const userText = userMessages.map((m) => m.content.toLowerCase()).join(" ");
+  if (!userText.trim()) return null;
+
+  for (const { tierId, keywords } of TIER_KEYWORDS) {
+    if (keywords.some((k) => userText.includes(k))) {
+      return { tierId, ...TIER_REASONS[tierId] };
+    }
+  }
+
+  return null;
 }

@@ -138,6 +138,21 @@ describe("DiscoveryPanel", () => {
     expect(screen.getByRole("button", { name: "Contact sales" })).toBeDefined();
   });
 
+  it("does not show a recommendation badge when recommendation is null", () => {
+    render(
+      <DiscoveryPanel
+        recommendation={null}
+        onSelectPlan={vi.fn()}
+        loadingTier={null}
+        error={null}
+      />,
+    );
+    expect(screen.queryByText("Best starting point")).toBeNull();
+    expect(screen.queryByText(/based on your needs/i)).toBeNull();
+    // Plans are still rendered
+    expect(screen.getByText("Pro")).toBeDefined();
+  });
+
   it("calls onSelectPlan with null for Enterprise Contact sales", () => {
     const onSelectPlan = vi.fn();
     render(
