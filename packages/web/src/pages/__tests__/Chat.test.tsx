@@ -672,6 +672,75 @@ describe("Chat onboarding integration", () => {
     });
   });
 
+  it("preserves onboarding transcript in live mode when agent is not_found after completing onboarding", async () => {
+    // Default beforeEach: getAgentStatus returns not_found
+    vi.mocked(getOnboardingState).mockResolvedValue({
+      state: {
+        id: "state-1",
+        status: "in_progress",
+        outstandingQuestions: ["channels"],
+        collectedAnswers: { name: "Bradley", role: "Founder" },
+        completedAt: null,
+        lastMessageAt: "2026-03-11T10:00:00.000Z",
+      },
+      messages: [
+        {
+          id: "m0",
+          role: "assistant",
+          content: "Which channels do you want?",
+          createdAt: "2026-03-11T10:00:00.000Z",
+        },
+      ],
+      nextQuestion: "Which channels do you want?",
+    });
+
+    vi.mocked(postOnboardingMessage).mockResolvedValue({
+      state: {
+        id: "state-1",
+        status: "completed",
+        outstandingQuestions: [],
+        collectedAnswers: {
+          name: "Bradley",
+          role: "Founder",
+          channels: "Telegram",
+        },
+        completedAt: "2026-03-11T10:10:00.000Z",
+        lastMessageAt: "2026-03-11T10:10:00.000Z",
+      },
+      messages: [
+        {
+          id: "m1",
+          role: "assistant",
+          content: "All set. You're onboarded.",
+          createdAt: "2026-03-11T10:10:00.000Z",
+        },
+      ],
+      assistantResponse: "All set. You're onboarded.",
+      isComplete: true,
+      nextQuestion: null,
+    });
+
+    render(
+      <MemoryRouter>
+        <Chat />
+      </MemoryRouter>,
+    );
+
+    await screen.findByText("Which channels do you want?");
+
+    fireEvent.change(screen.getByPlaceholderText(/answer axel's question/i), {
+      target: { value: "Telegram" },
+    });
+    fireEvent.click(screen.getByRole("button"));
+
+    // Should switch to live mode with the final onboarding message still visible
+    await waitFor(() => {
+      expect(screen.getByText("Chat")).toBeDefined();
+    });
+    // Onboarding transcript must not be wiped — user needs context in live mode
+    expect(screen.getByText("All set. You're onboarded.")).toBeDefined();
+  });
+
   it("handles 409 completed-state conflict by switching to live mode", async () => {
     vi.mocked(getOnboardingState).mockResolvedValue({
       state: {

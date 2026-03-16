@@ -203,13 +203,13 @@ export function ChatContainer() {
           "Agent setup failed. Please contact support or try again later.",
         );
       } else {
-        // Only inject the greeting when the dedicated Axel is confirmed active.
-        // For not_found or error fallbacks, start with an empty chat window.
-        const greeting =
-          agentStatus?.success && agentStatus.status === "active"
-            ? agentStatus.handoffGreeting
-            : undefined;
-        setMessages(buildHandoffMessages(greeting));
+        // When the dedicated agent is confirmed active, replace the onboarding
+        // transcript with the handoff greeting so the transition feels intentional.
+        // For not_found or error fallbacks, keep the existing messages so the user
+        // sees their onboarding context rather than a blank live-chat window.
+        if (agentStatus?.success && agentStatus.status === "active") {
+          setMessages(buildHandoffMessages(agentStatus.handoffGreeting));
+        }
         setChatMode("live");
       }
     } catch (err) {
