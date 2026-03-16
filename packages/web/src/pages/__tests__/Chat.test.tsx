@@ -942,6 +942,81 @@ describe("Chat onboarding integration", () => {
     });
   });
 
+  it("restores focus to the input after send completes", async () => {
+    vi.mocked(getOnboardingState).mockResolvedValue({
+      state: {
+        id: "state-1",
+        status: "in_progress",
+        outstandingQuestions: ["channels"],
+        collectedAnswers: { name: "Bradley", role: "Founder" },
+        completedAt: null,
+        lastMessageAt: "2026-03-11T10:00:00.000Z",
+      },
+      messages: [
+        {
+          id: "m0",
+          role: "assistant",
+          content: "Which channels do you want?",
+          createdAt: "2026-03-11T10:00:00.000Z",
+        },
+      ],
+      nextQuestion: "Which channels do you want?",
+    });
+
+    vi.mocked(postOnboardingMessage).mockResolvedValue({
+      state: {
+        id: "state-1",
+        status: "in_progress",
+        outstandingQuestions: ["role"],
+        collectedAnswers: {
+          name: "Bradley",
+          role: "Founder",
+          channels: "Telegram",
+        },
+        completedAt: null,
+        lastMessageAt: "2026-03-11T10:05:00.000Z",
+      },
+      messages: [
+        {
+          id: "m1",
+          role: "user",
+          content: "Telegram",
+          createdAt: "2026-03-11T10:04:30.000Z",
+        },
+        {
+          id: "m2",
+          role: "assistant",
+          content: "Great choice!",
+          createdAt: "2026-03-11T10:05:00.000Z",
+        },
+      ],
+      assistantResponse: "Great choice!",
+      isComplete: false,
+      nextQuestion: "What is your role?",
+    });
+
+    render(
+      <MemoryRouter>
+        <Chat />
+      </MemoryRouter>,
+    );
+
+    await screen.findByText("Which channels do you want?");
+
+    const input = screen.getByPlaceholderText(/answer axel's question/i);
+    fireEvent.change(input, { target: { value: "Telegram" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+
+    await waitFor(() => {
+      expect(postOnboardingMessage).toHaveBeenCalledWith("Telegram");
+    });
+
+    // After send completes and isSending returns to false, input must regain focus
+    await waitFor(() => {
+      expect(document.activeElement).toBe(input);
+    });
+  });
+
   describe("Provisioning mode", () => {
     it("shows provisioning state when agent status is provisioning on load", async () => {
       // Always return provisioning so the poll reschedules (not a concern for this test)
