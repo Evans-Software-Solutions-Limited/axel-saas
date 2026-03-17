@@ -175,6 +175,16 @@ const TIER_REASONS: Record<string, { reason: string; shortReason: string }> = {
 };
 
 /**
+ * Returns true when `keyword` appears in `text` at a word boundary, preventing
+ * substring false positives (e.g. "exec" matching "executive").
+ * Multi-word phrases are matched as complete boundary-delimited phrases.
+ */
+function matchesKeyword(text: string, keyword: string): boolean {
+  const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`\\b${escaped}\\b`).test(text);
+}
+
+/**
  * Returns a plan recommendation derived from user signals, or null when no
  * meaningful signals are available.
  *
@@ -194,7 +204,7 @@ export function getRecommendedPlan(
   if (!userText.trim()) return null;
 
   for (const { tierId, keywords } of TIER_KEYWORDS) {
-    if (keywords.some((k) => userText.includes(k))) {
+    if (keywords.some((k) => matchesKeyword(userText, k))) {
       return { tierId, ...TIER_REASONS[tierId] };
     }
   }

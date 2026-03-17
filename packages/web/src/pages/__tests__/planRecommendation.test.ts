@@ -37,6 +37,26 @@ describe("getRecommendedPlan", () => {
     expect(result).toBeNull();
   });
 
+  it("does not recommend developer when user mentions executive (exec false positive)", () => {
+    const result = getRecommendedPlan({
+      messages: [
+        {
+          role: "user",
+          content: "I am an executive at a large company",
+        },
+      ],
+    });
+    // "executive" contains "exec" as a substring — must not trigger developer tier
+    expect(result?.tierId).not.toBe("developer");
+  });
+
+  it("still recommends developer when user explicitly says exec", () => {
+    const result = getRecommendedPlan({
+      messages: [{ role: "user", content: "I want exec access to scripts" }],
+    });
+    expect(result?.tierId).toBe("developer");
+  });
+
   it("recommends developer when user mentions api", () => {
     const result = getRecommendedPlan({
       messages: [{ role: "user", content: "I need api access and scripting" }],

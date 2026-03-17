@@ -24,8 +24,10 @@ export function DiscoveryPanel({
       <div className="flex justify-start">
         <div className="bg-surface-raised text-text rounded-lg rounded-bl-none px-4 py-3 max-w-sm">
           <p className="text-sm">
-            To get started, pick a plan that fits how you work. I&apos;ve
-            suggested one below — but you can choose any.
+            To get started, pick a plan that fits how you work.
+            {recommendation !== null && (
+              <> I&apos;ve suggested one below — but you can choose any.</>
+            )}
           </p>
         </div>
       </div>
