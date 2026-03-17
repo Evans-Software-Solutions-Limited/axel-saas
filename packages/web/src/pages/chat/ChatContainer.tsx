@@ -87,9 +87,9 @@ export function ChatContainer() {
   const postCheckoutRef = useRef(searchParams.get("checkout") === "success");
   const pollingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mountedRef = useRef(true);
-  // Always points to the latest loadState — used by startConfirmingPaymentPoll
-  // to call back into loadState without creating a circular useCallback dependency.
-  const loadStateRef = useRef<() => Promise<void>>(async () => {});
+  // When payment-confirm poll sees subscription active, we request a reload
+  // via state so the load effect runs without a callback ref.
+  const [reloadTrigger, setReloadTrigger] = useState(0);
   // Incremented on every new poll chain start and on unmount cleanup.
   // Each in-progress poll iteration captures its generation at creation time
   // and stops if the current value no longer matches, preventing duplicate chains.
@@ -159,10 +159,9 @@ export function ChatContainer() {
           agentStatus.success &&
           agentStatus.status !== "subscription_required"
         ) {
-          // Subscription is now active — re-run the full state load via ref
-          // to avoid a circular useCallback dependency on loadState.
-          // postCheckoutRef is already false so we won't loop back here.
-          void loadStateRef.current();
+          // Subscription is now active — request a reload so the load effect
+          // runs with the latest loadState (postCheckout is already false).
+          setReloadTrigger((t) => t + 1);
           return;
         }
       } catch {
@@ -351,23 +350,30 @@ export function ChatContainer() {
     } finally {
       setIsLoadingState(false);
     }
+    // onboardingCompleted intentionally omitted: including it would re-run this
+    // effect when handleCompleteOnboarding sets it to true, causing a race and
+    // a "Loading…" flash. We read it in the subscription_required branch; when
+    // loadState is run from the reload-trigger effect we get the latest closure.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- see comment above
   }, [
     setOnboardingCompleted,
     refreshOnboardingStatus,
     startProvisioningPoll,
     startConfirmingPaymentPoll,
     setSearchParams,
-    onboardingCompleted,
     navigate,
   ]);
-
-  // Keep the ref current on every render so startConfirmingPaymentPoll always
-  // calls back into the latest version of loadState without a circular dep.
-  loadStateRef.current = loadState;
 
   useEffect(() => {
     void loadState();
   }, [loadState]);
+
+  // When payment poll confirms subscription is active, reload state once.
+  useEffect(() => {
+    if (reloadTrigger === 0) return;
+    setReloadTrigger(0);
+    void loadState();
+  }, [reloadTrigger, loadState]);
 
   // Clean up any pending poll timer on unmount and guard async continuations.
   // Incrementing pollingGenerationRef cancels any in-flight poll iteration
