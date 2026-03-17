@@ -1554,6 +1554,76 @@ describe("Chat onboarding integration", () => {
       });
     });
 
+    it("navigates to /subscribe when getAgentStatus returns subscription_required after completing onboarding", async () => {
+      // Call 1 (loadState): not_found — fall through to onboarding
+      // Call 2 (handleCompleteOnboarding status check): subscription_required → navigate
+      vi.mocked(getAgentStatus)
+        .mockRejectedValueOnce(new Error("not found"))
+        .mockResolvedValueOnce({
+          success: true,
+          status: "subscription_required",
+        });
+
+      vi.mocked(getOnboardingState).mockResolvedValue({
+        state: {
+          id: "state-1",
+          status: "in_progress",
+          outstandingQuestions: ["channels"],
+          collectedAnswers: { name: "Bradley", role: "Founder" },
+          completedAt: null,
+          lastMessageAt: "2026-03-11T10:00:00.000Z",
+        },
+        messages: [
+          {
+            id: "m0",
+            role: "assistant",
+            content: "Which channels do you want?",
+            createdAt: "2026-03-11T10:00:00.000Z",
+          },
+        ],
+        nextQuestion: "Which channels do you want?",
+      });
+
+      vi.mocked(postOnboardingMessage).mockResolvedValue({
+        state: {
+          id: "state-1",
+          status: "completed",
+          outstandingQuestions: [],
+          collectedAnswers: {
+            name: "Bradley",
+            role: "Founder",
+            channels: "Telegram",
+          },
+          completedAt: "2026-03-11T10:10:00.000Z",
+          lastMessageAt: "2026-03-11T10:10:00.000Z",
+        },
+        messages: [],
+        assistantResponse: "All set.",
+        isComplete: true,
+        nextQuestion: null,
+      });
+
+      render(
+        <MemoryRouter>
+          <Chat />
+        </MemoryRouter>,
+      );
+
+      await screen.findByText("Which channels do you want?");
+
+      fireEvent.change(screen.getByPlaceholderText(/answer axel's question/i), {
+        target: { value: "Telegram" },
+      });
+      fireEvent.click(screen.getByRole("button"));
+
+      await waitFor(() => {
+        expect(navigateMock).toHaveBeenCalledWith("/subscribe");
+      });
+
+      // Must not show discovery panel — navigate away instead
+      expect(screen.queryByText("Choose your plan")).toBeNull();
+    });
+
     it("shows failed state when getAgentStatus returns failed after completing onboarding", async () => {
       // Call 1 (loadState): not_found — fall through to onboarding
       // Call 2 (handleCompleteOnboarding status check): failed → set failed mode
@@ -1820,7 +1890,7 @@ describe("Chat onboarding integration", () => {
       expect(await screen.findByText("Failed to send message")).toBeDefined();
     });
 
-    it("shows discovery mode when postChatMessage returns 402 mid-chat", async () => {
+    it("navigates to /subscribe when postChatMessage returns 402 mid-chat", async () => {
       vi.mocked(getAgentStatus).mockResolvedValue({
         success: true,
         status: "active",
@@ -1844,10 +1914,11 @@ describe("Chat onboarding integration", () => {
       fireEvent.click(screen.getByRole("button"));
 
       await waitFor(() => {
-        expect(screen.getByText("Choose your plan")).toBeDefined();
+        expect(navigateMock).toHaveBeenCalledWith("/subscribe");
       });
 
-      // Should not show an error banner
+      // Should not show the discovery plan picker or an error banner
+      expect(screen.queryByText("Choose your plan")).toBeNull();
       expect(screen.queryByText("subscription_required")).toBeNull();
     });
   });
@@ -1868,6 +1939,40 @@ describe("Chat onboarding integration", () => {
       expect(await screen.findByText("Choose your plan")).toBeDefined();
       // Should NOT navigate away — user stays in chat
       expect(navigateMock).not.toHaveBeenCalled();
+    });
+
+    it("navigates to /subscribe (not discovery) when subscription_required and onboarding already completed", async () => {
+      vi.mocked(useAuth).mockReturnValue({
+        isAuthenticated: true,
+        isLoading: false,
+        onboardingCompleted: true,
+        setOnboardingCompleted,
+        refreshOnboardingStatus,
+        user: { id: "user-1", email: "test@example.com" },
+        session: {} as never,
+        error: null,
+        signIn: vi.fn(),
+        signUp: vi.fn(),
+        signOut: vi.fn(),
+      });
+
+      vi.mocked(getAgentStatus).mockResolvedValue({
+        success: true,
+        status: "subscription_required",
+      });
+
+      render(
+        <MemoryRouter>
+          <Chat />
+        </MemoryRouter>,
+      );
+
+      await waitFor(() => {
+        expect(navigateMock).toHaveBeenCalledWith("/subscribe");
+      });
+
+      // Discovery panel must not appear for post-onboarding users
+      expect(screen.queryByText("Choose your plan")).toBeNull();
     });
 
     it("shows plan cards without recommendation badge when no signals exist", async () => {
@@ -1892,7 +1997,7 @@ describe("Chat onboarding integration", () => {
       expect(screen.getByText("Business")).toBeDefined();
     });
 
-    it("shows discovery panel when postChatMessage returns 402", async () => {
+    it("navigates to /subscribe when postChatMessage returns 402", async () => {
       vi.mocked(getAgentStatus).mockResolvedValue({
         success: true,
         status: "active",
@@ -1916,16 +2021,15 @@ describe("Chat onboarding integration", () => {
       fireEvent.click(screen.getByRole("button"));
 
       await waitFor(() => {
-        expect(screen.getByText("Choose your plan")).toBeDefined();
+        expect(navigateMock).toHaveBeenCalledWith("/subscribe");
       });
 
-      // Should NOT navigate away
-      expect(navigateMock).not.toHaveBeenCalledWith("/subscribe");
-      // Should not show an error banner for subscription errors
+      // Should not show the discovery plan picker or an error banner
+      expect(screen.queryByText("Choose your plan")).toBeNull();
       expect(screen.queryByText("subscription_required")).toBeNull();
     });
 
-    it("removes the optimistic user message when SubscriptionRequiredError is thrown", async () => {
+    it("removes the optimistic user message and navigates to /subscribe when SubscriptionRequiredError is thrown", async () => {
       vi.mocked(getAgentStatus).mockResolvedValue({
         success: true,
         status: "active",
@@ -1948,9 +2052,8 @@ describe("Chat onboarding integration", () => {
       });
       fireEvent.click(screen.getByRole("button"));
 
-      // Discovery panel appears
       await waitFor(() => {
-        expect(screen.getByText("Choose your plan")).toBeDefined();
+        expect(navigateMock).toHaveBeenCalledWith("/subscribe");
       });
 
       // The unsent optimistic message must NOT appear in the transcript

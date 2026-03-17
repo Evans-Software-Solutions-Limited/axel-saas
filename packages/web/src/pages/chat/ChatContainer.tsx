@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useSearchParams } from "react-router";
+import { useNavigate, useSearchParams } from "react-router";
 import { useAuth } from "@/hooks/useAuth";
 import {
   getOnboardingState,
@@ -94,7 +94,12 @@ export function ChatContainer() {
   // Each in-progress poll iteration captures its generation at creation time
   // and stops if the current value no longer matches, preventing duplicate chains.
   const pollingGenerationRef = useRef(0);
-  const { setOnboardingCompleted, refreshOnboardingStatus } = useAuth();
+  const navigate = useNavigate();
+  const {
+    setOnboardingCompleted,
+    refreshOnboardingStatus,
+    onboardingCompleted,
+  } = useAuth();
 
   // Poll agent status until it becomes active, then switch to live mode.
   // A generation counter ensures that only one chain runs at a time: each call
@@ -207,6 +212,13 @@ export function ChatContainer() {
         setError(
           "Agent setup failed. Please contact support or try again later.",
         );
+      } else if (
+        agentStatus?.success &&
+        agentStatus.status === "subscription_required"
+      ) {
+        // Onboarding is done but no active subscription — send user to the
+        // dedicated subscribe page rather than surfacing plan cards in chat.
+        navigate("/subscribe");
       } else {
         // When the dedicated agent is confirmed active, replace the onboarding
         // transcript with the handoff greeting so the transition feels intentional.
@@ -225,7 +237,12 @@ export function ChatContainer() {
       setError(message);
       // Don't switch mode; stay in onboarding mode to allow retry
     }
-  }, [setOnboardingCompleted, refreshOnboardingStatus, startProvisioningPoll]);
+  }, [
+    setOnboardingCompleted,
+    refreshOnboardingStatus,
+    startProvisioningPoll,
+    navigate,
+  ]);
 
   // Load initial state - determines if onboarding or live chat
   const loadState = useCallback(async () => {
@@ -243,11 +260,9 @@ export function ChatContainer() {
         // This is expected when user hasn't completed onboarding yet
       }
 
-      // Show the discovery panel if subscription is required.
+      // Handle subscription_required status from the agent endpoint.
       // GET /users/me/agent returns this when the subscription is missing or
       // in a non-active/trialing state — it is not a phantom value.
-      // We keep the user in chat rather than navigating away so the plan
-      // recommendation can be shown with context.
       if (
         agentStatus?.success &&
         agentStatus.status === "subscription_required"
@@ -263,6 +278,14 @@ export function ChatContainer() {
           startConfirmingPaymentPoll();
           return;
         }
+        // Post-onboarding users must subscribe via the dedicated /subscribe
+        // page rather than seeing a duplicate plan picker inside chat.
+        if (onboardingCompleted) {
+          navigate("/subscribe");
+          return;
+        }
+        // Pre-onboarding (new) users see the discovery panel inline so they
+        // can pick a plan before starting the onboarding conversation.
         setChatMode("discovery");
         return;
       }
@@ -334,6 +357,8 @@ export function ChatContainer() {
     startProvisioningPoll,
     startConfirmingPaymentPoll,
     setSearchParams,
+    onboardingCompleted,
+    navigate,
   ]);
 
   // Keep the ref current on every render so startConfirmingPaymentPoll always
@@ -420,7 +445,9 @@ export function ChatContainer() {
     } catch (sendError) {
       if (sendError instanceof SubscriptionRequiredError) {
         setMessages((current) => current.slice(0, -1));
-        setChatMode("discovery");
+        // Live mode is only reachable after onboarding; send to the dedicated
+        // subscribe page rather than surfacing plan cards inside chat.
+        navigate("/subscribe");
         return;
       }
       const message =
@@ -432,7 +459,7 @@ export function ChatContainer() {
     } finally {
       setIsSending(false);
     }
-  }, [chatMode, input, isSending]);
+  }, [chatMode, input, isSending, navigate]);
 
   const handleSend = useCallback(() => {
     if (chatMode === "onboarding") {
