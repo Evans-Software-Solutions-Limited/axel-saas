@@ -14,8 +14,8 @@ describe("Pre-onboarding routing and tab locking", () => {
     vi.clearAllMocks();
   });
 
-  describe("Root redirect for pre-onboarding users", () => {
-    it("redirects authenticated user without onboarding to /dashboard/chat", () => {
+  describe("Home redirect for pre-onboarding users", () => {
+    it("redirects authenticated user without onboarding from / to /dashboard/chat", () => {
       vi.mocked(useAuth).mockReturnValue({
         isAuthenticated: true,
         isLoading: false,
@@ -36,11 +36,10 @@ describe("Pre-onboarding routing and tab locking", () => {
         </MemoryRouter>,
       );
 
-      // Should redirect to /dashboard/chat
       expect(screen.getAllByText("Chat")[0]).toBeDefined();
     });
 
-    it("redirects authenticated user with onboarding to /dashboard", () => {
+    it("redirects authenticated user with onboarding from / to office", () => {
       vi.mocked(useAuth).mockReturnValue({
         isAuthenticated: true,
         isLoading: false,
@@ -61,35 +60,7 @@ describe("Pre-onboarding routing and tab locking", () => {
         </MemoryRouter>,
       );
 
-      // Should redirect to /dashboard with Office as default
       expect(screen.getAllByText("Office")[0]).toBeDefined();
-    });
-  });
-
-  describe("/onboarding route redirect", () => {
-    it("redirects /onboarding to /dashboard/chat for authenticated users", () => {
-      vi.mocked(useAuth).mockReturnValue({
-        isAuthenticated: true,
-        isLoading: false,
-        onboardingCompleted: false,
-        user: { id: "1", email: "a@b.com" },
-        session: {} as never,
-        error: null,
-        setOnboardingCompleted: vi.fn(),
-        refreshOnboardingStatus: vi.fn().mockResolvedValue(undefined),
-        signIn: vi.fn(),
-        signUp: vi.fn(),
-        signOut: vi.fn(),
-      });
-
-      render(
-        <MemoryRouter initialEntries={["/onboarding"]}>
-          <App />
-        </MemoryRouter>,
-      );
-
-      // Should redirect to /dashboard/chat
-      expect(screen.getAllByText("Chat")[0]).toBeDefined();
     });
   });
 

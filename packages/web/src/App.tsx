@@ -16,6 +16,10 @@ import { Chat } from "./pages/Chat";
 import { Crons } from "./pages/Crons";
 import { Tasks } from "./pages/Tasks";
 import { Integrations } from "./pages/Integrations";
+import Home from "./pages/Home";
+import UseCases from "./pages/UseCases";
+import Pricing from "./pages/Pricing";
+import About from "./pages/About";
 
 const queryClient = new QueryClient();
 
@@ -40,7 +44,7 @@ function ProtectedRoute({ children }: Readonly<{ children: React.ReactNode }>) {
   return <>{children}</>;
 }
 
-/** Redirects to homepage if user is already authenticated (for login/signup). */
+/** Redirects to home (dashboard when logged in) if already authenticated. */
 function GuestOnlyRoute({ children }: Readonly<{ children: React.ReactNode }>) {
   const { isAuthenticated } = useAuth();
   if (isAuthenticated) {
@@ -60,19 +64,26 @@ function App() {
     );
   }
 
-  let rootRedirectTo: string;
-  if (isAuthenticated) {
-    rootRedirectTo = onboardingCompleted ? "/dashboard" : "/dashboard/chat";
-  } else {
-    rootRedirectTo = "/login";
-  }
-
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
         <Routes>
-          {/* Root redirect */}
-          <Route path="/" element={<Navigate to={rootRedirectTo} replace />} />
+          {/* Root: marketing home when logged out, redirect to dashboard when logged in */}
+          <Route
+            path="/"
+            element={
+              isAuthenticated ? (
+                <Navigate to="/dashboard" replace />
+              ) : (
+                <Home />
+              )
+            }
+          />
+
+          {/* Marketing pages (public) */}
+          <Route path="/use-cases" element={<UseCases />} />
+          <Route path="/pricing" element={<Pricing />} />
+          <Route path="/about" element={<About />} />
 
           {/* Auth routes — redirect to homepage if already logged in */}
           <Route

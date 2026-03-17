@@ -99,14 +99,25 @@ describe("Dashboard", () => {
     expect(aside?.className).toContain("w-20");
   });
 
-  it("navigates to login when logout is clicked", () => {
+  it("calls signOut when logout is clicked", () => {
+    const signOutMock = vi.fn().mockResolvedValue({ success: true });
+    mockUseAuth.mockReturnValue({
+      onboardingCompleted: true,
+      isAuthenticated: true,
+      isLoading: false,
+      user: { id: "1", email: "test@test.com" },
+      session: {} as never,
+      error: null,
+      signIn: vi.fn(),
+      signUp: vi.fn(),
+      signOut: signOutMock,
+    });
     render(
       <MemoryRouter initialEntries={["/dashboard/office"]}>
         <Routes>
           <Route path="/dashboard" element={<Dashboard />}>
             <Route path="office" element={<MockOutlet />} />
           </Route>
-          <Route path="/login" element={<div data-testid="login">Login</div>} />
         </Routes>
       </MemoryRouter>,
     );
@@ -114,7 +125,7 @@ describe("Dashboard", () => {
       .getAllByRole("button")
       .filter((b) => b.textContent?.includes("Logout"));
     fireEvent.click(logoutButtons[0]!);
-    expect(screen.getByTestId("login")).toBeDefined();
+    expect(signOutMock).toHaveBeenCalled();
   });
 
   it("renders legal page links in sidebar footer when expanded", () => {
