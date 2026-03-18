@@ -1,10 +1,35 @@
+import { coreApiDomain, hostedZoneId, webOrigin } from "./domains";
 import {
   supabaseDatabaseUrl,
   stripeSecretKey,
   stripeWebhookSecret,
 } from "./secrets";
 
-export const coreAPI = new sst.aws.ApiGatewayV2("api-core");
+export const coreAPI = new sst.aws.ApiGatewayV2("api-core", {
+  domain:
+    coreApiDomain != null
+      ? {
+          name: coreApiDomain,
+          ...(hostedZoneId && { dns: sst.aws.dns({ zone: hostedZoneId }) }),
+        }
+      : undefined,
+  cors:
+    webOrigin != null
+      ? {
+          allowOrigins: [webOrigin],
+          allowCredentials: true,
+          allowHeaders: ["Content-Type", "Authorization"],
+          allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        }
+      : false,
+  transform: {
+    route: {
+      handler: (args) => {
+        args.runtime ??= "nodejs22.x";
+      },
+    },
+  },
+});
 
 coreAPI.route("$default", {
   handler: "microservices/core/src/api.handler",
