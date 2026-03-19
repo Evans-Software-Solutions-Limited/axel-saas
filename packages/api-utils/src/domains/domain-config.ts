@@ -36,7 +36,6 @@ const getEnvironment = (stage: string): Environment => {
 
 const getDeployedHosts = (
   environment: Exclude<Environment, "dev">,
-  stage: string,
 ): { webHost: string; apiHost: string } => {
   switch (environment) {
     case "production":
@@ -62,7 +61,7 @@ export function getDomainConfig(stage: string): DomainConfig {
   if (environment === "dev") {
     return { webHost: null, apiHost: null, zoneId: undefined };
   }
-  const { webHost, apiHost } = getDeployedHosts(environment, stage);
+  const { webHost, apiHost } = getDeployedHosts(environment);
   return {
     webHost,
     apiHost,
