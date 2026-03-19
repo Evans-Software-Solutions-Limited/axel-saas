@@ -19,7 +19,7 @@ export const coreAPI = new sst.aws.ApiGatewayV2("api-core", {
           allowOrigins: [webOrigin],
           allowCredentials: true,
           allowHeaders: ["Content-Type", "Authorization"],
-          allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+          allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
         }
       : false,
   transform: {
