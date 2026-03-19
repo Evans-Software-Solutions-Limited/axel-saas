@@ -26,12 +26,11 @@ export interface DomainConfig {
   zoneId: string | undefined;
 }
 
-type Environment = "production" | "staging" | "qa" | "dev";
+type Environment = "production" | "staging" | "dev";
 
 const getEnvironment = (stage: string): Environment => {
   if (stage === "production") return "production";
   if (stage === "staging") return "staging";
-  if (stage.startsWith("pr-") || stage.includes("qa")) return "qa";
   return "dev";
 };
 
@@ -49,21 +48,6 @@ const getDeployedHosts = (
       return {
         webHost: `staging.${BASE_DOMAIN}`,
         apiHost: `api.staging.${BASE_DOMAIN}`,
-      };
-    case "qa":
-      // PR stages: web = pr-N.qa..., api = pr-N.api.qa...
-      // The api host uses pr-N.api.qa (not api.pr-N.qa) so that the single
-      // wildcard *.api.qa.fdp.capitalpay.co.uk covers all PR OAuth callbacks
-      // in WorkOS — WorkOS wildcards only match one subdomain level.
-      if (stage.startsWith("pr-")) {
-        return {
-          webHost: `${stage}.qa.${BASE_DOMAIN}`,
-          apiHost: `${stage}.api.qa.${BASE_DOMAIN}`,
-        };
-      }
-      return {
-        webHost: `qa.${BASE_DOMAIN}`,
-        apiHost: `api.qa.${BASE_DOMAIN}`,
       };
   }
 };
