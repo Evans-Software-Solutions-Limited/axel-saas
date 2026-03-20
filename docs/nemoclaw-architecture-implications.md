@@ -10,6 +10,7 @@
 NVIDIA's NemoClaw puts a local security layer on top of OpenClaw: Nemotron models run on-device, enforce policy rules on what agents can do (via OpenShell), and route to cloud models only when local execution falls short or explicit rules permit it. Agents can extend with new skills, but only within the defined policy envelope.
 
 The core contribution isn't the local GPU — it's the **architectural separation** of:
+
 1. What an agent is allowed to do (policy)
 2. Where data is allowed to go (routing)
 3. What counts as a cloud-eligible request (classification)
@@ -26,17 +27,17 @@ Guardrails defined at the infrastructure layer, not just in prompts. A prompt in
 
 **For Axel SaaS right now:**
 
-The `requireAuth` / `getAuthUser` pattern already enforces access control at the HTTP boundary. The gap is at the *agent behaviour* level — there's nothing stopping a future Axel skill from exfiltrating user data or calling an unapproved external service. This needs to be explicit.
+The `requireAuth` / `getAuthUser` pattern already enforces access control at the HTTP boundary. The gap is at the _agent behaviour_ level — there's nothing stopping a future Axel skill from exfiltrating user data or calling an unapproved external service. This needs to be explicit.
 
 **Concrete implementation:**
 
 ```typescript
 // infra/agent-policy.ts — define what an agent instance can do
 export type AgentPolicy = {
-  allowedTools: string[];           // whitelist of skill/tool names
-  externalCallsPermitted: boolean;  // can this agent make outbound HTTP?
-  dataClassifications: string[];    // e.g. ['public', 'internal'] — not 'pii', 'financial'
-  cloudModelFallback: boolean;      // can this agent escalate to Claude/GPT?
+  allowedTools: string[]; // whitelist of skill/tool names
+  externalCallsPermitted: boolean; // can this agent make outbound HTTP?
+  dataClassifications: string[]; // e.g. ['public', 'internal'] — not 'pii', 'financial'
+  cloudModelFallback: boolean; // can this agent escalate to Claude/GPT?
 };
 ```
 
@@ -52,7 +53,7 @@ Every LLM call is a potential data egress event. If a user types a message conta
 
 **For Axel SaaS right now:**
 
-Bradley's stack is cloud-native (AWS/Supabase), so "local execution" isn't the immediate option. But the *routing decision* pattern is directly implementable:
+Bradley's stack is cloud-native (AWS/Supabase), so "local execution" isn't the immediate option. But the _routing decision_ pattern is directly implementable:
 
 ```
 User message → PII classifier →
@@ -72,14 +73,14 @@ This is a real differentiator for lettings agencies, gym operators with health d
 
 Policy-based guardrails map cleanly onto the existing subscription tiers:
 
-| Tier | Agent Policy |
-|------|-------------|
-| Starter | Pre-approved tool list only, no external HTTP, no PII classification bypass |
-| Pro | Extended tool set, external HTTP with logging, basic PII classification |
-| Business | Custom tool allowlist, full audit log, PII classification + anonymisation, SSO |
-| Developer | Policy as code — define your own ruleset, API-first |
+| Tier      | Agent Policy                                                                   |
+| --------- | ------------------------------------------------------------------------------ |
+| Starter   | Pre-approved tool list only, no external HTTP, no PII classification bypass    |
+| Pro       | Extended tool set, external HTTP with logging, basic PII classification        |
+| Business  | Custom tool allowlist, full audit log, PII classification + anonymisation, SSO |
+| Developer | Policy as code — define your own ruleset, API-first                            |
 
-This is the enterprise unlock. Business and Developer tiers sell on the *policy story*, not just feature count.
+This is the enterprise unlock. Business and Developer tiers sell on the _policy story_, not just feature count.
 
 ---
 
@@ -93,7 +94,13 @@ Create `~/.openclaw/workspace/policies/axel-policy.json`:
 
 ```json
 {
-  "allowedSkills": ["research", "coding", "heartbeat", "morning-brief", "discord"],
+  "allowedSkills": [
+    "research",
+    "coding",
+    "heartbeat",
+    "morning-brief",
+    "discord"
+  ],
   "deniedSkills": [],
   "externalHTTP": {
     "permitted": true,
