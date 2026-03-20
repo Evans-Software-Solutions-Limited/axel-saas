@@ -11,6 +11,7 @@
 **Headline:** One assistant. Every kind of work.
 
 **What this means in practice:**
+
 - Axel is not a narrow tool (not just "meeting notes" or "code review"). He handles the full sweep of knowledge work.
 - The pitch is breadth + depth: one subscription, one interface, one assistant that grows with your workload.
 - Competitors (Notion AI, Copilot, ChatGPT) are either siloed to one context or feel generic. Axel sits in-between: opinionated, personal, capable across domains.
@@ -35,17 +36,18 @@ Start free — no card required.
 
 ### Problem / Value strip (3 cells, short)
 
-| Icon | Headline | Body |
-|------|----------|------|
-| 🗓 | Your day, planned | Axel reads your schedule, surfaces what matters, and briefs you every morning. |
-| 📋 | Every meeting, captured | Summaries, action items, and follow-ups — without lifting a finger. |
-| 🔧 | Built for builders too | Sub-agent orchestration and API access for technical users on any plan. |
+| Icon | Headline                | Body                                                                           |
+| ---- | ----------------------- | ------------------------------------------------------------------------------ |
+| 🗓   | Your day, planned       | Axel reads your schedule, surfaces what matters, and briefs you every morning. |
+| 📋   | Every meeting, captured | Summaries, action items, and follow-ups — without lifting a finger.            |
+| 🔧   | Built for builders too  | Sub-agent orchestration and API access for technical users on any plan.        |
 
-*(Swap icons for illustrated glyphs in the final design.)*
+_(Swap icons for illustrated glyphs in the final design.)_
 
 ### Social proof
 
 Keep minimal at launch. Aim for:
+
 - 1–2 real quotes if available, otherwise hold this section until post-launch
 - A "built by the OpenClaw team" trust line (see Compliance section)
 
@@ -79,24 +81,27 @@ Three tiers, one CTA to the full pricing page. Don't bury numbers on the home pa
 
 ### Tiers
 
-| Tier | Monthly Price | Target User |
-|------|--------------|-------------|
-| **Free** | $0 | Individuals evaluating; light personal use |
-| **Premium** | TBD | Professionals wanting full Axel capability |
-| **Enterprise** | Contact us | Teams, API volume, custom data retention |
+| Tier           | Monthly Price | Target User                                |
+| -------------- | ------------- | ------------------------------------------ |
+| **Free**       | $0            | Individuals evaluating; light personal use |
+| **Premium**    | TBD           | Professionals wanting full Axel capability |
+| **Enterprise** | Contact us    | Teams, API volume, custom data retention   |
 
 ### Key copy decisions
 
 **Free tier:**
+
 - Be explicit about limits. Users who hit a wall mid-workflow will churn.
 - Suggested framing: "Everything you need to meet Axel. Limits apply on volume and sub-agents."
 
 **Premium — 7-day upgrade offer:**
+
 - Surface a time-limited upgrade prompt on Free after signup.
-- Suggested banner or inline prompt: *"Try Premium free for 7 days — no card charged until day 8. Cancel any time."*
+- Suggested banner or inline prompt: _"Try Premium free for 7 days — no card charged until day 8. Cancel any time."_
 - The offer should appear in-app after first meaningful use (post-first-brief or post-first-summary), not immediately at signup. Don't burn the upgrade moment on a cold user.
 
 **Enterprise:**
+
 - Do not publish pricing. Use a "Talk to us" CTA with a short contact form or Calendly link.
 - List what Enterprise adds: SSO, audit logs, SLA, custom retention, dedicated support.
 
@@ -131,6 +136,7 @@ Three tiers, one CTA to the full pricing page. Don't bury numbers on the home pa
    - "One person. Axel makes it manageable."
 
 **Format guidance:**
+
 - Each section: headline → 2-sentence description → one-line CTA ("Get started free" or "See plans")
 - Avoid feature lists on this page. Features go on the pricing or home page. Use cases are about outcomes.
 
@@ -142,14 +148,15 @@ Three tiers, one CTA to the full pricing page. Don't bury numbers on the home pa
 
 ### Copy notes
 
-- Headline: *"Start for free. No card required."* (if true — verify)
-- Sub-line: *"Set up takes about two minutes."*
+- Headline: _"Start for free. No card required."_ (if true — verify)
+- Sub-line: _"Set up takes about two minutes."_
 - After sign-up, redirect to onboarding (already built). Don't drop the user on a blank dashboard.
-- If email verification is required, set the expectation: *"We'll send a quick confirmation email."*
+- If email verification is required, set the expectation: _"We'll send a quick confirmation email."_
 
 ### Legal / consent line
 
 One line below the signup button:
+
 > By signing up, you agree to our [Terms of Service] and [Privacy Policy].
 
 Links must be live before launch. No placeholder links.
@@ -162,17 +169,18 @@ This section is non-negotiable before launch. Do not go live without these in pl
 
 ### Pages required at launch
 
-| Page | Status | Notes |
-|------|--------|-------|
-| Privacy Policy | Exists (`/privacy`) | Review for accuracy against actual data handling |
-| Terms of Service | Exists (`/terms`) | Review for accuracy; ensure cancellation terms are covered |
-| Cookie notice / banner | Unknown | Required if using analytics or tracking cookies in EU/UK |
+| Page                   | Status              | Notes                                                      |
+| ---------------------- | ------------------- | ---------------------------------------------------------- |
+| Privacy Policy         | Exists (`/privacy`) | Review for accuracy against actual data handling           |
+| Terms of Service       | Exists (`/terms`)   | Review for accuracy; ensure cancellation terms are covered |
+| Cookie notice / banner | Unknown             | Required if using analytics or tracking cookies in EU/UK   |
 
 ### OpenClaw attribution
 
 Axel is built on OpenClaw. The site should acknowledge this clearly, but also clearly disclaim any official affiliation:
 
 **Suggested footer or About page line:**
+
 > Axel is powered by [OpenClaw](https://openclaw.dev), an open-source AI agent framework. Axel is an independent product and is not officially affiliated with or endorsed by the OpenClaw project.
 
 - Use the real OpenClaw URL if/when linking. Don't link to a placeholder.
@@ -181,11 +189,13 @@ Axel is built on OpenClaw. The site should acknowledge this clearly, but also cl
 ### Privacy / trust wording
 
 Suggested trust line for the home page footer or pricing page:
+
 > Your data is yours. We don't train on your conversations or sell your information.
 
 **Only use this line if it is accurate.** Confirm with the actual data handling setup before publishing.
 
 Additional lines to consider:
+
 - "Hosted on AWS" (if accurate — gives enterprise buyers confidence)
 - "SOC 2 in progress" (only if actually in progress — do not claim compliance you don't have)
 
