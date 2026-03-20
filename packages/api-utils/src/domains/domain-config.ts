@@ -5,8 +5,8 @@
 export const BASE_DOMAIN = "meetaxel.ai";
 
 const ZONE_IDS: Record<string, string> = {
-  staging: "Z04824262O09LOPK6FB4D",
-  production: "Z017254226MJ1S00874V3",
+  staging: "Z0445995RJ5V60U79DR5",
+  production: "Z00975242RQYVLZ1LRN73",
 };
 
 /** Route 53 hosted zone ID per environment. PR and QA use the QA zone. Dev/personal stages return undefined (no custom domain, use proxy/localhost). */

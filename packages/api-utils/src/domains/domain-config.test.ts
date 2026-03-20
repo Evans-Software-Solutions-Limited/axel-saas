@@ -10,11 +10,11 @@ describe("domain-config", () => {
 
   describe("getHostedZoneId", () => {
     it("returns production zone for production", () => {
-      expect(getHostedZoneId("production")).toBe("Z017254226MJ1S00874V3");
+      expect(getHostedZoneId("production")).toBe("Z00975242RQYVLZ1LRN73");
     });
 
     it("returns staging zone for staging", () => {
-      expect(getHostedZoneId("staging")).toBe("Z04824262O09LOPK6FB4D");
+      expect(getHostedZoneId("staging")).toBe("Z0445995RJ5V60U79DR5");
     });
 
     it("returns undefined for dev (no custom domain, uses proxy/localhost)", () => {
@@ -33,14 +33,14 @@ describe("domain-config", () => {
       const config = getDomainConfig("production");
       expect(config.webHost).toBe(BASE_DOMAIN);
       expect(config.apiHost).toBe(`api.${BASE_DOMAIN}`);
-      expect(config.zoneId).toBe("Z017254226MJ1S00874V3");
+      expect(config.zoneId).toBe("Z00975242RQYVLZ1LRN73");
     });
 
     it("returns staging hostnames and zone for staging", () => {
       const config = getDomainConfig("staging");
       expect(config.webHost).toBe(`staging.${BASE_DOMAIN}`);
       expect(config.apiHost).toBe(`api.staging.${BASE_DOMAIN}`);
-      expect(config.zoneId).toBe("Z04824262O09LOPK6FB4D");
+      expect(config.zoneId).toBe("Z0445995RJ5V60U79DR5");
     });
 
     it("returns null for all fields for dev stage", () => {
