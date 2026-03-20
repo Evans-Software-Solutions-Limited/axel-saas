@@ -6,6 +6,17 @@ import { VitePWA } from "vite-plugin-pwa";
 
 // https://vite.dev/config/
 export default defineConfig({
+  server: {
+    proxy: {
+      // Proxy API requests to the AWS API Gateway
+      "/api": {
+        target: process.env.VITE_CORE_API_URL || "http://localhost:3000",
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api/, ""),
+        secure: false,
+      },
+    },
+  },
   plugins: [
     react(),
     tailwindcss(),
