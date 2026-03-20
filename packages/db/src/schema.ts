@@ -248,3 +248,32 @@ export const onboardingState = pgTable(
 
 export type OnboardingState = typeof onboardingState.$inferSelect;
 export type NewOnboardingState = typeof onboardingState.$inferInsert;
+
+// ─── Waitlist ──────────────────────────────────────────────────────────────────
+
+export const waitlistInterestedInEnum = pgEnum("waitlist_interested_in", [
+  "free",
+  "pro",
+  "enterprise",
+]);
+
+export const waitlist = pgTable(
+  "waitlist",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    email: text("email").notNull(),
+    interestedIn: waitlistInterestedInEnum("interested_in").notNull(),
+    token: text("token").notNull(),
+    confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => ({
+    emailIdx: uniqueIndex("waitlist_email_idx").on(table.email),
+    tokenIdx: uniqueIndex("waitlist_token_idx").on(table.token),
+  }),
+);
+
+export type WaitlistEntry = typeof waitlist.$inferSelect;
+export type NewWaitlistEntry = typeof waitlist.$inferInsert;
