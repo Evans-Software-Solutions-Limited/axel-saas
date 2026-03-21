@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { RELEASE_EXPECTATION_COPY, waitlistSignupHref } from "@/lib/waitlist";
 
 export function SignUp() {
   const [name, setName] = useState("");
@@ -55,15 +56,32 @@ export function SignUp() {
             <h1 className="text-3xl font-bold text-text">
               <span className="text-accent">A</span>xel
             </h1>
-            <p className="text-sm text-muted">Your 24/7 AI Employee</p>
+            <p className="text-sm text-muted">
+              One assistant. Every kind of work.
+            </p>
+          </div>
+
+          <div className="rounded-lg border border-border bg-surface-raised p-4 text-sm text-muted text-left space-y-2">
+            <p className="font-medium text-text">Looking for access?</p>
+            <p>
+              {RELEASE_EXPECTATION_COPY}{" "}
+              <Link
+                to={waitlistSignupHref()}
+                className="text-accent font-medium hover:underline"
+              >
+                Join the waitlist
+              </Link>{" "}
+              on the home page — that&apos;s how we&apos;re onboarding first.
+            </p>
           </div>
 
           {/* Signup Card */}
           <Card className="border border-border">
             <CardHeader>
-              <CardTitle className="text-text">Create your account</CardTitle>
+              <CardTitle className="text-text">Create an account</CardTitle>
               <CardDescription>
-                Join thousands of teams building with Axel
+                For invited users. Set up takes about two minutes. If we need to
+                verify your email, we&apos;ll send a quick confirmation message.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -151,18 +169,17 @@ export function SignUp() {
 
               {/* Sign In Link */}
               <p className="text-center text-sm text-muted">
-                Already have an account?{" "}
                 <Link
-                  to="/login"
+                  to="/"
                   className="text-accent hover:text-accent/80 font-medium"
                 >
-                  Sign in
+                  Back to home
                 </Link>
               </p>
 
               {/* Legal Links */}
               <p className="text-center text-xs text-muted mt-4">
-                By creating an account, you agree to our{" "}
+                By signing up, you agree to our{" "}
                 <Link to="/terms" className="text-accent hover:underline">
                   Terms of Service
                 </Link>{" "}

@@ -53,7 +53,7 @@ describe("Dashboard", () => {
     expect(screen.getByTestId("outlet")).toBeDefined();
   });
 
-  it("renders current nav label in header", () => {
+  it("highlights Office in sidebar when on office route", () => {
     render(
       <MemoryRouter initialEntries={["/dashboard/office"]}>
         <Routes>
@@ -63,7 +63,8 @@ describe("Dashboard", () => {
         </Routes>
       </MemoryRouter>,
     );
-    expect(screen.getByRole("heading", { name: /office/i })).toBeDefined();
+    const officeBtn = screen.getByRole("button", { name: /office/i });
+    expect(officeBtn.className).toContain("bg-accent");
   });
 
   it("navigates when nav item is clicked", () => {
@@ -82,7 +83,7 @@ describe("Dashboard", () => {
     expect(screen.getByTestId("chat")).toBeDefined();
   });
 
-  it("toggles sidebar when menu button is clicked", () => {
+  it("renders sidebar at full navigation width", () => {
     render(
       <MemoryRouter initialEntries={["/dashboard/office"]}>
         <Routes>
@@ -92,11 +93,9 @@ describe("Dashboard", () => {
         </Routes>
       </MemoryRouter>,
     );
-    const menuButton = screen.getByRole("button", { name: "" });
     const aside = document.querySelector("aside");
     expect(aside).toBeDefined();
-    fireEvent.click(menuButton);
-    expect(aside?.className).toContain("w-20");
+    expect(aside?.className).toContain("w-60");
   });
 
   it("calls signOut when logout is clicked", () => {

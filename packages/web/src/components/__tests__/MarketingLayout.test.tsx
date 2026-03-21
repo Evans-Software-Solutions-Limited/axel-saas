@@ -3,6 +3,7 @@ import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { MarketingLayout } from "../MarketingLayout";
 import { useAuth } from "@/hooks/useAuth";
+import { waitlistSignupHref } from "@/lib/waitlist";
 
 vi.mock("@/hooks/useAuth", () => ({ useAuth: vi.fn() }));
 
@@ -16,10 +17,10 @@ function renderAt(path: string, children = <p>page content</p>) {
 
 describe("MarketingLayout", () => {
   beforeEach(() => {
-vi.mocked(useAuth).mockReturnValue({
-    isAuthenticated: false,
-    signOut: vi.fn(),
-  } as unknown as ReturnType<typeof useAuth>);
+    vi.mocked(useAuth).mockReturnValue({
+      isAuthenticated: false,
+      signOut: vi.fn(),
+    } as unknown as ReturnType<typeof useAuth>);
   });
 
   it("renders children", () => {
@@ -33,7 +34,7 @@ vi.mocked(useAuth).mockReturnValue({
     expect(logoLinks.length).toBeGreaterThanOrEqual(1);
   });
 
-  it("renders nav links in correct order: Home, Use Cases, Pricing, About, Login, Sign Up", () => {
+  it("renders nav links in correct order: Home, Use Cases, Pricing, About, Join waitlist", () => {
     renderAt("/");
     const nav = screen.getByRole("navigation", { name: /main navigation/i });
     const links = nav.querySelectorAll("a");
@@ -43,25 +44,20 @@ vi.mocked(useAuth).mockReturnValue({
       "Use Cases",
       "Pricing",
       "About",
-      "Login",
-      "Sign Up",
+      "Join waitlist",
     ]);
   });
 
-  it("nav Login links to /login", () => {
+  it("nav Join waitlist links to waitlist form on home", () => {
     renderAt("/");
-    const loginLinks = screen.getAllByRole("link", { name: /^login$/i });
-    expect(loginLinks.some((l) => l.getAttribute("href") === "/login")).toBe(
-      true,
-    );
-  });
-
-  it("nav Sign Up links to /signup", () => {
-    renderAt("/");
-    const signUpLinks = screen.getAllByRole("link", { name: /sign up/i });
-    expect(signUpLinks.some((l) => l.getAttribute("href") === "/signup")).toBe(
-      true,
-    );
+    const waitlistLinks = screen.getAllByRole("link", {
+      name: /join waitlist/i,
+    });
+    expect(
+      waitlistLinks.some(
+        (l) => l.getAttribute("href") === waitlistSignupHref(),
+      ),
+    ).toBe(true);
   });
 
   it("Home nav link has active styling when path is /", () => {
@@ -118,8 +114,21 @@ vi.mocked(useAuth).mockReturnValue({
     expect(link.getAttribute("href")).toBe("mailto:support@axel.ai");
   });
 
+  it("renders OpenClaw attribution link", () => {
+    renderAt("/");
+    const link = screen.getByRole("link", { name: /^openclaw$/i });
+    expect(link.getAttribute("href")).toBe("https://openclaw.dev");
+  });
+
   it("renders copyright notice", () => {
     renderAt("/");
     expect(screen.getByText(/axel\. all rights reserved/i)).toBeDefined();
+  });
+
+  it("renders data trust line", () => {
+    renderAt("/");
+    expect(
+      screen.getByText(/don.t train on your conversations/i),
+    ).toBeDefined();
   });
 });

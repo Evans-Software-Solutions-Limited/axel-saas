@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { waitlistSignupHref } from "@/lib/waitlist";
 
 export function Login() {
   const [email, setEmail] = useState("");
@@ -41,7 +42,9 @@ export function Login() {
             <h1 className="text-3xl font-bold text-text">
               <span className="text-accent">A</span>xel
             </h1>
-            <p className="text-sm text-muted">Your 24/7 AI Employee</p>
+            <p className="text-sm text-muted">
+              One assistant. Every kind of work.
+            </p>
           </div>
 
           {/* Auth Card */}
@@ -122,12 +125,12 @@ export function Login() {
 
               {/* Sign Up Link */}
               <p className="text-center text-sm text-muted">
-                Don't have an account?{" "}
+                Need access?{" "}
                 <Link
-                  to="/signup"
+                  to={waitlistSignupHref()}
                   className="text-accent hover:text-accent/80 font-medium"
                 >
-                  Create one
+                  Join the waitlist
                 </Link>
               </p>
 

@@ -3,6 +3,7 @@ import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import About from "../About";
 import { useAuth } from "@/hooks/useAuth";
+import { waitlistSignupHref } from "@/lib/waitlist";
 
 vi.mock("@/hooks/useAuth", () => ({ useAuth: vi.fn() }));
 
@@ -15,51 +16,57 @@ function renderAbout() {
 }
 
 beforeEach(() => {
-vi.mocked(useAuth).mockReturnValue({
-  isAuthenticated: false,
-  signOut: vi.fn(),
-} as unknown as ReturnType<typeof useAuth>);
+  vi.mocked(useAuth).mockReturnValue({
+    isAuthenticated: false,
+    signOut: vi.fn(),
+  } as unknown as ReturnType<typeof useAuth>);
 });
 
 describe("About", () => {
   it("renders page heading", () => {
     renderAbout();
-    expect(screen.getByRole("heading", { name: /about axel/i })).toBeDefined();
-  });
-
-  it("renders mission section", () => {
-    renderAbout();
-    expect(screen.getByRole("heading", { name: /our mission/i })).toBeDefined();
-    expect(screen.getByText(/coordination layer/i)).toBeDefined();
-  });
-
-  it("renders what makes axel different section", () => {
-    renderAbout();
     expect(
-      screen.getByRole("heading", { name: /what makes axel different/i }),
+      screen.getByRole("heading", { name: /why axel exists/i }),
     ).toBeDefined();
   });
 
-  it("renders built for real work section", () => {
+  it("renders narrative sections including landscape and hosted", () => {
     renderAbout();
+    expect(screen.getByRole("heading", { name: /the problem/i })).toBeDefined();
     expect(
-      screen.getByRole("heading", { name: /built for real work/i }),
+      screen.getByRole("heading", { name: /a crowded landscape/i }),
     ).toBeDefined();
+    expect(
+      screen.getByRole("heading", { name: /personal assistant first/i }),
+    ).toBeDefined();
+    expect(
+      screen.getByRole("heading", {
+        name: /integrations, not a public api product/i,
+      }),
+    ).toBeDefined();
+    expect(
+      screen.getByRole("heading", { name: /where axel comes from/i }),
+    ).toBeDefined();
+    expect(
+      screen.getByRole("heading", { name: /hosted solutions/i }),
+    ).toBeDefined();
+    expect(screen.getByText(/tool sprawl/i)).toBeDefined();
   });
 
-  it("renders get in touch section with email link", () => {
+  it("links to OpenClaw from body copy", () => {
     renderAbout();
+    const links = screen.getAllByRole("link", { name: /^openclaw$/i });
     expect(
-      screen.getByRole("heading", { name: /get in touch/i }),
-    ).toBeDefined();
-    const emailLink = screen.getByRole("link", { name: /hello@axel.ai/i });
-    expect(emailLink.getAttribute("href")).toBe("mailto:hello@axel.ai");
+      links.some((l) => l.getAttribute("href") === "https://openclaw.dev"),
+    ).toBe(true);
   });
 
-  it("renders Start for free CTA linking to /signup", () => {
+  it("renders Join waitlist CTA linking to waitlist form on home", () => {
     renderAbout();
-    const link = screen.getByRole("link", { name: /start for free/i });
-    expect(link.getAttribute("href")).toBe("/signup");
+    const links = screen.getAllByRole("link", { name: /join waitlist/i });
+    expect(
+      links.some((l) => l.getAttribute("href") === waitlistSignupHref()),
+    ).toBe(true);
   });
 
   it("renders marketing nav", () => {

@@ -10,10 +10,10 @@ export function TermsOfService() {
             <span className="text-accent">A</span>xel
           </Link>
           <Link
-            to="/login"
+            to="/#waitlist"
             className="text-sm text-muted hover:text-accent transition-colors"
           >
-            Sign in
+            Join waitlist
           </Link>
         </div>
       </header>

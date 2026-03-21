@@ -1,5 +1,6 @@
 import { Link, useLocation } from "react-router";
 import { useAuth } from "@/hooks/useAuth";
+import { waitlistSignupHref } from "@/lib/waitlist";
 
 const NAV_LINKS = [
   { label: "Home", to: "/" },
@@ -35,7 +36,9 @@ export function AppHeader() {
                 key={to}
                 to={to}
                 className={`text-sm transition-colors ${
-                  isActive ? "text-text font-medium" : "text-muted hover:text-text"
+                  isActive
+                    ? "text-text font-medium"
+                    : "text-muted hover:text-text"
                 }`}
               >
                 {label}
@@ -53,20 +56,12 @@ export function AppHeader() {
               </button>
             </>
           ) : (
-            <>
-              <Link
-                to="/login"
-                className="text-sm px-4 py-2 rounded-md border border-border text-text hover:bg-surface-elevated transition-colors font-medium"
-              >
-                Login
-              </Link>
-              <Link
-                to="/signup"
-                className="text-sm px-4 py-2 rounded-md bg-accent text-white hover:bg-accent/90 transition-colors font-medium"
-              >
-                Sign Up
-              </Link>
-            </>
+            <Link
+              to={waitlistSignupHref()}
+              className="text-sm px-4 py-2 cursor-pointer rounded-md bg-accent text-white hover:bg-accent/90 transition-colors font-medium"
+            >
+              Join waitlist
+            </Link>
           )}
         </nav>
 
@@ -83,20 +78,12 @@ export function AppHeader() {
               </button>
             </>
           ) : (
-            <>
-              <Link
-                to="/login"
-                className="text-sm px-3 py-1.5 rounded-md border border-border text-text hover:bg-surface-elevated"
-              >
-                Login
-              </Link>
-              <Link
-                to="/signup"
-                className="text-sm px-3 py-1.5 rounded-md bg-accent text-white hover:bg-accent/90"
-              >
-                Sign Up
-              </Link>
-            </>
+            <Link
+              to={waitlistSignupHref()}
+              className="text-sm px-3 py-1.5 rounded-md bg-accent text-white hover:bg-accent/90"
+            >
+              Join waitlist
+            </Link>
           )}
         </div>
       </div>

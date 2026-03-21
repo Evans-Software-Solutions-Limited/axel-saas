@@ -1,91 +1,112 @@
 import { Link } from "react-router";
 import { MarketingLayout } from "@/components/MarketingLayout";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { waitlistSignupHref } from "@/lib/waitlist";
 
-const USE_CASES = [
+type SectionCta = { label: string; to: string };
+
+const SECTIONS: ReadonlyArray<{
+  title: string;
+  body: readonly [string, string];
+  cta: SectionCta;
+}> = [
   {
-    title: "Busy Professionals",
-    description:
-      "Axel triages your inbox, prepares your daily brief, and keeps your calendar clear of conflicts — all before you've finished your morning coffee.",
-    highlights: [
-      "Inbox zero by 9am",
-      "Daily summary brief",
-      "Conflict-free scheduling",
+    title: "The Knowledge Worker",
+    body: [
+      "Daily briefs, meeting prep, and task triage — Axel keeps the moving parts in one place so you can focus on the work that needs you.",
+      "Start your day knowing what matters.",
     ],
+    cta: {
+      label: "Join waitlist",
+      to: waitlistSignupHref("free"),
+    },
   },
   {
-    title: "Founders & Solopreneurs",
-    description:
-      "Run your business without drowning in admin. Axel handles follow-ups, schedules meetings, and tracks your tasks across projects.",
-    highlights: [
-      "Automated follow-ups",
-      "Multi-project task tracking",
-      "Meeting scheduling",
+    title: "The Operator / Team Lead",
+    body: [
+      "Meeting summaries, async catch-up, and team-wide status without chasing threads in five apps.",
+      "Never miss what was decided.",
     ],
+    cta: { label: "See plans", to: "/pricing" },
   },
   {
-    title: "Remote Teams",
-    description:
-      "Keep distributed teams aligned with automated standups, shared task boards, and async communication — routed through Axel.",
-    highlights: [
-      "Async standup summaries",
-      "Shared task visibility",
-      "Multi-agent workflows",
+    title: "The Developer",
+    body: [
+      "You can go deep when you want — but Axel is your assistant first, not a thin wrapper that assumes you live in YAML. We focus on integrations with tools you already use; a wide-open public API is not how Axel is positioned.",
+      "Powerful when you want it — still usable when you don't.",
     ],
+    cta: {
+      label: "Join waitlist",
+      to: waitlistSignupHref("pro"),
+    },
   },
   {
-    title: "Technical Teams",
-    description:
-      "Connect Axel to your stack via API. Trigger automations from code, query task state, and integrate with your existing pipelines.",
-    highlights: ["Full API access", "Code generation", "Custom integrations"],
+    title: "The Solopreneur",
+    body: [
+      "Calendar, comms, and deliverables when you wear every hat. Axel carries the admin so you can ship.",
+      "One person. Axel makes it manageable.",
+    ],
+    cta: {
+      label: "Join waitlist",
+      to: waitlistSignupHref("free"),
+    },
   },
 ] as const;
+
+function CtaButton({ cta }: Readonly<{ cta: SectionCta }>) {
+  return (
+    <Link to={cta.to}>
+      <Button
+        variant={cta.to === "/pricing" ? "outline" : "default"}
+        className={
+          cta.to === "/pricing"
+            ? "border-border text-text hover:bg-surface-raised"
+            : "bg-accent hover:bg-accent/90 text-white"
+        }
+      >
+        {cta.label}
+      </Button>
+    </Link>
+  );
+}
 
 export function UseCases() {
   return (
     <MarketingLayout>
       <section className="py-16 px-4">
-        <div className="max-w-5xl mx-auto">
-          <div className="text-center mb-12">
-            <h1 className="text-4xl font-bold text-text mb-4">Use Cases</h1>
-            <p className="text-muted text-lg max-w-2xl mx-auto">
-              Axel adapts to how you work — whether you're a solo operator or a
-              growing team.
+        <div className="max-w-3xl mx-auto">
+          <div className="text-center mb-14">
+            <h1 className="text-4xl font-bold text-text mb-4">Use cases</h1>
+            <p className="text-muted text-lg">
+              See whether Axel fits someone like you — outcomes first, feature
+              lists live on pricing.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            {USE_CASES.map((uc) => (
-              <Card
-                key={uc.title}
-                className="border border-border bg-surface-raised"
+          <div className="space-y-14">
+            {SECTIONS.map(({ title, body, cta }) => (
+              <div
+                key={title}
+                className="border-b border-border pb-14 last:border-0 last:pb-0"
               >
-                <CardHeader>
-                  <CardTitle className="text-text">{uc.title}</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <p className="text-muted text-sm">{uc.description}</p>
-                  <ul className="space-y-2">
-                    {uc.highlights.map((h) => (
-                      <li
-                        key={h}
-                        className="flex items-center gap-2 text-sm text-text"
-                      >
-                        <span className="w-1.5 h-1.5 rounded-full bg-accent flex-shrink-0" />
-                        {h}
-                      </li>
-                    ))}
-                  </ul>
-                </CardContent>
-              </Card>
+                <h2 className="text-2xl font-semibold text-text mb-4">
+                  {title}
+                </h2>
+                <div className="space-y-3 text-muted leading-relaxed">
+                  <p>{body[0]}</p>
+                  <p className="text-text font-medium">{body[1]}</p>
+                </div>
+                <div className="mt-6">
+                  <CtaButton cta={cta} />
+                </div>
+              </div>
             ))}
           </div>
 
-          <div className="text-center mt-12">
-            <Link to="/signup">
+          <div className="text-center mt-16">
+            <Link to={waitlistSignupHref()}>
               <Button className="bg-accent hover:bg-accent/90 text-white px-8">
-                Try Axel for free
+                Join waitlist
               </Button>
             </Link>
           </div>

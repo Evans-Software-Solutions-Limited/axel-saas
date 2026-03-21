@@ -35,18 +35,24 @@ describe("App", () => {
       </MemoryRouter>,
     );
     expect(
-      screen.getByRole("heading", { name: /your 24\/7 ai employee/i }),
+      screen.getByRole("heading", {
+        name: /one assistant\. every kind of work/i,
+      }),
     ).toBeDefined();
   });
 
-  it("redirects to login when unauthenticated user visits protected route", () => {
+  it("redirects unauthenticated user from protected route to home (not login)", () => {
     vi.mocked(useAuth).mockReturnValue(mockAuth());
     render(
       <MemoryRouter initialEntries={["/subscribe"]}>
         <App />
       </MemoryRouter>,
     );
-    expect(screen.getByText("Welcome back")).toBeDefined();
+    expect(
+      screen.getByRole("heading", {
+        name: /one assistant\. every kind of work/i,
+      }),
+    ).toBeDefined();
   });
 
   it("shows loading when auth is loading", () => {

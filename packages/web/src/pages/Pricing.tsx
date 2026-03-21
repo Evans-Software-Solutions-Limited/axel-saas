@@ -8,91 +8,126 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { IconCheck } from "@tabler/icons-react";
-import { PLANS, getRecommendedPlan } from "./planRecommendation";
+import { PUBLIC_TIERS } from "./publicPricing";
+import { RELEASE_EXPECTATION_COPY } from "@/lib/waitlist";
 
-const recommendation = getRecommendedPlan();
+function TierCta({
+  label,
+  href,
+  external,
+  highlight,
+}: Readonly<{
+  label: string;
+  href: string;
+  external?: boolean;
+  highlight?: boolean;
+}>) {
+  const className = highlight
+    ? "w-full bg-accent hover:bg-accent/90 text-white"
+    : "w-full bg-surface-raised hover:bg-surface-elevated text-text border border-border";
+
+  if (external) {
+    return (
+      <a href={href} className="block">
+        <Button type="button" className={className}>
+          {label}
+        </Button>
+      </a>
+    );
+  }
+
+  return (
+    <Link to={href} className="block">
+      <Button type="button" className={className}>
+        {label}
+      </Button>
+    </Link>
+  );
+}
 
 export function Pricing() {
   return (
     <MarketingLayout>
       <section className="py-16 px-4">
-        <div className="max-w-6xl mx-auto">
+        <div className="max-w-5xl mx-auto">
           <div className="text-center mb-12">
-            <h1 className="text-4xl font-bold text-text mb-4">
-              Simple, transparent pricing
-            </h1>
-            <p className="text-muted text-lg">
-              14-day free trial on all plans. No credit card required.
+            <h1 className="text-4xl font-bold text-text mb-4">Pricing</h1>
+            <p className="text-muted text-lg max-w-2xl mx-auto">
+              We&apos;re opening in stages. {RELEASE_EXPECTATION_COPY} Join the
+              waitlist for access; Premium pricing will be published here.
+              Enterprise and hosted solutions are a conversation.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
-            {PLANS.map((plan) => {
-              const isRecommended = plan.tierId === recommendation.tierId;
-              return (
-                <Card
-                  key={plan.name}
-                  className={`border-2 relative flex flex-col transition-all ${
-                    isRecommended
-                      ? "border-accent bg-surface-elevated"
-                      : "border-border"
-                  }`}
-                >
-                  {isRecommended && (
-                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 whitespace-nowrap">
-                      <Badge className="bg-accent text-white">
-                        {recommendation.shortReason}
-                      </Badge>
-                    </div>
-                  )}
-                  <CardHeader>
-                    <CardTitle className="text-text text-xl">
-                      {plan.name}
-                    </CardTitle>
-                    <CardDescription className="text-muted text-xs font-medium uppercase tracking-wide">
-                      {plan.tagline}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="flex flex-col flex-1">
-                    <div className="mb-4">
-                      <div className="text-3xl font-bold text-text">
-                        {plan.price}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {PUBLIC_TIERS.map((tier) => (
+              <Card
+                key={tier.id}
+                className={`border-2 relative flex flex-col transition-all border-border`}
+              >
+                <CardHeader>
+                  <CardTitle className="text-text text-xl">
+                    {tier.name}
+                  </CardTitle>
+                  <CardDescription className="text-muted text-xs font-medium uppercase tracking-wide">
+                    {tier.targetUser}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="flex flex-col flex-1">
+                  <div className="mb-4">
+                    <div className="text-3xl font-bold text-text">
+                      {tier.price}
+                      {tier.period ? (
                         <span className="text-sm text-muted font-normal">
-                          {plan.period}
+                          {tier.period}
                         </span>
-                      </div>
+                      ) : null}
                     </div>
-                    <p className="text-xs text-muted mb-4 leading-relaxed">
-                      {plan.description}
-                    </p>
-                    <ul className="space-y-3 mb-6 flex-1">
-                      {plan.features.map((feature, idx) => (
-                        <li key={idx} className="flex items-start gap-2">
-                          <IconCheck className="w-4 h-4 text-success mt-0.5 flex-shrink-0" />
-                          <span className="text-sm text-text">{feature}</span>
-                        </li>
-                      ))}
-                    </ul>
-                    <Link to="/signup">
-                      <Button
-                        className={`w-full ${
-                          isRecommended
-                            ? "bg-accent hover:bg-accent/90 text-white"
-                            : "bg-surface-raised hover:bg-surface-elevated text-text border border-border"
-                        }`}
-                      >
-                        {plan.tierId === null ? "Contact sales" : "Get started"}
-                      </Button>
-                    </Link>
-                  </CardContent>
-                </Card>
-              );
-            })}
+                  </div>
+                  <p className="text-xs text-muted mb-4 leading-relaxed">
+                    {tier.description}
+                  </p>
+                  <ul className="space-y-3 mb-6 flex-1">
+                    {tier.features.map((feature) => (
+                      <li key={feature} className="flex items-start gap-2">
+                        <IconCheck className="w-4 h-4 text-success mt-0.5 flex-shrink-0" />
+                        <span className="text-sm text-text">{feature}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  <TierCta
+                    label={tier.ctaLabel}
+                    href={tier.ctaHref}
+                    external={tier.ctaExternal}
+                    highlight={tier.highlight}
+                  />
+                </CardContent>
+              </Card>
+            ))}
           </div>
 
-          {/* FAQ */}
+          <div className="max-w-2xl mx-auto mt-12 rounded-xl border border-border bg-surface-raised p-6 text-center">
+            <h2 className="text-lg font-semibold text-text mb-2">
+              Hosted deployments
+            </h2>
+            <p className="text-sm text-muted leading-relaxed mb-4">
+              Need Axel in a dedicated, managed environment? We offer hosted
+              solutions scoped to your organisation — pricing depends on
+              requirements. Tell us what you need.
+            </p>
+            <a
+              href="mailto:admin@evans-software-soltuions.com?subject=Hosted%20Axel"
+              className="inline-flex text-accent font-medium hover:underline text-sm"
+            >
+              admin@evans-software-soltuions.com
+            </a>
+          </div>
+
+          <div className="max-w-2xl mx-auto mt-12 text-center text-sm text-muted">
+            <p>Cancel any time. No questions asked.</p>
+          </div>
+
           <div className="max-w-2xl mx-auto mt-16">
             <h2 className="text-2xl font-bold text-text mb-6 text-center">
               Common questions
@@ -100,28 +135,47 @@ export function Pricing() {
             <div className="space-y-6">
               <div>
                 <h3 className="text-text font-semibold mb-2">
-                  Can I change my plan later?
+                  What are the Free tier limits?
                 </h3>
                 <p className="text-muted text-sm">
-                  Yes, upgrade or downgrade any time. Changes take effect at the
-                  next billing cycle.
+                  Free is for meeting Axel and light personal use. We cap volume
+                  and sub-agents so expectations stay honest — upgrade when you
+                  outgrow them.
                 </p>
               </div>
               <div>
                 <h3 className="text-text font-semibold mb-2">
-                  Is there a free trial?
+                  How do I get access?
                 </h3>
                 <p className="text-muted text-sm">
-                  Yes, all plans include a 14-day free trial with full access.
+                  Join the waitlist. {RELEASE_EXPECTATION_COPY} We&apos;ll
+                  invite people in batches as we scale capacity.
                 </p>
               </div>
               <div>
                 <h3 className="text-text font-semibold mb-2">
-                  What payment methods do you accept?
+                  How does the Premium trial work?
                 </h3>
                 <p className="text-muted text-sm">
-                  All major credit cards, bank transfers, and enterprise
-                  invoicing.
+                  After you&apos;re up and running, you may see a time-limited
+                  Premium trial in-app — not a wall at signup. Example: try
+                  Premium free for 7 days; no card until day 8. Final terms TBD.
+                </p>
+              </div>
+              <div>
+                <h3 className="text-text font-semibold mb-2">
+                  What does Enterprise include?
+                </h3>
+                <p className="text-muted text-sm">
+                  SSO, audit logs, SLA options, custom retention, integrations,
+                  and dedicated support — tell us what you need at{" "}
+                  <a
+                    href="mailto:admin@evans-software-soltuions.com"
+                    className="text-accent hover:underline"
+                  >
+                    admin@evans-software-soltuions.com
+                  </a>
+                  .
                 </p>
               </div>
             </div>

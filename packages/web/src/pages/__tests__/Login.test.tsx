@@ -48,13 +48,14 @@ describe("Login", () => {
     expect(screen.getByLabelText(/password/i)).toBeDefined();
   });
 
-  it("renders link to sign up", () => {
+  it("renders join waitlist link to home form", () => {
     render(
       <MemoryRouter>
         <Login />
       </MemoryRouter>,
     );
-    expect(screen.getByRole("link", { name: /create one/i })).toBeDefined();
+    const link = screen.getByRole("link", { name: /join the waitlist/i });
+    expect(link.getAttribute("href")).toBe("/#waitlist");
   });
 
   it("calls signIn when form is submitted", async () => {

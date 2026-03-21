@@ -3,6 +3,7 @@ import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { AppHeader } from "../AppHeader";
 import { useAuth } from "@/hooks/useAuth";
+import { waitlistSignupHref } from "@/lib/waitlist";
 
 vi.mock("@/hooks/useAuth", () => ({ useAuth: vi.fn() }));
 
@@ -24,18 +25,17 @@ describe("AppHeader", () => {
     expect(logo.getAttribute("href")).toBe("/");
   });
 
-  it("renders Login and Sign Up when unauthenticated", () => {
+  it("renders Join waitlist when unauthenticated", () => {
     render(
       <MemoryRouter>
         <AppHeader />
       </MemoryRouter>,
     );
-    const loginLinks = screen.getAllByRole("link", { name: /^login$/i });
-    expect(loginLinks.length).toBeGreaterThanOrEqual(1);
-    expect(loginLinks[0]!.getAttribute("href")).toBe("/login");
-    const signUpLinks = screen.getAllByRole("link", { name: /sign up/i });
-    expect(signUpLinks.length).toBeGreaterThanOrEqual(1);
-    expect(signUpLinks[0]!.getAttribute("href")).toBe("/signup");
+    const waitlistLinks = screen.getAllByRole("link", {
+      name: /join waitlist/i,
+    });
+    expect(waitlistLinks.length).toBeGreaterThanOrEqual(1);
+    expect(waitlistLinks[0]!.getAttribute("href")).toBe(waitlistSignupHref());
   });
 
   it("renders Home nav and Logout when authenticated (no Dashboard link)", () => {

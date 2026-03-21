@@ -3,6 +3,7 @@ import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import UseCases from "../UseCases";
 import { useAuth } from "@/hooks/useAuth";
+import { waitlistSignupHref } from "@/lib/waitlist";
 
 vi.mock("@/hooks/useAuth", () => ({ useAuth: vi.fn() }));
 
@@ -15,10 +16,10 @@ function renderUseCases() {
 }
 
 beforeEach(() => {
-vi.mocked(useAuth).mockReturnValue({
-  isAuthenticated: false,
-  signOut: vi.fn(),
-} as unknown as ReturnType<typeof useAuth>);
+  vi.mocked(useAuth).mockReturnValue({
+    isAuthenticated: false,
+    signOut: vi.fn(),
+  } as unknown as ReturnType<typeof useAuth>);
 });
 
 describe("UseCases", () => {
@@ -27,37 +28,36 @@ describe("UseCases", () => {
     expect(screen.getByRole("heading", { name: /use cases/i })).toBeDefined();
   });
 
-  it("renders subtitle", () => {
+  it("renders four persona sections from messaging strategy", () => {
     renderUseCases();
-    expect(screen.getByText(/adapts to how you work/i)).toBeDefined();
+    expect(
+      screen.getByRole("heading", { name: /the knowledge worker/i }),
+    ).toBeDefined();
+    expect(
+      screen.getByRole("heading", { name: /the operator \/ team lead/i }),
+    ).toBeDefined();
+    expect(
+      screen.getByRole("heading", { name: /the developer/i }),
+    ).toBeDefined();
+    expect(
+      screen.getByRole("heading", { name: /the solopreneur/i }),
+    ).toBeDefined();
   });
 
-  it("renders all four use case card titles", () => {
+  it("renders See plans linking to /pricing", () => {
     renderUseCases();
-    expect(screen.getByText("Busy Professionals")).toBeDefined();
-    expect(screen.getByText("Founders & Solopreneurs")).toBeDefined();
-    expect(screen.getByText("Remote Teams")).toBeDefined();
-    expect(screen.getByText("Technical Teams")).toBeDefined();
+    const link = screen.getByRole("link", { name: /see plans/i });
+    expect(link.getAttribute("href")).toBe("/pricing");
   });
 
-  it("renders highlights for Busy Professionals", () => {
+  it("renders Join waitlist links to home waitlist with tier where set", () => {
     renderUseCases();
-    expect(screen.getByText("Inbox zero by 9am")).toBeDefined();
-    expect(screen.getByText("Daily summary brief")).toBeDefined();
-    expect(screen.getByText("Conflict-free scheduling")).toBeDefined();
-  });
-
-  it("renders highlights for Technical Teams", () => {
-    renderUseCases();
-    expect(screen.getByText("Full API access")).toBeDefined();
-    expect(screen.getByText("Code generation")).toBeDefined();
-    expect(screen.getByText("Custom integrations")).toBeDefined();
-  });
-
-  it("renders CTA link to /signup", () => {
-    renderUseCases();
-    const link = screen.getByRole("link", { name: /try axel for free/i });
-    expect(link.getAttribute("href")).toBe("/signup");
+    const hrefs = screen
+      .getAllByRole("link", { name: /join waitlist/i })
+      .map((l) => l.getAttribute("href"));
+    expect(hrefs).toContain(waitlistSignupHref("free"));
+    expect(hrefs).toContain(waitlistSignupHref("pro"));
+    expect(hrefs).toContain(waitlistSignupHref());
   });
 
   it("renders marketing nav", () => {

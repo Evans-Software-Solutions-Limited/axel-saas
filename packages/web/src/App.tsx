@@ -4,8 +4,6 @@ import { ThemeProvider } from "./components/theme-provider";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 
-import Login from "./pages/Login";
-import SignUp from "./pages/SignUp";
 import Subscribe from "./pages/Subscribe";
 import Dashboard from "./pages/Dashboard";
 import { Office } from "./pages/Office";
@@ -20,6 +18,7 @@ import Home from "./pages/Home";
 import UseCases from "./pages/UseCases";
 import Pricing from "./pages/Pricing";
 import About from "./pages/About";
+import WaitlistUnsubscribe from "./pages/WaitlistUnsubscribe";
 
 const queryClient = new QueryClient();
 
@@ -38,18 +37,9 @@ function ProtectedRoute({ children }: Readonly<{ children: React.ReactNode }>) {
   const { isAuthenticated } = useAuth();
 
   if (!isAuthenticated) {
-    return <Navigate to="/login" />;
-  }
-
-  return <>{children}</>;
-}
-
-/** Redirects to home (dashboard when logged in) if already authenticated. */
-function GuestOnlyRoute({ children }: Readonly<{ children: React.ReactNode }>) {
-  const { isAuthenticated } = useAuth();
-  if (isAuthenticated) {
     return <Navigate to="/" replace />;
   }
+
   return <>{children}</>;
 }
 
@@ -72,11 +62,7 @@ function App() {
           <Route
             path="/"
             element={
-              isAuthenticated ? (
-                <Navigate to="/dashboard" replace />
-              ) : (
-                <Home />
-              )
+              isAuthenticated ? <Navigate to="/dashboard" replace /> : <Home />
             }
           />
 
@@ -85,22 +71,14 @@ function App() {
           <Route path="/pricing" element={<Pricing />} />
           <Route path="/about" element={<About />} />
 
-          {/* Auth routes — redirect to homepage if already logged in */}
+          {/* Auth routes disabled during waitlist — send users home */}
+          <Route path="/login" element={<Navigate to="/" replace />} />
+          <Route path="/signup" element={<Navigate to="/" replace />} />
+
+          {/* Public waitlist unsubscribe — matches email link path */}
           <Route
-            path="/login"
-            element={
-              <GuestOnlyRoute>
-                <Login />
-              </GuestOnlyRoute>
-            }
-          />
-          <Route
-            path="/signup"
-            element={
-              <GuestOnlyRoute>
-                <SignUp />
-              </GuestOnlyRoute>
-            }
+            path="/waitlist/unsubscribe"
+            element={<WaitlistUnsubscribe />}
           />
 
           {/* Legal pages */}
