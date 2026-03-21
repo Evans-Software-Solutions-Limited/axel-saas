@@ -8,10 +8,6 @@ describe("PUBLIC_TIERS", () => {
     expect(ids).toEqual(["free", "premium", "enterprise"]);
   });
 
-  it("marks exactly one tier as highlight", () => {
-    expect(PUBLIC_TIERS.filter((t) => t.highlight).length).toBe(1);
-  });
-
   it("Free and Premium point at home waitlist with API tier", () => {
     const free = PUBLIC_TIERS.find((t) => t.id === "free")!;
     const premium = PUBLIC_TIERS.find((t) => t.id === "premium")!;
@@ -21,9 +17,10 @@ describe("PUBLIC_TIERS", () => {
     expect(premium.ctaExternal).toBe(false);
   });
 
-  it("Enterprise uses external mailto CTA", () => {
+  it("Enterprise uses same waitlist CTA with enterprise tier", () => {
     const ent = PUBLIC_TIERS.find((t) => t.id === "enterprise")!;
-    expect(ent.ctaExternal).toBe(true);
-    expect(ent.ctaHref.startsWith("mailto:")).toBe(true);
+    expect(ent.ctaLabel).toBe("Join waitlist");
+    expect(ent.ctaHref).toBe(waitlistSignupHref("enterprise"));
+    expect(ent.ctaExternal).toBe(false);
   });
 });

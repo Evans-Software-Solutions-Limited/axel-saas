@@ -41,11 +41,14 @@ describe("Pricing", () => {
     expect(screen.getByText("TBD")).toBeDefined();
   });
 
-  it("renders Talk to us for Enterprise linking to mailto", () => {
+  it("renders Join waitlist for Enterprise linking to home waitlist with tier", () => {
     renderPricing();
-    const link = screen.getByRole("link", { name: /talk to us/i });
-    expect(link.getAttribute("href")).toBe(
-      "mailto:admin@evans-software-soltuions.com",
+    const enterpriseLink = screen
+      .getAllByRole("link", { name: /join waitlist/i })
+      .find((l) => l.getAttribute("href") === waitlistSignupHref("enterprise"));
+    expect(enterpriseLink).toBeDefined();
+    expect(enterpriseLink!.getAttribute("href")).toBe(
+      waitlistSignupHref("enterprise"),
     );
   });
 
@@ -56,9 +59,10 @@ describe("Pricing", () => {
       .filter(
         (l) =>
           l.getAttribute("href") === waitlistSignupHref("free") ||
-          l.getAttribute("href") === waitlistSignupHref("pro"),
+          l.getAttribute("href") === waitlistSignupHref("pro") ||
+          l.getAttribute("href") === waitlistSignupHref("enterprise"),
       );
-    expect(tierLinks.length).toBeGreaterThanOrEqual(2);
+    expect(tierLinks.length).toBeGreaterThanOrEqual(3);
   });
 
   it("renders hosted deployments section", () => {

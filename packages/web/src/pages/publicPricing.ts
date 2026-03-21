@@ -13,7 +13,6 @@ export type PublicTier = {
   ctaLabel: string;
   ctaHref: string;
   ctaExternal?: boolean;
-  highlight?: boolean;
 };
 
 export const PUBLIC_TIERS: PublicTier[] = [
@@ -33,7 +32,6 @@ export const PUBLIC_TIERS: PublicTier[] = [
     ctaLabel: "Join waitlist",
     ctaHref: waitlistSignupHref("free"),
     ctaExternal: false,
-    highlight: true,
   },
   {
     id: "premium",
@@ -51,7 +49,6 @@ export const PUBLIC_TIERS: PublicTier[] = [
     ctaLabel: "Join waitlist",
     ctaHref: waitlistSignupHref("pro"),
     ctaExternal: false,
-    highlight: true,
   },
   {
     id: "enterprise",
@@ -67,8 +64,8 @@ export const PUBLIC_TIERS: PublicTier[] = [
       "Custom retention and data controls",
       "Dedicated support",
     ],
-    ctaLabel: "Talk to us",
-    ctaHref: "mailto:admin@evans-software-soltuions.com",
-    ctaExternal: true,
+    ctaLabel: "Join waitlist",
+    ctaHref: waitlistSignupHref("enterprise"),
+    ctaExternal: false,
   },
 ];

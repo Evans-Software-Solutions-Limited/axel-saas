@@ -12,25 +12,22 @@ import { IconCheck } from "@tabler/icons-react";
 import { PUBLIC_TIERS } from "./publicPricing";
 import { RELEASE_EXPECTATION_COPY } from "@/lib/waitlist";
 
+const tierCtaClassName =
+  "w-full bg-surface-raised hover:bg-surface-elevated text-text border border-border";
+
 function TierCta({
   label,
   href,
   external,
-  highlight,
 }: Readonly<{
   label: string;
   href: string;
   external?: boolean;
-  highlight?: boolean;
 }>) {
-  const className = highlight
-    ? "w-full bg-accent hover:bg-accent/90 text-white"
-    : "w-full bg-surface-raised hover:bg-surface-elevated text-text border border-border";
-
   if (external) {
     return (
       <a href={href} className="block">
-        <Button type="button" className={className}>
+        <Button type="button" className={tierCtaClassName}>
           {label}
         </Button>
       </a>
@@ -39,7 +36,7 @@ function TierCta({
 
   return (
     <Link to={href} className="block">
-      <Button type="button" className={className}>
+      <Button type="button" className={tierCtaClassName}>
         {label}
       </Button>
     </Link>
@@ -100,7 +97,6 @@ export function Pricing() {
                     label={tier.ctaLabel}
                     href={tier.ctaHref}
                     external={tier.ctaExternal}
-                    highlight={tier.highlight}
                   />
                 </CardContent>
               </Card>
