@@ -52,8 +52,9 @@ export function Pricing() {
             <h1 className="text-4xl font-bold text-text mb-4">Pricing</h1>
             <p className="text-muted text-lg max-w-2xl mx-auto">
               We&apos;re opening in stages. {RELEASE_EXPECTATION_COPY} Join the
-              waitlist for access; Premium pricing will be published here.
-              Enterprise and hosted solutions are a conversation.
+              waitlist for access. Premium is £49/month — Free users can
+              activate a 7-day trial from inside the app. Enterprise and hosted
+              solutions are a conversation.
             </p>
           </div>
 
@@ -113,10 +114,10 @@ export function Pricing() {
               requirements. Tell us what you need.
             </p>
             <a
-              href="mailto:admin@evans-software-soltuions.com?subject=Hosted%20Axel"
+              href="mailto:admin@evans-software-solutions.com?subject=Hosted%20Axel"
               className="inline-flex text-accent font-medium hover:underline text-sm"
             >
-              admin@evans-software-soltuions.com
+              admin@evans-software-solutions.com
             </a>
           </div>
 
@@ -153,9 +154,9 @@ export function Pricing() {
                   How does the Premium trial work?
                 </h3>
                 <p className="text-muted text-sm">
-                  After you&apos;re up and running, you may see a time-limited
-                  Premium trial in-app — not a wall at signup. Example: try
-                  Premium free for 7 days; no card until day 8. Final terms TBD.
+                  Free users can activate a 7-day Premium trial from inside the
+                  app — no card required until the trial ends. You&apos;re never
+                  hit with a paywall at signup.
                 </p>
               </div>
               <div>
@@ -166,10 +167,10 @@ export function Pricing() {
                   SSO, audit logs, SLA options, custom retention, integrations,
                   and dedicated support — tell us what you need at{" "}
                   <a
-                    href="mailto:admin@evans-software-soltuions.com"
+                    href="mailto:admin@evans-software-solutions.com"
                     className="text-accent hover:underline"
                   >
-                    admin@evans-software-soltuions.com
+                    admin@evans-software-solutions.com
                   </a>
                   .
                 </p>

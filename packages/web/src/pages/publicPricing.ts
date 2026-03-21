@@ -19,7 +19,7 @@ export const PUBLIC_TIERS: PublicTier[] = [
   {
     id: "free",
     name: "Free",
-    price: "$0",
+    price: "£0",
     period: "",
     targetUser: "Individuals evaluating; light personal use",
     description:
@@ -27,7 +27,7 @@ export const PUBLIC_TIERS: PublicTier[] = [
     features: [
       "Core Axel experience",
       "Briefs and light automation",
-      "Join the waitlist for early access",
+      "Activate a 7-day Premium trial from inside the app",
     ],
     ctaLabel: "Join waitlist",
     ctaHref: waitlistSignupHref("free"),
@@ -36,15 +36,16 @@ export const PUBLIC_TIERS: PublicTier[] = [
   {
     id: "premium",
     name: "Premium",
-    price: "TBD",
+    price: "£49",
     period: "/month",
     targetUser: "Professionals wanting full Axel capability",
     description:
       "Full calendar, comms, orchestration, and the features serious daily use needs.",
     features: [
       "Everything in Free, without the same caps",
+      "Bring your own model (BYOM)",
       "Deeper integrations and higher volume",
-      "In-app trials may appear after you start — not a cold wall at signup",
+      "Cancel any time",
     ],
     ctaLabel: "Join waitlist",
     ctaHref: waitlistSignupHref("pro"),

@@ -191,7 +191,7 @@ export function TermsOfService() {
               </h2>
               <p className="text-muted mt-2">
                 If you have any questions about these Terms, please contact us
-                at support@axel.ai.
+                at admin@evans-software-solutions.com.
               </p>
             </div>
           </section>

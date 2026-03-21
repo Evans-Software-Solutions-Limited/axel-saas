@@ -103,10 +103,10 @@ export function About() {
                 managed Axel environment — scoped, priced per engagement. If
                 that&apos;s you, reach out at{" "}
                 <a
-                  href="mailto:admin@evans-software-soltuions.com?subject=Hosted%20Axel"
+                  href="mailto:admin@evans-software-solutions.com?subject=Hosted%20Axel"
                   className="text-accent hover:underline"
                 >
-                  admin@evans-software-soltuions.com
+                  admin@evans-software-solutions.com
                 </a>{" "}
                 and we&apos;ll talk it through.
               </p>
@@ -131,10 +131,10 @@ export function About() {
                 Small team, big standards. If something breaks your trust, we
                 want to hear it — reach us at{" "}
                 <a
-                  href="mailto:admin@evans-software-soltuions.com"
+                  href="mailto:admin@evans-software-solutions.com"
                   className="text-accent hover:underline"
                 >
-                  admin@evans-software-soltuions.com
+                  admin@evans-software-solutions.com
                 </a>
                 .
               </p>

@@ -87,13 +87,13 @@ describe("MarketingLayout", () => {
     expect(pricingLink.className).toContain("font-medium");
   });
 
-  it("renders footer with Privacy Policy, Terms of Service, and Support links", () => {
+  it("renders footer with Privacy Policy, Terms of Service, and Contact links", () => {
     renderAt("/");
     expect(screen.getByRole("link", { name: /privacy policy/i })).toBeDefined();
     expect(
       screen.getByRole("link", { name: /terms of service/i }),
     ).toBeDefined();
-    expect(screen.getByRole("link", { name: /support/i })).toBeDefined();
+    expect(screen.getByRole("link", { name: /contact/i })).toBeDefined();
   });
 
   it("footer Privacy Policy links to /privacy", () => {
@@ -108,10 +108,12 @@ describe("MarketingLayout", () => {
     expect(link.getAttribute("href")).toBe("/terms");
   });
 
-  it("footer Support links to mailto:support@axel.ai", () => {
+  it("footer Contact links to mailto:admin@evans-software-solutions.com", () => {
     renderAt("/");
-    const link = screen.getByRole("link", { name: /support/i });
-    expect(link.getAttribute("href")).toBe("mailto:support@axel.ai");
+    const link = screen.getByRole("link", { name: /contact/i });
+    expect(link.getAttribute("href")).toBe(
+      "mailto:admin@evans-software-solutions.com",
+    );
   });
 
   it("renders OpenClaw attribution link", () => {

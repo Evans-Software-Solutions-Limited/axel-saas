@@ -35,10 +35,10 @@ describe("Pricing", () => {
     expect(screen.getByText(/^Enterprise$/)).toBeDefined();
   });
 
-  it("renders Free at $0 and Premium as TBD", () => {
+  it("renders Free at £0 and Premium at £49/month", () => {
     renderPricing();
-    expect(screen.getByText("$0")).toBeDefined();
-    expect(screen.getByText("TBD")).toBeDefined();
+    expect(screen.getByText("£0")).toBeDefined();
+    expect(screen.getByText("£49")).toBeDefined();
   });
 
   it("renders Join waitlist for Enterprise linking to home waitlist with tier", () => {
@@ -77,7 +77,7 @@ describe("Pricing", () => {
     expect(
       screen.getByRole("heading", { name: /what are the free tier limits/i }),
     ).toBeDefined();
-    expect(screen.getByText(/cancel any time/i)).toBeDefined();
+    expect(screen.getAllByText(/cancel any time/i).length).toBeGreaterThan(0);
   });
 
   it("Pricing nav link is active when at /pricing", () => {

@@ -25,10 +25,10 @@ export function MarketingLayout({
                 Terms of Service
               </Link>
               <a
-                href="mailto:support@axel.ai"
+                href="mailto:admin@evans-software-solutions.com"
                 className="hover:text-accent transition-colors"
               >
-                Support
+                Contact
               </a>
             </div>
           </div>

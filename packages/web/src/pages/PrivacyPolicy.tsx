@@ -132,7 +132,7 @@ export function PrivacyPolicy() {
               <h2 className="text-xl font-semibold text-text">9. Contact Us</h2>
               <p className="text-muted mt-2">
                 If you have any questions about this Privacy Policy, please
-                contact us at support@axel.ai.
+                contact us at admin@evans-software-solutions.com.
               </p>
             </div>
           </section>

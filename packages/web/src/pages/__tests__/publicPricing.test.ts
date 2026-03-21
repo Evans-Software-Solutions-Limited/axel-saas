@@ -17,6 +17,22 @@ describe("PUBLIC_TIERS", () => {
     expect(premium.ctaExternal).toBe(false);
   });
 
+  it("Premium is priced at £49/month and includes BYOM feature", () => {
+    const premium = PUBLIC_TIERS.find((t) => t.id === "premium")!;
+    expect(premium.price).toBe("£49");
+    expect(premium.period).toBe("/month");
+    expect(premium.features.some((f) => /bring your own model/i.test(f))).toBe(
+      true,
+    );
+  });
+
+  it("Free tier advertises 7-day Premium trial", () => {
+    const free = PUBLIC_TIERS.find((t) => t.id === "free")!;
+    expect(free.features.some((f) => /7-day premium trial/i.test(f))).toBe(
+      true,
+    );
+  });
+
   it("Enterprise uses same waitlist CTA with enterprise tier", () => {
     const ent = PUBLIC_TIERS.find((t) => t.id === "enterprise")!;
     expect(ent.ctaLabel).toBe("Join waitlist");
