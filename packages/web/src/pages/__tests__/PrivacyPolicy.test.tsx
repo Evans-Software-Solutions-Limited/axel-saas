@@ -24,13 +24,14 @@ describe("PrivacyPolicy", () => {
     expect(screen.getByRole("link", { name: /axel/i })).toBeDefined();
   });
 
-  it("renders sign in link in header", () => {
+  it("renders join waitlist link in header", () => {
     render(
       <MemoryRouter>
         <PrivacyPolicy />
       </MemoryRouter>,
     );
-    expect(screen.getByRole("link", { name: /sign in/i })).toBeDefined();
+    const link = screen.getByRole("link", { name: /join waitlist/i });
+    expect(link.getAttribute("href")).toBe("/#waitlist");
   });
 
   it("renders terms of service link in footer", () => {

@@ -10,10 +10,10 @@ export function PrivacyPolicy() {
             <span className="text-accent">A</span>xel
           </Link>
           <Link
-            to="/login"
+            to="/#waitlist"
             className="text-sm text-muted hover:text-accent transition-colors"
           >
-            Sign in
+            Join waitlist
           </Link>
         </div>
       </header>
@@ -132,7 +132,7 @@ export function PrivacyPolicy() {
               <h2 className="text-xl font-semibold text-text">9. Contact Us</h2>
               <p className="text-muted mt-2">
                 If you have any questions about this Privacy Policy, please
-                contact us at support@axel.ai.
+                contact us at admin@evans-software-solutions.com.
               </p>
             </div>
           </section>
