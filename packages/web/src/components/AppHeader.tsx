@@ -16,8 +16,9 @@ export function AppHeader() {
   return (
     <header className="border-b border-border bg-surface-raised sticky top-0 z-10 shrink-0">
       <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
-        <Link to="/" className="text-xl font-bold text-text">
-          <span className="text-accent">A</span>xel
+        <Link to="/" className="text-xl font-bold text-text flex items-center">
+          <img src="/axel-logo.png" alt="Axel" className="w-8 h-8 mr-2" />
+          Meet<span className="text-accent">Axel</span>
         </Link>
 
         {/* Desktop nav */}

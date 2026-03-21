@@ -48,8 +48,8 @@ Placeholder icons use the brand gradient. Replace them with your own assets:
 
 | File                           | Purpose                                | Recommended Sizes                                |
 | ------------------------------ | -------------------------------------- | ------------------------------------------------ |
-| `public/pwa-icon.svg`          | General app icon (any context)         | 192×192, 512×512 (or SVG with `sizes="any"`)     |
-| `public/pwa-maskable-icon.svg` | Maskable icon (Android adaptive icons) | Keep important content in center 80% "safe zone" |
+| `public/pwa-icon.png`          | General app icon (any context)         | 192×192, 512×512 (or SVG with `sizes="any"`)     |
+| `public/pwa-maskable-icon.png` | Maskable icon (Android adaptive icons) | Keep important content in center 80% "safe zone" |
 | `public/vite.svg`              | Favicon                                | 32×32 or small SVG                               |
 
 **For production:** Consider adding PNG versions (192×192, 512×512) for broader compatibility. Update the `icons` array in `vite.config.ts`:
