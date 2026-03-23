@@ -1,4 +1,5 @@
 User-agent: *
+Disallow: /
 
 # Public marketing and legal pages — index these
 Allow: /$
