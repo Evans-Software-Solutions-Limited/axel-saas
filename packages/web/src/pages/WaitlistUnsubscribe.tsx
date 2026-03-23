@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router";
 import { MarketingLayout } from "@/components/MarketingLayout";
+import { PageMeta } from "@/components/PageMeta";
 import { unsubscribeWaitlist } from "@/lib/waitlistApi";
 
 const MISSING_TOKEN_MSG =
@@ -38,6 +39,12 @@ export function WaitlistUnsubscribe() {
 
   return (
     <MarketingLayout>
+      <PageMeta
+        title="Unsubscribe from Waitlist — Axel"
+        description="Remove your email address from the Axel waitlist."
+        path="/waitlist/unsubscribe"
+        noIndex
+      />
       <section className="py-24 px-4 text-center">
         <div className="max-w-md mx-auto space-y-4">
           {phase === "loading" && (

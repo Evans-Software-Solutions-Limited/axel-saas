@@ -1,5 +1,6 @@
 import { Link } from "react-router";
 import { MarketingLayout } from "@/components/MarketingLayout";
+import { PageMeta } from "@/components/PageMeta";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -46,6 +47,11 @@ function TierCta({
 export function Pricing() {
   return (
     <MarketingLayout>
+      <PageMeta
+        title="Pricing — Axel AI Personal Assistant"
+        description="Free, Premium (£49/month), and Enterprise plans. 7-day Premium trial — no card required. Join the waitlist for early access."
+        path="/pricing"
+      />
       <section className="py-16 px-4">
         <div className="max-w-5xl mx-auto">
           <div className="text-center mb-12">

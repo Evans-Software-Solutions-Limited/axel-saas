@@ -1,8 +1,14 @@
 import { Link } from "react-router";
+import { PageMeta } from "@/components/PageMeta";
 
 export function TermsOfService() {
   return (
     <div className="min-h-screen bg-surface flex flex-col">
+      <PageMeta
+        title="Terms of Service — Axel"
+        description="The terms governing your use of the Axel AI personal assistant service, including subscription, acceptable use, and UK governing law."
+        path="/terms"
+      />
       {/* Header */}
       <header className="border-b border-border bg-surface-raised">
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">

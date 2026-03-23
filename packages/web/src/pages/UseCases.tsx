@@ -1,5 +1,6 @@
 import { Link } from "react-router";
 import { MarketingLayout } from "@/components/MarketingLayout";
+import { PageMeta } from "@/components/PageMeta";
 import { Button } from "@/components/ui/button";
 import { waitlistSignupHref } from "@/lib/waitlist";
 
@@ -73,6 +74,11 @@ function CtaButton({ cta }: Readonly<{ cta: SectionCta }>) {
 export function UseCases() {
   return (
     <MarketingLayout>
+      <PageMeta
+        title="Use Cases — Axel for Knowledge Workers, Operators, Developers & Solopreneurs"
+        description="See how Axel fits your role: daily briefs and meeting prep for knowledge workers, async catch-up for operators, and task management for solopreneurs."
+        path="/use-cases"
+      />
       <section className="py-16 px-4">
         <div className="max-w-3xl mx-auto">
           <div className="text-center mb-14">

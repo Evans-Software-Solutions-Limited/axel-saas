@@ -1,11 +1,17 @@
 import { Link } from "react-router";
 import { MarketingLayout } from "@/components/MarketingLayout";
+import { PageMeta } from "@/components/PageMeta";
 import { Button } from "@/components/ui/button";
 import { waitlistSignupHref } from "@/lib/waitlist";
 
 export function About() {
   return (
     <MarketingLayout>
+      <PageMeta
+        title="About Axel — Why We Built an AI PA for Everyone"
+        description="Axel exists to end tool sprawl. One context-aware AI assistant built on OpenClaw — approachable for anyone, deep enough for developers."
+        path="/about"
+      />
       <section className="py-16 px-4">
         <div className="max-w-3xl mx-auto">
           <h1 className="text-4xl font-bold text-text mb-10">
