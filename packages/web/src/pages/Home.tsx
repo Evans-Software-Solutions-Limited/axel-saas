@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { Link, useLocation } from "react-router";
 import { MarketingLayout } from "@/components/MarketingLayout";
+import { PageMeta } from "@/components/PageMeta";
 import { WaitlistForm } from "@/components/WaitlistForm";
 import { Button } from "@/components/ui/button";
 import {
@@ -54,6 +55,11 @@ export function Home() {
 
   return (
     <MarketingLayout>
+      <PageMeta
+        title="Axel — AI Personal Assistant for Everyone"
+        description="Axel handles your calendar, comms, and tasks — built for anyone, not just developers. One assistant for every kind of work. Join the waitlist."
+        path="/"
+      />
       {/* Hero */}
       <section className="py-24 px-4 text-center">
         <div className="max-w-3xl mx-auto space-y-6">

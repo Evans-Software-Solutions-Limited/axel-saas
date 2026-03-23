@@ -1,0 +1,20 @@
+User-agent: *
+
+# Public marketing and legal pages — index these
+Allow: /$
+Allow: /pricing$
+Allow: /use-cases$
+Allow: /about$
+Allow: /privacy$
+Allow: /terms$
+
+# Authenticated product surfaces — do not index
+Disallow: /dashboard/
+Disallow: /subscribe
+Disallow: /login
+Disallow: /signup
+
+# Utility / token-bearing pages — do not index
+Disallow: /waitlist/unsubscribe
+
+Sitemap: https://meetaxel.ai/sitemap.xml

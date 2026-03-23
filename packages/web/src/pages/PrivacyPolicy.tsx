@@ -1,8 +1,14 @@
 import { Link } from "react-router";
+import { PageMeta } from "@/components/PageMeta";
 
 export function PrivacyPolicy() {
   return (
     <div className="min-h-screen bg-surface flex flex-col">
+      <PageMeta
+        title="Privacy Policy — Axel"
+        description="How Axel collects, uses, and protects your personal data. We do not sell your information or train on your conversations."
+        path="/privacy"
+      />
       {/* Header */}
       <header className="border-b border-border bg-surface-raised">
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
