@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.0](https://github.com/Evans-Software-Solutions-Limited/axel-saas/compare/axel-saas-v1.0.0...axel-saas-v1.1.0) (2026-03-23)
+
+
+### Features
+
+* public SEO foundation for acquisition surfaces ([#51](https://github.com/Evans-Software-Solutions-Limited/axel-saas/issues/51)) ([0f0a9c3](https://github.com/Evans-Software-Solutions-Limited/axel-saas/commit/0f0a9c319829060a9ae003f4cb29acd89c597d19))
+
 ## 1.0.0 (2026-03-21)
 
 
