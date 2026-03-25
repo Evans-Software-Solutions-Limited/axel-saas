@@ -66,7 +66,6 @@ describe("AppHeader", () => {
       const toggle = screen.getByRole("button", {
         name: /toggle navigation menu/i,
       });
-      expect(toggle).toBeDefined();
       expect(toggle.getAttribute("aria-expanded")).toBe("false");
     });
 
@@ -87,7 +86,7 @@ describe("AppHeader", () => {
       const mobileNav = screen.getByRole("navigation", {
         name: /mobile navigation/i,
       });
-      expect(mobileNav).toBeDefined();
+      expect(mobileNav).not.toBeNull();
       expect(
         screen
           .getByRole("button", { name: /toggle navigation menu/i })
@@ -108,10 +107,10 @@ describe("AppHeader", () => {
       const mobileNav = screen.getByRole("navigation", {
         name: /mobile navigation/i,
       });
-      expect(mobileNav.querySelector('a[href="/"]')).toBeDefined();
-      expect(mobileNav.querySelector('a[href="/use-cases"]')).toBeDefined();
-      expect(mobileNav.querySelector('a[href="/pricing"]')).toBeDefined();
-      expect(mobileNav.querySelector('a[href="/about"]')).toBeDefined();
+      expect(mobileNav.querySelector('a[href="/"]')).not.toBeNull();
+      expect(mobileNav.querySelector('a[href="/use-cases"]')).not.toBeNull();
+      expect(mobileNav.querySelector('a[href="/pricing"]')).not.toBeNull();
+      expect(mobileNav.querySelector('a[href="/about"]')).not.toBeNull();
     });
 
     it("closes the mobile nav when a nav link is clicked", () => {
@@ -123,13 +122,10 @@ describe("AppHeader", () => {
       fireEvent.click(
         screen.getByRole("button", { name: /toggle navigation menu/i }),
       );
-      expect(
-        screen.getByRole("navigation", { name: /mobile navigation/i }),
-      ).toBeDefined();
-
       const mobileNav = screen.getByRole("navigation", {
         name: /mobile navigation/i,
       });
+      expect(mobileNav).not.toBeNull();
       const pricingLink = mobileNav.querySelector('a[href="/pricing"]')!;
       fireEvent.click(pricingLink as HTMLElement);
 
@@ -150,7 +146,7 @@ describe("AppHeader", () => {
       fireEvent.click(toggle);
       expect(
         screen.getByRole("navigation", { name: /mobile navigation/i }),
-      ).toBeDefined();
+      ).not.toBeNull();
 
       fireEvent.click(toggle);
       expect(
