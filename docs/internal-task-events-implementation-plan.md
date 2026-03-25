@@ -9,6 +9,7 @@ Define the first Axel SaaS implementation slice for an **internal event-driven t
 
 This is not just about Claude.
 It is the common lifecycle model for any background or internal task run that Axel may perform, including:
+
 - model-routed prep tasks
 - research/background reads
 - long-running summarisation/drafting work
@@ -16,6 +17,7 @@ It is the common lifecycle model for any background or internal task run that Ax
 - later UI visibility into what Axel is doing
 
 The local workspace version has now been proved in principle using:
+
 - append-only JSONL events
 - Claude launcher as first producer
 - conservative lifecycle events (`task.started`, `task.completed`, `task.failed`, `task.review_ready`)
@@ -29,6 +31,7 @@ The Axel SaaS version should reuse that contract, not invent a different one.
 Right now, without an explicit task lifecycle, the system has to guess from logs, provider text, or ad hoc state.
 
 That creates ambiguity around:
+
 - did the task actually start?
 - is it still running?
 - did it fail or merely go quiet?
@@ -48,6 +51,7 @@ This should not be guesswork.
 That separation matters.
 
 Producers may include:
+
 - cheap-lane prep worker
 - premium-lane finaliser
 - research worker
@@ -55,6 +59,7 @@ Producers may include:
 - future coding/automation producer
 
 Consumers may include:
+
 - task status UI
 - chat surface
 - notifications
@@ -68,6 +73,7 @@ Consumers may include:
 Keep the first Axel SaaS slice small and honest.
 
 ### Include
+
 - one internal task record / identity
 - append-only lifecycle events for that task
 - conservative status projection from events
@@ -75,6 +81,7 @@ Keep the first Axel SaaS slice small and honest.
 - one or two initial producers only
 
 ### Exclude for now
+
 - real-time streaming complexity
 - retries/orchestration engine
 - dependency graphs
@@ -99,6 +106,7 @@ This should stay boring.
 ### Why add `task.no_changes`
 
 The local smoke test already hit a meaningful real-world state:
+
 - task ran
 - no system failure occurred
 - but there were no keeper changes/artifacts
@@ -106,6 +114,7 @@ The local smoke test already hit a meaningful real-world state:
 That state matters for product truth.
 
 It should not be forced into either:
+
 - success with meaningful output, or
 - failure
 
@@ -114,6 +123,7 @@ So Axel SaaS should explicitly model it.
 ### Deferred event types
 
 Defer these until needed:
+
 - `task.progress`
 - `task.blocked`
 - `task.needs_human`
@@ -131,6 +141,7 @@ They are useful later, not required for the clean first slice.
 One row/document per task run.
 
 Suggested fields:
+
 - `id`
 - `userId`
 - `sessionId` or `conversationId`
@@ -150,6 +161,7 @@ This is the stable identity.
 Append-only records keyed by `taskId`.
 
 Suggested fields:
+
 - `id`
 - `taskId`
 - `eventType`
@@ -159,6 +171,7 @@ Suggested fields:
 - `payload` (JSON)
 
 Payload may include:
+
 - provider/model info
 - artifact references
 - timing
@@ -171,6 +184,7 @@ Payload may include:
 Do **not** treat raw events as the only read model for product UI.
 
 Instead, project events into a simple current-state view such as:
+
 - `queued`
 - `running`
 - `completed`
@@ -187,7 +201,9 @@ This is what the product should render.
 Start with the producers that align with the routing strategy.
 
 ### Producer 1 — Cheap-lane prep task
+
 Use for:
+
 - summaries
 - extraction
 - note cleanup
@@ -195,13 +211,16 @@ Use for:
 - report skeletons
 
 ### Producer 2 — Premium-lane finaliser
+
 Use for:
+
 - recommendation layer
 - final polish
 - trust-critical wording
 - judgment-heavy final output
 
 This maps directly to the product decision already locked:
+
 - cheap lane does the legwork
 - premium lane does the judgment
 
@@ -214,6 +233,7 @@ Claude was the first local producer, but for Axel SaaS the first product produce
 Keep them simple.
 
 ### Suggested projection
+
 - latest `task.started` with no terminal event → `running`
 - latest terminal event `task.completed` → `completed`
 - latest terminal event `task.failed` → `failed`
@@ -231,6 +251,7 @@ For v1, avoid clever state machines.
 The user should not need to understand event names.
 
 They should see clear state like:
+
 - Working on this
 - Done
 - Done — nothing changed
@@ -246,10 +267,12 @@ The chat/product layer can translate internal lifecycle truth into clean languag
 This task lifecycle system is the operational backbone for routing.
 
 Routing decides:
+
 - what lane should do the work
 - whether it is cheap, premium, or hybrid
 
 Task events answer:
+
 - what happened after routing
 - what state the work is in now
 - what the UI or follow-up logic should do next
@@ -262,25 +285,30 @@ It is the execution/lifecycle half of the same architecture.
 ## Recommended Engineering Order
 
 ### Phase 1 — Product contract only
+
 - define task + task_event shapes
 - define terminal statuses
 - define projection rules
 - define first producer interfaces
 
 ### Phase 2 — First storage implementation
+
 - add task + task event persistence in the product backend
 - append-only events
 - minimal state projection
 
 ### Phase 3 — First real product producer
+
 - cheap-lane prep task emits lifecycle events
 - backend can return projected state
 
 ### Phase 4 — UI visibility
+
 - show lightweight task status in chat / task surface
 - do not overbuild dashboards yet
 
 ### Phase 5 — Hybrid routing integration
+
 - cheap task starts
 - premium finaliser continues/finishes
 - both write to same task identity
@@ -307,6 +335,7 @@ Routing chooses the lane.
 Events make the work observable and trustworthy.
 
 The clean first product implementation should therefore be:
+
 1. task identity
 2. append-only task events
 3. projected current state
