@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { useSearchParams } from "react-router";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router";
 import { useAuth } from "@/hooks/useAuth";
 import {
   getOnboardingState,
@@ -15,7 +15,7 @@ import {
   type AgentStatus,
   type ChatMessage,
 } from "./chatApi";
-import { getRecommendedPlan, type Recommendation } from "../planRecommendation";
+import { getRecommendedPlan } from "../planRecommendation";
 import { useCheckoutSelection } from "@/hooks/useCheckoutSelection";
 import { ChatPresenter } from "./ChatPresenter";
 
@@ -70,7 +70,12 @@ export function ChatContainer() {
   const [chatMode, setChatMode] = useState<ChatMode>("loading");
   const [nextQuestion, setNextQuestion] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [recommendation] = useState<Recommendation>(getRecommendedPlan);
+  // Derive recommendation from real onboarding/chat signals. When messages is
+  // empty (new user in discovery mode) this returns null — no badge is shown.
+  const recommendation = useMemo(
+    () => getRecommendedPlan({ messages }),
+    [messages],
+  );
   const {
     loadingTier: discoveryLoadingTier,
     error: discoveryError,
@@ -82,14 +87,19 @@ export function ChatContainer() {
   const postCheckoutRef = useRef(searchParams.get("checkout") === "success");
   const pollingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mountedRef = useRef(true);
-  // Always points to the latest loadState — used by startConfirmingPaymentPoll
-  // to call back into loadState without creating a circular useCallback dependency.
-  const loadStateRef = useRef<() => Promise<void>>(async () => {});
+  // When payment-confirm poll sees subscription active, we request a reload
+  // via state so the load effect runs without a callback ref.
+  const [reloadTrigger, setReloadTrigger] = useState(0);
   // Incremented on every new poll chain start and on unmount cleanup.
   // Each in-progress poll iteration captures its generation at creation time
   // and stops if the current value no longer matches, preventing duplicate chains.
   const pollingGenerationRef = useRef(0);
-  const { setOnboardingCompleted, refreshOnboardingStatus } = useAuth();
+  const navigate = useNavigate();
+  const {
+    setOnboardingCompleted,
+    refreshOnboardingStatus,
+    onboardingCompleted,
+  } = useAuth();
 
   // Poll agent status until it becomes active, then switch to live mode.
   // A generation counter ensures that only one chain runs at a time: each call
@@ -149,10 +159,9 @@ export function ChatContainer() {
           agentStatus.success &&
           agentStatus.status !== "subscription_required"
         ) {
-          // Subscription is now active — re-run the full state load via ref
-          // to avoid a circular useCallback dependency on loadState.
-          // postCheckoutRef is already false so we won't loop back here.
-          void loadStateRef.current();
+          // Subscription is now active — request a reload so the load effect
+          // runs with the latest loadState (postCheckout is already false).
+          setReloadTrigger((t) => t + 1);
           return;
         }
       } catch {
@@ -202,14 +211,21 @@ export function ChatContainer() {
         setError(
           "Agent setup failed. Please contact support or try again later.",
         );
+      } else if (
+        agentStatus?.success &&
+        agentStatus.status === "subscription_required"
+      ) {
+        // Onboarding is done but no active subscription — send user to the
+        // dedicated subscribe page rather than surfacing plan cards in chat.
+        navigate("/subscribe");
       } else {
-        // Only inject the greeting when the dedicated Axel is confirmed active.
-        // For not_found or error fallbacks, start with an empty chat window.
-        const greeting =
-          agentStatus?.success && agentStatus.status === "active"
-            ? agentStatus.handoffGreeting
-            : undefined;
-        setMessages(buildHandoffMessages(greeting));
+        // When the dedicated agent is confirmed active, replace the onboarding
+        // transcript with the handoff greeting so the transition feels intentional.
+        // For not_found or error fallbacks, keep the existing messages so the user
+        // sees their onboarding context rather than a blank live-chat window.
+        if (agentStatus?.success && agentStatus.status === "active") {
+          setMessages(buildHandoffMessages(agentStatus.handoffGreeting));
+        }
         setChatMode("live");
       }
     } catch (err) {
@@ -220,7 +236,12 @@ export function ChatContainer() {
       setError(message);
       // Don't switch mode; stay in onboarding mode to allow retry
     }
-  }, [setOnboardingCompleted, refreshOnboardingStatus, startProvisioningPoll]);
+  }, [
+    setOnboardingCompleted,
+    refreshOnboardingStatus,
+    startProvisioningPoll,
+    navigate,
+  ]);
 
   // Load initial state - determines if onboarding or live chat
   const loadState = useCallback(async () => {
@@ -238,11 +259,9 @@ export function ChatContainer() {
         // This is expected when user hasn't completed onboarding yet
       }
 
-      // Show the discovery panel if subscription is required.
+      // Handle subscription_required status from the agent endpoint.
       // GET /users/me/agent returns this when the subscription is missing or
       // in a non-active/trialing state — it is not a phantom value.
-      // We keep the user in chat rather than navigating away so the plan
-      // recommendation can be shown with context.
       if (
         agentStatus?.success &&
         agentStatus.status === "subscription_required"
@@ -258,6 +277,14 @@ export function ChatContainer() {
           startConfirmingPaymentPoll();
           return;
         }
+        // Post-onboarding users must subscribe via the dedicated /subscribe
+        // page rather than seeing a duplicate plan picker inside chat.
+        if (onboardingCompleted) {
+          navigate("/subscribe");
+          return;
+        }
+        // Pre-onboarding (new) users see the discovery panel inline so they
+        // can pick a plan before starting the onboarding conversation.
         setChatMode("discovery");
         return;
       }
@@ -323,21 +350,30 @@ export function ChatContainer() {
     } finally {
       setIsLoadingState(false);
     }
+    // onboardingCompleted intentionally omitted: including it would re-run this
+    // effect when handleCompleteOnboarding sets it to true, causing a race and
+    // a "Loading…" flash. We read it in the subscription_required branch; when
+    // loadState is run from the reload-trigger effect we get the latest closure.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- see comment above
   }, [
     setOnboardingCompleted,
     refreshOnboardingStatus,
     startProvisioningPoll,
     startConfirmingPaymentPoll,
     setSearchParams,
+    navigate,
   ]);
-
-  // Keep the ref current on every render so startConfirmingPaymentPoll always
-  // calls back into the latest version of loadState without a circular dep.
-  loadStateRef.current = loadState;
 
   useEffect(() => {
     void loadState();
   }, [loadState]);
+
+  // When payment poll confirms subscription is active, reload state once.
+  useEffect(() => {
+    if (reloadTrigger === 0) return;
+    setReloadTrigger(0);
+    void loadState();
+  }, [reloadTrigger, loadState]);
 
   // Clean up any pending poll timer on unmount and guard async continuations.
   // Incrementing pollingGenerationRef cancels any in-flight poll iteration
@@ -415,7 +451,9 @@ export function ChatContainer() {
     } catch (sendError) {
       if (sendError instanceof SubscriptionRequiredError) {
         setMessages((current) => current.slice(0, -1));
-        setChatMode("discovery");
+        // Live mode is only reachable after onboarding; send to the dedicated
+        // subscribe page rather than surfacing plan cards inside chat.
+        navigate("/subscribe");
         return;
       }
       const message =
@@ -427,7 +465,7 @@ export function ChatContainer() {
     } finally {
       setIsSending(false);
     }
-  }, [chatMode, input, isSending]);
+  }, [chatMode, input, isSending, navigate]);
 
   const handleSend = useCallback(() => {
     if (chatMode === "onboarding") {
