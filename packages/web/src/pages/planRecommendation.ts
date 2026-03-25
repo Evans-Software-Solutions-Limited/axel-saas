@@ -116,7 +116,6 @@ const TIER_KEYWORDS: Array<{ tierId: string; keywords: string[] }> = [
       "technical",
       "programming",
       "exec",
-      "build",
     ],
   },
   {
@@ -177,11 +176,13 @@ const TIER_REASONS: Record<string, { reason: string; shortReason: string }> = {
 /**
  * Returns true when `keyword` appears in `text` at a word boundary, preventing
  * substring false positives (e.g. "exec" matching "executive").
+ * An optional trailing "s" is allowed so plurals like "teams" or "emails"
+ * match their base keyword without re-opening substring false positives.
  * Multi-word phrases are matched as complete boundary-delimited phrases.
  */
 function matchesKeyword(text: string, keyword: string): boolean {
   const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  return new RegExp(`\\b${escaped}\\b`).test(text);
+  return new RegExp(`\\b${escaped}s?\\b`).test(text);
 }
 
 /**

@@ -117,6 +117,45 @@ describe("getRecommendedPlan", () => {
     expect(result?.tierId).toBe("starter");
   });
 
+  it("does not recommend developer for 'build a team' — build is too generic", () => {
+    const result = getRecommendedPlan({
+      messages: [{ role: "user", content: "I want to build a team" }],
+    });
+    expect(result?.tierId).not.toBe("developer");
+    expect(result?.tierId).toBe("business");
+  });
+
+  it("does not recommend developer for 'build my email workflow'", () => {
+    const result = getRecommendedPlan({
+      messages: [
+        { role: "user", content: "I want to build my email workflow" },
+      ],
+    });
+    expect(result?.tierId).not.toBe("developer");
+    expect(result?.tierId).toBe("pro");
+  });
+
+  it("recommends business when user mentions teams (plural)", () => {
+    const result = getRecommendedPlan({
+      messages: [{ role: "user", content: "I manage multiple teams" }],
+    });
+    expect(result?.tierId).toBe("business");
+  });
+
+  it("recommends pro when user mentions emails (plural)", () => {
+    const result = getRecommendedPlan({
+      messages: [{ role: "user", content: "automate my emails" }],
+    });
+    expect(result?.tierId).toBe("pro");
+  });
+
+  it("recommends pro when user mentions meetings (plural)", () => {
+    const result = getRecommendedPlan({
+      messages: [{ role: "user", content: "I have a lot of meetings" }],
+    });
+    expect(result?.tierId).toBe("pro");
+  });
+
   it("developer takes priority over pro when both keywords are present", () => {
     const result = getRecommendedPlan({
       messages: [
