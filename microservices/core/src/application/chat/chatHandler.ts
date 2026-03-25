@@ -139,34 +139,6 @@ function validateGatewayUrl(urlString: string): string | null {
   }
 }
 
-/**
- * Emit a task.started event when a chat message is received, then emit a
- * terminal event when the response is known.  Failures here must never surface
- * to the caller — task tracking is additive, not load-bearing.
- */
-export async function emitChatTaskEvents(
-  userId: string,
-  taskSummary: string,
-  emitTerminal: (taskId: string) => Promise<void>,
-): Promise<void> {
-  try {
-    const task = await taskRepo.createTask({
-      userId,
-      source: "chat",
-      taskSummary,
-    });
-    await taskRepo.appendEvent({
-      taskId: task.id,
-      eventType: "task.started",
-      source: "chat",
-      payload: {},
-    });
-    await emitTerminal(task.id);
-  } catch (err) {
-    console.error("Task event emission failed (non-fatal):", err);
-  }
-}
-
 async function getDemoChatResponse(
   userId: string,
   message: string,
@@ -424,18 +396,19 @@ export const chatHandler = new Elysia({ name: "ChatHandler" })
             messageId?: string;
           };
 
-          // Emit task.completed — non-fatal if it fails.
+          // Emit task.completed — awaited so the write completes before Lambda
+          // returns; non-fatal if it fails.
           if (taskId) {
-            taskRepo
-              .appendEvent({
+            try {
+              await taskRepo.appendEvent({
                 taskId,
                 eventType: "task.completed",
                 source: "chat",
                 payload: {},
-              })
-              .catch((err) =>
-                console.error("Task completed event failed (non-fatal):", err),
-              );
+              });
+            } catch (err) {
+              console.error("Task completed event failed (non-fatal):", err);
+            }
           }
 
           return {
@@ -447,10 +420,11 @@ export const chatHandler = new Elysia({ name: "ChatHandler" })
         } catch (fetchError) {
           console.error("Gateway fetch error:", fetchError);
 
-          // Emit task.failed — non-fatal if it fails.
+          // Emit task.failed — awaited so the write completes before Lambda
+          // returns; non-fatal if it fails.
           if (taskId) {
-            taskRepo
-              .appendEvent({
+            try {
+              await taskRepo.appendEvent({
                 taskId,
                 eventType: "task.failed",
                 source: "chat",
@@ -460,10 +434,10 @@ export const chatHandler = new Elysia({ name: "ChatHandler" })
                       ? fetchError.message
                       : String(fetchError),
                 },
-              })
-              .catch((err) =>
-                console.error("Task failed event failed (non-fatal):", err),
-              );
+              });
+            } catch (err) {
+              console.error("Task failed event failed (non-fatal):", err);
+            }
           }
 
           // For development/demo, return a contextual response using onboarding data
