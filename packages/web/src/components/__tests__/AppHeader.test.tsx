@@ -83,7 +83,10 @@ describe("AppHeader", () => {
         screen.getByRole("button", { name: /toggle navigation menu/i }),
       );
 
-      screen.getByRole("navigation", { name: /mobile navigation/i });
+      const mobileNav = screen.getByRole("navigation", {
+        name: /mobile navigation/i,
+      });
+      expect(mobileNav).not.toBeNull();
       expect(
         screen
           .getByRole("button", { name: /toggle navigation menu/i })
@@ -122,6 +125,7 @@ describe("AppHeader", () => {
       const mobileNav = screen.getByRole("navigation", {
         name: /mobile navigation/i,
       });
+      expect(mobileNav).not.toBeNull();
       const pricingLink = mobileNav.querySelector('a[href="/pricing"]')!;
       fireEvent.click(pricingLink as HTMLElement);
 
@@ -140,7 +144,9 @@ describe("AppHeader", () => {
         name: /toggle navigation menu/i,
       });
       fireEvent.click(toggle);
-      screen.getByRole("navigation", { name: /mobile navigation/i });
+      expect(
+        screen.getByRole("navigation", { name: /mobile navigation/i }),
+      ).not.toBeNull();
 
       fireEvent.click(toggle);
       expect(
