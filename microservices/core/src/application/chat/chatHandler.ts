@@ -7,9 +7,11 @@ import {
 import { userRepository } from "../repositories/userRepository";
 import { ProvisioningRepository } from "../repositories/provisioningRepository";
 import { SubscriptionRepository } from "../repositories/subscriptionRepository";
+import { TaskRepository } from "../tasks/taskRepository";
 
 // Create instance for use in handler
 const provisioningRepo = new ProvisioningRepository();
+const taskRepo = new TaskRepository();
 
 // Types for API responses
 export interface ChatMessageRequest {
@@ -134,6 +136,34 @@ function validateGatewayUrl(urlString: string): string | null {
   } catch (err) {
     console.error("Invalid gateway URL:", err);
     return null;
+  }
+}
+
+/**
+ * Emit a task.started event when a chat message is received, then emit a
+ * terminal event when the response is known.  Failures here must never surface
+ * to the caller — task tracking is additive, not load-bearing.
+ */
+export async function emitChatTaskEvents(
+  userId: string,
+  taskSummary: string,
+  emitTerminal: (taskId: string) => Promise<void>,
+): Promise<void> {
+  try {
+    const task = await taskRepo.createTask({
+      userId,
+      source: "chat",
+      taskSummary,
+    });
+    await taskRepo.appendEvent({
+      taskId: task.id,
+      eventType: "task.started",
+      source: "chat",
+      payload: {},
+    });
+    await emitTerminal(task.id);
+  } catch (err) {
+    console.error("Task event emission failed (non-fatal):", err);
   }
 }
 
@@ -350,6 +380,26 @@ export const chatHandler = new Elysia({ name: "ChatHandler" })
           };
         }
 
+        // Create a task record and emit task.started before dispatching to the
+        // gateway.  Errors here are non-fatal — task tracking must not block chat.
+        let taskId: string | null = null;
+        try {
+          const task = await taskRepo.createTask({
+            userId: dbUser.id,
+            source: "chat",
+            taskSummary: body.message.slice(0, 200),
+          });
+          taskId = task.id;
+          await taskRepo.appendEvent({
+            taskId: task.id,
+            eventType: "task.started",
+            source: "chat",
+            payload: {},
+          });
+        } catch (taskStartErr) {
+          console.error("Task start event failed (non-fatal):", taskStartErr);
+        }
+
         try {
           const gatewayResponse = await fetch(`${gatewayUrl}/api/chat`, {
             method: "POST",
@@ -374,6 +424,20 @@ export const chatHandler = new Elysia({ name: "ChatHandler" })
             messageId?: string;
           };
 
+          // Emit task.completed — non-fatal if it fails.
+          if (taskId) {
+            taskRepo
+              .appendEvent({
+                taskId,
+                eventType: "task.completed",
+                source: "chat",
+                payload: {},
+              })
+              .catch((err) =>
+                console.error("Task completed event failed (non-fatal):", err),
+              );
+          }
+
           return {
             success: true,
             response:
@@ -382,6 +446,26 @@ export const chatHandler = new Elysia({ name: "ChatHandler" })
           };
         } catch (fetchError) {
           console.error("Gateway fetch error:", fetchError);
+
+          // Emit task.failed — non-fatal if it fails.
+          if (taskId) {
+            taskRepo
+              .appendEvent({
+                taskId,
+                eventType: "task.failed",
+                source: "chat",
+                payload: {
+                  error:
+                    fetchError instanceof Error
+                      ? fetchError.message
+                      : String(fetchError),
+                },
+              })
+              .catch((err) =>
+                console.error("Task failed event failed (non-fatal):", err),
+              );
+          }
+
           // For development/demo, return a contextual response using onboarding data
           if (process.env.NODE_ENV !== "production") {
             return getDemoChatResponse(dbUser.id, body.message);
