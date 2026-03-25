@@ -7,6 +7,7 @@
 
 A strong early Axel SaaS use case is not generic "AI chat".
 It is practical work support:
+
 - helping professionals document what they are doing
 - converting rough notes into clean outputs
 - drafting internal reports
@@ -20,6 +21,7 @@ This is especially relevant for Bradley's internal/work deployment path, where A
 ## Core jobs Axel should do here
 
 ### Documentation support
+
 - Turn raw notes into structured documents
 - Reorganise messy working docs into clear sections
 - Convert bullet points into readable internal prose
@@ -27,6 +29,7 @@ This is especially relevant for Bradley's internal/work deployment path, where A
 - Maintain continuity across ongoing workstreams
 
 ### Report writing support
+
 - Produce first-pass drafts from notes and source materials
 - Summarise multiple inputs into one coherent update
 - Create status reports, decision notes, and handoff summaries
@@ -34,6 +37,7 @@ This is especially relevant for Bradley's internal/work deployment path, where A
 - Help transform "what happened" into "what matters"
 
 ### Day-to-day work assistance
+
 - Read links, updates, and reference material before the user does
 - Prepare briefings for meetings or review sessions
 - Summarise email-like or document-heavy inputs
@@ -55,6 +59,7 @@ For many users, that is more valuable than open-ended chat.
 ## How this should feel
 
 A user should feel that Axel:
+
 - saves them time before they start writing
 - improves clarity once they do start
 - helps them finish documentation they would otherwise delay
@@ -67,7 +72,9 @@ This is a practical, paid-for benefit.
 ## Free vs Paid experience
 
 ### Free tier
+
 Useful but bounded:
+
 - summaries
 - note cleanup
 - basic report skeletons
@@ -78,7 +85,9 @@ Useful but bounded:
 The free tier should feel genuinely helpful for low-stakes documentation tasks.
 
 ### Paid tiers
+
 Higher-trust support:
+
 - better reasoning and synthesis
 - stronger final writing quality
 - more reliable outputs
@@ -88,6 +97,7 @@ Higher-trust support:
 
 The upgrade path is not "more tokens".
 It is:
+
 - better judgment
 - better polish
 - better reliability
@@ -100,7 +110,9 @@ It is:
 This use case is well-suited to split routing:
 
 ### Cheap / free lane
+
 Use for:
+
 - reading sources
 - extracting facts
 - pulling actions and risks
@@ -109,7 +121,9 @@ Use for:
 - low-stakes internal cleanup
 
 ### Premium lane
+
 Use for:
+
 - final report refinement
 - judgment-heavy synthesis
 - stakeholder-facing writing quality
