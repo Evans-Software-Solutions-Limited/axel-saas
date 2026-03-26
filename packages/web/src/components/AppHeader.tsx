@@ -10,6 +10,13 @@ const NAV_LINKS = [
   { label: "About", to: "/about" },
 ] as const;
 
+function getIsActive(to: string, pathname: string): boolean {
+  if (to === "/") {
+    return pathname === "/" || pathname.startsWith("/dashboard");
+  }
+  return pathname === to;
+}
+
 export function AppHeader() {
   const location = useLocation();
   const { isAuthenticated, signOut } = useAuth();
@@ -29,11 +36,7 @@ export function AppHeader() {
           className="hidden md:flex items-center gap-6"
         >
           {NAV_LINKS.map(({ label, to }) => {
-            const isHome = to === "/";
-            const isActive = isHome
-              ? location.pathname === "/" ||
-                location.pathname.startsWith("/dashboard")
-              : location.pathname === to;
+            const isActive = getIsActive(to, location.pathname);
             return (
               <Link
                 key={to}
@@ -138,11 +141,7 @@ export function AppHeader() {
           className="md:hidden border-t border-border bg-surface-raised px-4 py-3 flex flex-col gap-1"
         >
           {NAV_LINKS.map(({ label, to }) => {
-            const isHome = to === "/";
-            const isActive = isHome
-              ? location.pathname === "/" ||
-                location.pathname.startsWith("/dashboard")
-              : location.pathname === to;
+            const isActive = getIsActive(to, location.pathname);
             return (
               <Link
                 key={to}
