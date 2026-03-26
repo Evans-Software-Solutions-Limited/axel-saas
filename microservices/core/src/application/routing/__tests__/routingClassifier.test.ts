@@ -99,6 +99,20 @@ describe("classifyMessage", () => {
       );
     });
 
+    it("does not false-positive on 'current' (contains 'rent' as substring)", () => {
+      expect(classifyMessage("current 3 tenants need attention")).toBe("clean");
+    });
+
+    it("does not false-positive on 'parent' (contains 'rent' as substring)", () => {
+      expect(classifyMessage("contact the parent 5 times this week")).toBe(
+        "clean",
+      );
+    });
+
+    it("does not false-positive on 'different' (contains 'rent' as substring)", () => {
+      expect(classifyMessage("different 10 options available")).toBe("clean");
+    });
+
     it("prioritises financial-data over pii-suspected when both present", () => {
       // Contains both a sort code (PII) and a currency amount (financial)
       expect(classifyMessage("Account 20-00-00 owes £300")).toBe(

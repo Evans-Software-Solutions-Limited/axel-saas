@@ -15,8 +15,13 @@
 // Primitives
 // ---------------------------------------------------------------------------
 
-/** Subscription tiers — canonical definition for routing decisions. */
-export type SubscriptionTier = "starter" | "pro" | "business" | "developer";
+/**
+ * Subscription tiers — imported from the repository that derives this type
+ * from the DB schema enum, so routing stays in sync with the source of truth
+ * automatically.
+ */
+import type { SubscriptionTier } from "../repositories/subscriptionRepository";
+export type { SubscriptionTier };
 
 /**
  * Classification of data present in a user message.

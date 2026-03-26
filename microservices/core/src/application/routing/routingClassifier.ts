@@ -39,8 +39,9 @@ const PII_PATTERNS: RegExp[] = [
 const FINANCIAL_PATTERNS: RegExp[] = [
   // Currency amounts: £1,200 / £12.50 / $500 / €99
   /[£$€]\s?\d[\d,]*(?:\.\d{1,2})?/,
-  // "owes £X" / "rent of £X" style phrases
-  /(?:owes?|rent|arrears?|balance|invoice|payment)\s+(?:of\s+)?[£$€]?\s?\d/i,
+  // "owes £X" / "rent of £X" style phrases (\b prevents false-positives on
+  // substrings like "current", "parent", "different" that contain "rent")
+  /\b(?:owes?|rent|arrears?|balance|invoice|payment)\s+(?:of\s+)?[£$€]?\s?\d/i,
   // Account/reference numbers that look financial (IBAN-style or long numeric refs)
   /\b[A-Z]{2}\d{2}[A-Z0-9]{4}\d{7,}\b/,
 ];
