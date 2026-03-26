@@ -249,6 +249,84 @@ export const onboardingState = pgTable(
 export type OnboardingState = typeof onboardingState.$inferSelect;
 export type NewOnboardingState = typeof onboardingState.$inferInsert;
 
+// ─── Tasks ────────────────────────────────────────────────────────────────────
+
+export const tasks = pgTable(
+  "tasks",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id").notNull(),
+    source: text("source").notNull(),
+    taskSummary: text("task_summary"),
+    repo: text("repo"),
+    branch: text("branch"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => ({
+    userIdIdx: index("tasks_user_id_idx").on(table.userId),
+    tasksUserFk: foreignKey({
+      columns: [table.userId],
+      foreignColumns: [users.id],
+      name: "tasks_user_id_fkey",
+    }).onDelete("cascade"),
+  }),
+);
+
+export type Task = typeof tasks.$inferSelect;
+export type NewTask = typeof tasks.$inferInsert;
+
+// Task event types — append-only log of what happened to a task.
+// Use text (not pgEnum) so new event types can be added without a DB migration.
+export type TaskEventType =
+  | "task.started"
+  | "task.completed"
+  | "task.failed"
+  | "task.review_ready"
+  | "task.no_changes";
+
+// Projected task state derived from the event log.
+export type TaskState =
+  | "running"
+  | "completed"
+  | "failed"
+  | "review_ready"
+  | "no_changes"
+  | "unknown";
+
+// task_events is append-only — no updatedAt column by design.
+export const taskEvents = pgTable(
+  "task_events",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    taskId: uuid("task_id").notNull(),
+    eventType: text("event_type").notNull().$type<TaskEventType>(),
+    source: text("source").notNull(),
+    payload: jsonb("payload")
+      .$type<Record<string, unknown>>()
+      .notNull()
+      .default({}),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => ({
+    taskIdIdx: index("task_events_task_id_idx").on(table.taskId),
+    taskEventsFk: foreignKey({
+      columns: [table.taskId],
+      foreignColumns: [tasks.id],
+      name: "task_events_task_id_fkey",
+    }).onDelete("cascade"),
+  }),
+);
+
+export type TaskEvent = typeof taskEvents.$inferSelect;
+export type NewTaskEvent = typeof taskEvents.$inferInsert;
+
 // ─── Waitlist ──────────────────────────────────────────────────────────────────
 
 export const waitlistInterestedInEnum = pgEnum("waitlist_interested_in", [
