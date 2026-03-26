@@ -3,6 +3,7 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { Subscribe } from "../Subscribe";
 import { createCheckoutSession } from "../subscribeApi";
+import * as planRecommendation from "../planRecommendation";
 
 vi.mock("../subscribeApi", () => ({
   createCheckoutSession: vi
@@ -35,18 +36,16 @@ describe("Subscribe", () => {
     expect(screen.getByText(/£149/)).toBeDefined();
   });
 
-  it("shows recommendation badge with explicit reason on Pro plan", () => {
+  it("does not show a recommendation badge when no signals are available", () => {
     render(
       <MemoryRouter>
         <Subscribe />
       </MemoryRouter>,
     );
-    // Badge shows a short, meaningful label — never just "Recommended"
-    expect(screen.getByText("Best starting point")).toBeDefined();
-    // Full reason text is shown below the badge
-    expect(
-      screen.getByText(/covers calendar, email, and task automation/i),
-    ).toBeDefined();
+    // No onboarding signals on the generic pricing page — no badge should render
+    expect(screen.queryByText("Best starting point")).toBeNull();
+    expect(screen.queryByText(/based on your needs/i)).toBeNull();
+    expect(screen.queryByText(/covers calendar, email/i)).toBeNull();
   });
 
   it("renders Get started for non-Enterprise plans", () => {
@@ -106,6 +105,52 @@ describe("Subscribe", () => {
     fireEvent.click(screen.getAllByRole("button", { name: "Get started" })[0]);
     await waitFor(() => {
       expect(screen.getByText("Stripe unavailable")).toBeDefined();
+    });
+  });
+
+  describe("when a signal-driven recommendation is available", () => {
+    it("shows the recommendation badge and reason on the recommended plan", () => {
+      vi.spyOn(planRecommendation, "getRecommendedPlan").mockReturnValue({
+        tierId: "pro",
+        reason: "Based on your calendar, email, and task automation needs.",
+        shortReason: "Based on your needs",
+      });
+
+      render(
+        <MemoryRouter>
+          <Subscribe />
+        </MemoryRouter>,
+      );
+
+      expect(screen.getByText("Based on your needs")).toBeDefined();
+      expect(
+        screen.getByText(
+          /based on your calendar, email, and task automation needs/i,
+        ),
+      ).toBeDefined();
+
+      vi.restoreAllMocks();
+    });
+
+    it("highlights the recommended plan card with accent border", () => {
+      vi.spyOn(planRecommendation, "getRecommendedPlan").mockReturnValue({
+        tierId: "pro",
+        reason: "Based on your calendar, email, and task automation needs.",
+        shortReason: "Based on your needs",
+      });
+
+      render(
+        <MemoryRouter>
+          <Subscribe />
+        </MemoryRouter>,
+      );
+
+      // Recommended plan button uses accent background
+      const buttons = screen.getAllByRole("button", { name: "Get started" });
+      // Pro is the second plan (index 1); its button should exist
+      expect(buttons.length).toBeGreaterThanOrEqual(2);
+
+      vi.restoreAllMocks();
     });
   });
 

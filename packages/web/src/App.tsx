@@ -4,8 +4,6 @@ import { ThemeProvider } from "./components/theme-provider";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 
-import Login from "./pages/Login";
-import SignUp from "./pages/SignUp";
 import Subscribe from "./pages/Subscribe";
 import Dashboard from "./pages/Dashboard";
 import { Office } from "./pages/Office";
@@ -16,6 +14,11 @@ import { Chat } from "./pages/Chat";
 import { Crons } from "./pages/Crons";
 import { Tasks } from "./pages/Tasks";
 import { Integrations } from "./pages/Integrations";
+import Home from "./pages/Home";
+import UseCases from "./pages/UseCases";
+import Pricing from "./pages/Pricing";
+import About from "./pages/About";
+import WaitlistUnsubscribe from "./pages/WaitlistUnsubscribe";
 
 const queryClient = new QueryClient();
 
@@ -34,18 +37,9 @@ function ProtectedRoute({ children }: Readonly<{ children: React.ReactNode }>) {
   const { isAuthenticated } = useAuth();
 
   if (!isAuthenticated) {
-    return <Navigate to="/login" />;
-  }
-
-  return <>{children}</>;
-}
-
-/** Redirects to homepage if user is already authenticated (for login/signup). */
-function GuestOnlyRoute({ children }: Readonly<{ children: React.ReactNode }>) {
-  const { isAuthenticated } = useAuth();
-  if (isAuthenticated) {
     return <Navigate to="/" replace />;
   }
+
   return <>{children}</>;
 }
 
@@ -60,36 +54,31 @@ function App() {
     );
   }
 
-  let rootRedirectTo: string;
-  if (isAuthenticated) {
-    rootRedirectTo = onboardingCompleted ? "/dashboard" : "/dashboard/chat";
-  } else {
-    rootRedirectTo = "/login";
-  }
-
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
         <Routes>
-          {/* Root redirect */}
-          <Route path="/" element={<Navigate to={rootRedirectTo} replace />} />
-
-          {/* Auth routes — redirect to homepage if already logged in */}
+          {/* Root: marketing home when logged out, redirect to dashboard when logged in */}
           <Route
-            path="/login"
+            path="/"
             element={
-              <GuestOnlyRoute>
-                <Login />
-              </GuestOnlyRoute>
+              isAuthenticated ? <Navigate to="/dashboard" replace /> : <Home />
             }
           />
+
+          {/* Marketing pages (public) */}
+          <Route path="/use-cases" element={<UseCases />} />
+          <Route path="/pricing" element={<Pricing />} />
+          <Route path="/about" element={<About />} />
+
+          {/* Auth routes disabled during waitlist — send users home */}
+          <Route path="/login" element={<Navigate to="/" replace />} />
+          <Route path="/signup" element={<Navigate to="/" replace />} />
+
+          {/* Public waitlist unsubscribe — matches email link path */}
           <Route
-            path="/signup"
-            element={
-              <GuestOnlyRoute>
-                <SignUp />
-              </GuestOnlyRoute>
-            }
+            path="/waitlist/unsubscribe"
+            element={<WaitlistUnsubscribe />}
           />
 
           {/* Legal pages */}

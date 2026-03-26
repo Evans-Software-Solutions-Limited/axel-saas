@@ -2,8 +2,12 @@ import { treaty } from "@elysiajs/eden";
 import { type CoreApi } from "@axel-saas/core";
 import { supabase } from "@/lib/supabase";
 
+export const CORE_API_URL = import.meta.env.DEV
+  ? `${window.location.origin}/api`
+  : import.meta.env.VITE_CORE_API_URL;
+
 export const api = {
-  core: treaty<CoreApi>(import.meta.env.VITE_CORE_API_URL, {
+  core: treaty<CoreApi>(CORE_API_URL, {
     headers: async () => {
       const {
         data: { session },

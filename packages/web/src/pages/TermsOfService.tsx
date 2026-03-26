@@ -1,8 +1,14 @@
 import { Link } from "react-router";
+import { PageMeta } from "@/components/PageMeta";
 
 export function TermsOfService() {
   return (
     <div className="min-h-screen bg-surface flex flex-col">
+      <PageMeta
+        title="Terms of Service — Axel"
+        description="The terms governing your use of the Axel AI personal assistant service, including subscription, acceptable use, and UK governing law."
+        path="/terms"
+      />
       {/* Header */}
       <header className="border-b border-border bg-surface-raised">
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
@@ -10,10 +16,10 @@ export function TermsOfService() {
             <span className="text-accent">A</span>xel
           </Link>
           <Link
-            to="/login"
+            to="/#waitlist"
             className="text-sm text-muted hover:text-accent transition-colors"
           >
-            Sign in
+            Join waitlist
           </Link>
         </div>
       </header>
@@ -191,7 +197,7 @@ export function TermsOfService() {
               </h2>
               <p className="text-muted mt-2">
                 If you have any questions about these Terms, please contact us
-                at support@axel.ai.
+                at admin@evans-software-solutions.com.
               </p>
             </div>
           </section>

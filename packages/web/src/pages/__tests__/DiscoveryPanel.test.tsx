@@ -138,6 +138,49 @@ describe("DiscoveryPanel", () => {
     expect(screen.getByRole("button", { name: "Contact sales" })).toBeDefined();
   });
 
+  it("does not show a recommendation badge when recommendation is null", () => {
+    render(
+      <DiscoveryPanel
+        recommendation={null}
+        onSelectPlan={vi.fn()}
+        loadingTier={null}
+        error={null}
+      />,
+    );
+    expect(screen.queryByText("Best starting point")).toBeNull();
+    expect(screen.queryByText(/based on your needs/i)).toBeNull();
+    // Plans are still rendered
+    expect(screen.getByText("Pro")).toBeDefined();
+  });
+
+  it("does not claim a suggestion in the intro when recommendation is null", () => {
+    render(
+      <DiscoveryPanel
+        recommendation={null}
+        onSelectPlan={vi.fn()}
+        loadingTier={null}
+        error={null}
+      />,
+    );
+    expect(screen.queryByText(/i've suggested one below/i)).toBeNull();
+    // Generic intro copy is still shown
+    expect(
+      screen.getByText(/pick a plan that fits how you work/i),
+    ).toBeDefined();
+  });
+
+  it("shows the suggestion claim in the intro when a recommendation is present", () => {
+    render(
+      <DiscoveryPanel
+        recommendation={recommendation}
+        onSelectPlan={vi.fn()}
+        loadingTier={null}
+        error={null}
+      />,
+    );
+    expect(screen.getByText(/i've suggested one below/i)).toBeDefined();
+  });
+
   it("calls onSelectPlan with null for Enterprise Contact sales", () => {
     const onSelectPlan = vi.fn();
     render(

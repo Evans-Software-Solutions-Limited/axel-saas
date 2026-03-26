@@ -7,8 +7,8 @@ export function useCheckoutSelection() {
 
   const handleSelectPlan = useCallback(async (tierId: string | null) => {
     if (!tierId) {
-      // Enterprise — contact sales
-      window.location.assign("mailto:sales@axel.ai");
+      // Enterprise — contact us
+      window.location.assign("mailto:admin@evans-software-solutions.com");
       return;
     }
     setError(null);

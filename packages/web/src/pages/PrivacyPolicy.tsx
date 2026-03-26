@@ -1,8 +1,14 @@
 import { Link } from "react-router";
+import { PageMeta } from "@/components/PageMeta";
 
 export function PrivacyPolicy() {
   return (
     <div className="min-h-screen bg-surface flex flex-col">
+      <PageMeta
+        title="Privacy Policy — Axel"
+        description="How Axel collects, uses, and protects your personal data. We do not sell your information or train on your conversations."
+        path="/privacy"
+      />
       {/* Header */}
       <header className="border-b border-border bg-surface-raised">
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
@@ -10,10 +16,10 @@ export function PrivacyPolicy() {
             <span className="text-accent">A</span>xel
           </Link>
           <Link
-            to="/login"
+            to="/#waitlist"
             className="text-sm text-muted hover:text-accent transition-colors"
           >
-            Sign in
+            Join waitlist
           </Link>
         </div>
       </header>
@@ -132,7 +138,7 @@ export function PrivacyPolicy() {
               <h2 className="text-xl font-semibold text-text">9. Contact Us</h2>
               <p className="text-muted mt-2">
                 If you have any questions about this Privacy Policy, please
-                contact us at support@axel.ai.
+                contact us at admin@evans-software-solutions.com.
               </p>
             </div>
           </section>

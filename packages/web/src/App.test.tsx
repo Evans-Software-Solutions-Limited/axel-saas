@@ -27,24 +27,32 @@ describe("App", () => {
     vi.mocked(useAuth).mockReturnValue(mockAuth());
   });
 
-  it("redirects unauthenticated user to login", () => {
+  it("shows marketing home page to unauthenticated user at /", () => {
     vi.mocked(useAuth).mockReturnValue(mockAuth());
     render(
       <MemoryRouter initialEntries={["/"]}>
         <App />
       </MemoryRouter>,
     );
-    expect(screen.getByText("Welcome back")).toBeDefined();
+    expect(
+      screen.getByRole("heading", {
+        name: /one assistant\. every kind of work/i,
+      }),
+    ).toBeDefined();
   });
 
-  it("redirects to login when unauthenticated user visits protected route", () => {
+  it("redirects unauthenticated user from protected route to home (not login)", () => {
     vi.mocked(useAuth).mockReturnValue(mockAuth());
     render(
       <MemoryRouter initialEntries={["/subscribe"]}>
         <App />
       </MemoryRouter>,
     );
-    expect(screen.getByText("Welcome back")).toBeDefined();
+    expect(
+      screen.getByRole("heading", {
+        name: /one assistant\. every kind of work/i,
+      }),
+    ).toBeDefined();
   });
 
   it("shows loading when auth is loading", () => {
@@ -61,7 +69,7 @@ describe("App", () => {
     expect(screen.getByText(/loading/i)).toBeDefined();
   });
 
-  it("redirects authenticated user without onboarding to chat (pre-onboarding state)", () => {
+  it("redirects authenticated user without onboarding from / to chat", () => {
     vi.mocked(useAuth).mockReturnValue(
       mockAuth({
         isAuthenticated: true,
@@ -75,12 +83,10 @@ describe("App", () => {
         <App />
       </MemoryRouter>,
     );
-    // Pre-onboarding users should be redirected to /dashboard/chat
-    // The Dashboard should render with Chat tab active
     expect(screen.getAllByText("Chat")[0]).toBeDefined();
   });
 
-  it("redirects authenticated user with onboarding to dashboard", () => {
+  it("redirects authenticated user with onboarding from / to office", () => {
     vi.mocked(useAuth).mockReturnValue(
       mockAuth({
         isAuthenticated: true,
@@ -97,7 +103,7 @@ describe("App", () => {
     expect(screen.getAllByText("Office")[0]).toBeDefined();
   });
 
-  it("redirects authenticated users away from /login", () => {
+  it("redirects authenticated users away from /login to home (dashboard)", () => {
     vi.mocked(useAuth).mockReturnValue(
       mockAuth({
         isAuthenticated: true,

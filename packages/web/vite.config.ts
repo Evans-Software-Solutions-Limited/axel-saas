@@ -6,16 +6,27 @@ import { VitePWA } from "vite-plugin-pwa";
 
 // https://vite.dev/config/
 export default defineConfig({
+  server: {
+    proxy: {
+      // Proxy API requests to the AWS API Gateway
+      "/api": {
+        target: process.env.VITE_CORE_API_URL || "http://localhost:3000",
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api/, ""),
+        secure: false,
+      },
+    },
+  },
   plugins: [
     react(),
     tailwindcss(),
     VitePWA({
       registerType: "autoUpdate",
-      includeAssets: ["vite.svg", "pwa-icon.svg", "pwa-maskable-icon.svg"],
+      includeAssets: ["vite.svg", "pwa-icon.png", "pwa-maskable-icon.png"],
       manifest: {
-        name: "Web App",
-        short_name: "Web",
-        description: "A Progressive Web App built with Vite",
+        name: "Meet Axel AI",
+        short_name: "Axel",
+        description: "Meet Axel; your AI personal assistant",
         theme_color: "#ef5e41",
         background_color: "#02040f",
         display: "standalone",
@@ -24,15 +35,15 @@ export default defineConfig({
         scope: "/",
         icons: [
           {
-            src: "/pwa-icon.svg",
+            src: "/pwa-icon.png",
             sizes: "any",
-            type: "image/svg+xml",
+            type: "image/png",
             purpose: "any",
           },
           {
-            src: "/pwa-maskable-icon.svg",
+            src: "/pwa-maskable-icon.png",
             sizes: "any",
-            type: "image/svg+xml",
+            type: "image/png",
             purpose: "maskable",
           },
         ],

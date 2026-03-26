@@ -21,7 +21,7 @@ interface ChatPresenterProps {
   isFailedMode: boolean;
   nextQuestion: string | null;
   error: string | null;
-  discoveryRecommendation: Recommendation;
+  discoveryRecommendation: Recommendation | null;
   discoveryLoadingTier: string | null;
   discoveryError: string | null;
   onDiscoverySelectPlan: (tierId: string | null) => void;
@@ -49,10 +49,19 @@ export function ChatPresenter({
   onSend,
 }: ChatPresenterProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const prevIsSendingRef = useRef(false);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  useEffect(() => {
+    if (prevIsSendingRef.current && !isSending) {
+      inputRef.current?.focus();
+    }
+    prevIsSendingRef.current = isSending;
+  }, [isSending]);
 
   const canSend =
     input.trim().length > 0 &&
@@ -181,6 +190,7 @@ export function ChatPresenter({
 
       <div className="flex gap-2">
         <Input
+          ref={inputRef}
           value={input}
           onChange={(e) => onInputChange(e.target.value)}
           onKeyDown={(e) => {

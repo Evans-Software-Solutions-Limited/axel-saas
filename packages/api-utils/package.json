@@ -5,7 +5,8 @@
   "exports": {
     "./env": "./src/env/index.ts",
     "./jwt": "./src/jwt/index.ts",
-    "./auth/supabaseAuth": "./src/auth/supabaseAuth.ts"
+    "./auth/supabaseAuth": "./src/auth/supabaseAuth.ts",
+    "./domains": "./src/domains/index.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

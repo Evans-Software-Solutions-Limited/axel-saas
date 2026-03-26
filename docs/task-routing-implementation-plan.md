@@ -256,8 +256,11 @@ At implementation time, we likely need:
 - observability by task type and lane
 - per-tier quota controls
 - evaluation harness for benchmark tasks
+- an explicit internal task lifecycle model so routed work emits trustworthy state, not guessed state
 
 This should be treated as core product infrastructure, not a side optimisation.
+
+See also: `docs/internal-task-events-implementation-plan.md`
 
 ---
 

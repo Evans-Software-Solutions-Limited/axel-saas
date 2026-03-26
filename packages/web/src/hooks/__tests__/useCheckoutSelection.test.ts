@@ -26,12 +26,14 @@ describe("useCheckoutSelection", () => {
     expect(result.current.error).toBeNull();
   });
 
-  it("redirects to sales email for null tierId (Enterprise)", async () => {
+  it("redirects to contact email for null tierId (Enterprise)", async () => {
     const { result } = renderHook(() => useCheckoutSelection());
     await act(async () => {
       await result.current.handleSelectPlan(null);
     });
-    expect(assignMock).toHaveBeenCalledWith("mailto:sales@axel.ai");
+    expect(assignMock).toHaveBeenCalledWith(
+      "mailto:admin@evans-software-solutions.com",
+    );
     expect(createCheckoutSession).not.toHaveBeenCalled();
   });
 

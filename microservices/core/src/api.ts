@@ -12,6 +12,7 @@ import { userHandler } from "./application/users/userHandler";
 import { onboardingHandler } from "./application/onboarding/onboardingHandler";
 import { chatHandler } from "./application/chat/chatHandler";
 import { provisioningHandler } from "./application/provisioning/provisioningHandler";
+import { waitlistHandler } from "./application/waitlist/waitlistHandler";
 
 const getAllowedOrigins = (): string[] => {
   const origins: string[] = [];
@@ -49,6 +50,8 @@ const app = new Elysia()
   .get("/health", () => ({ status: "ok" }))
   // Stripe webhook — unauthenticated (Stripe signs payloads itself)
   .use(stripeHandler)
+  // Public waitlist routes — no auth
+  .use(waitlistHandler)
   // Public subscription routes — no auth
   .use(subscriptionPublicHandler)
   // Protected routes — each handler applies supabaseAuth internally

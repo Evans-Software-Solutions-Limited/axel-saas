@@ -42,19 +42,20 @@ describe("Login", () => {
         <Login />
       </MemoryRouter>,
     );
-    expect(screen.getByText(/axel/i)).toBeDefined();
+    expect(screen.getAllByText(/axel/i).length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText(/welcome back/i)).toBeDefined();
     expect(screen.getByLabelText(/email/i)).toBeDefined();
     expect(screen.getByLabelText(/password/i)).toBeDefined();
   });
 
-  it("renders link to sign up", () => {
+  it("renders join waitlist link to home form", () => {
     render(
       <MemoryRouter>
         <Login />
       </MemoryRouter>,
     );
-    expect(screen.getByRole("link", { name: /create one/i })).toBeDefined();
+    const link = screen.getByRole("link", { name: /join the waitlist/i });
+    expect(link.getAttribute("href")).toBe("/#waitlist");
   });
 
   it("calls signIn when form is submitted", async () => {
@@ -100,7 +101,7 @@ describe("Login", () => {
     expect(screen.getByText(/welcome back/i)).toBeDefined();
   });
 
-  it("navigates to the root redirect on successful login", async () => {
+  it("navigates to home on successful login", async () => {
     const signIn = vi.fn().mockResolvedValue({ success: true });
     vi.mocked(useAuth).mockReturnValue(mockAuth({ signIn, error: null }));
     render(

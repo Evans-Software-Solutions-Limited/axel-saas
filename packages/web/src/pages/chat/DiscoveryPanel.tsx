@@ -4,7 +4,7 @@ import { IconCheck } from "@tabler/icons-react";
 import { PLANS, type Recommendation } from "../planRecommendation";
 
 interface DiscoveryPanelProps {
-  recommendation: Recommendation;
+  recommendation: Recommendation | null;
   onSelectPlan: (tierId: string | null) => void;
   loadingTier: string | null;
   error: string | null;
@@ -24,8 +24,10 @@ export function DiscoveryPanel({
       <div className="flex justify-start">
         <div className="bg-surface-raised text-text rounded-lg rounded-bl-none px-4 py-3 max-w-sm">
           <p className="text-sm">
-            To get started, pick a plan that fits how you work. I&apos;ve
-            suggested one below — but you can choose any.
+            To get started, pick a plan that fits how you work.
+            {recommendation !== null && (
+              <> I&apos;ve suggested one below — but you can choose any.</>
+            )}
           </p>
         </div>
       </div>
@@ -35,7 +37,8 @@ export function DiscoveryPanel({
       {/* Plan cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {PLANS.map((plan) => {
-          const isRecommended = plan.tierId === recommendation.tierId;
+          const isRecommended =
+            recommendation !== null && plan.tierId === recommendation.tierId;
           const isLoading = plan.tierId !== null && loadingTier === plan.tierId;
 
           return (
