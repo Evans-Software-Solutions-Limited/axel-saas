@@ -8,6 +8,7 @@
 Axel should be more active and more useful without premium-model costs eating the business alive.
 
 The product principle is simple:
+
 - **cheap/free models power background work**
 - **strong paid models power trust-critical moments**
 
@@ -24,6 +25,7 @@ That means we should aggressively route low-stakes, background, repetitive, and 
 But we should **not** let low-cost routing degrade the moments users actually judge the product on.
 
 **Rule of thumb:**
+
 - If the task is mostly **prep, triage, extraction, formatting, or summarisation**, cheap routing is a candidate.
 - If the task involves **judgment, trust, external consequences, or final delivery quality**, use stronger models.
 
@@ -36,6 +38,7 @@ But we should **not** let low-cost routing degrade the moments users actually ju
 These task types are the best first targets for ClawRouter, free NVIDIA-hosted models, and similar low-cost lanes.
 
 #### Personal Axel / internal ops
+
 - Article and link summaries
 - Research triage
 - POA inbox sorting
@@ -45,6 +48,7 @@ These task types are the best first targets for ClawRouter, free NVIDIA-hosted m
 - Low-stakes first-pass drafting
 
 #### Axel SaaS free tier
+
 - Summaries
 - Morning brief style outputs
 - Bounded research tasks
@@ -78,6 +82,7 @@ These are trust-critical and should stay on stronger paid lanes unless we later 
 Free tier should feel like a real assistant for lightweight tasks, not a crippled demo. But it must stay cheap to serve.
 
 **Allowed lanes:**
+
 - summaries
 - research triage
 - bounded retrieval / Q&A
@@ -86,6 +91,7 @@ Free tier should feel like a real assistant for lightweight tasks, not a cripple
 - background prep
 
 **Constraints:**
+
 - best-effort delivery
 - slower response tolerance is acceptable
 - clear quotas / throttles
@@ -95,7 +101,9 @@ Free tier should feel like a real assistant for lightweight tasks, not a cripple
 ### Paid tiers
 
 #### Premium / Pro
+
 Use stronger paid models for:
+
 - nuanced reasoning
 - business support
 - high-trust assistance
@@ -103,7 +111,9 @@ Use stronger paid models for:
 - final-surface outputs users directly judge
 
 #### Business / Enterprise
+
 Use stronger models and/or user-supplied model credentials for:
+
 - reliability-sensitive workflows
 - regulated or compliance-sensitive use cases
 - custom routing rules
@@ -137,6 +147,7 @@ This allows Axel to feel proactive and active all day while reserving premium sp
 ## ClawRouter / Free NVIDIA Model Fit
 
 ClawRouter and free NVIDIA-hosted models are promising for:
+
 - background research
 - internal summarisation
 - async prep jobs
@@ -144,6 +155,7 @@ ClawRouter and free NVIDIA-hosted models are promising for:
 - cost-controlled experimentation
 
 They are **not** yet assumed safe for:
+
 - trust-critical final responses
 - guaranteed responsiveness
 - premium-tier identity-defining interactions
@@ -182,11 +194,13 @@ Before any free-model routing is enabled in production, validate:
 ## Product Positioning Implication
 
 A strong free tier should be:
+
 - useful enough to demonstrate everyday value
 - cheap enough to serve responsibly
 - clearly bounded so upgrades feel logical
 
 The upgrade story should be:
+
 - **Free:** helpful assistant for summaries, triage, light planning, and lightweight support
 - **Paid:** deeper reasoning, better reliability, more initiative, and trust-critical help
 

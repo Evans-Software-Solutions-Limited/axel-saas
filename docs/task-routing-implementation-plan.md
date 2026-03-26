@@ -8,6 +8,7 @@
 Productionise Axel with explicit task routing so the product can be highly useful without paying premium-model costs for every step.
 
 The key architectural principle is:
+
 - **cheap lanes handle prep work**
 - **premium lanes handle trust-critical work**
 
@@ -16,10 +17,12 @@ The key architectural principle is:
 ## Why this matters
 
 Without routing, the product either:
+
 1. becomes too expensive to serve, or
 2. becomes low quality everywhere
 
 We need a third option:
+
 - cheap where safe
 - premium where it matters
 - clear product boundaries
@@ -30,7 +33,9 @@ We need a third option:
 ## Core routing categories
 
 ### Category A — Cheap-safe tasks
+
 These are the first production candidates for cheaper/free routing:
+
 - summarisation
 - extraction
 - classification
@@ -42,11 +47,14 @@ These are the first production candidates for cheaper/free routing:
 - low-stakes internal organisation
 
 ### Category B — Hybrid tasks
+
 These should use a two-stage pipeline:
+
 1. cheap lane prepares the material
 2. premium lane reviews, improves, or finalises
 
 Examples:
+
 - internal reports
 - decision notes
 - meeting briefings
@@ -54,7 +62,9 @@ Examples:
 - structured recommendations with source material
 
 ### Category C — Premium-only tasks
+
 These stay on stronger models:
+
 - strategy
 - architecture
 - trust-critical final writing
@@ -68,12 +78,15 @@ These stay on stronger models:
 ## Recommended routing pipeline
 
 ### Step 1 — Task classification
+
 Every incoming request should be classified into:
+
 - cheap-safe
 - hybrid
 - premium-only
 
 Classifier inputs may include:
+
 - user tier
 - task intent
 - consequence level
@@ -82,12 +95,15 @@ Classifier inputs may include:
 - whether a final recommendation is being asked for
 
 ### Step 2 — Lane selection
+
 - cheap-safe → cheap lane
 - hybrid → cheap lane then premium lane
 - premium-only → premium lane
 
 ### Step 3 — Quality boundary
+
 Before returning the final answer, the system must know whether the output is:
+
 - rough draft
 - internal working output
 - final polished output
@@ -95,13 +111,16 @@ Before returning the final answer, the system must know whether the output is:
 This boundary should be explicit, not implied.
 
 ### Step 4 — Fallback handling
+
 If cheap lane fails due to:
+
 - rate limits
 - bad latency
 - poor output quality
 - upstream provider instability
 
 Then the system should do one of:
+
 - retry within policy
 - queue if async is acceptable
 - escalate to premium lane if the product promise requires it
@@ -112,36 +131,45 @@ Then the system should do one of:
 ## Tier-specific behaviour
 
 ### Free tier
+
 **Promise:** genuinely useful, best-effort assistant for lightweight work
 
 Routing:
+
 - cheap-safe tasks → cheap lane
 - hybrid tasks → limited or upgrade-gated
 - premium-only tasks → blocked or upsold
 
 Key requirement:
+
 - the free tier must still feel useful, not intentionally broken
 
 ### Paid individual tiers
+
 **Promise:** reliable day-to-day partner with better reasoning and polish
 
 Routing:
+
 - cheap-safe tasks may still use cheap prep lane internally
 - hybrid tasks use full two-stage routing
 - premium-only tasks go straight to premium lane
 
 Key requirement:
+
 - users feel high quality and responsiveness, regardless of internal cost routing
 
 ### Business / enterprise tiers
+
 **Promise:** stronger reliability, better controls, higher trust
 
 Routing:
+
 - same categories, but with stricter quality controls
 - optional custom routing rules
 - optional BYOM / custom provider policies
 
 Key requirement:
+
 - premium user experience must not be degraded by cost optimisation experiments
 
 ---
@@ -168,8 +196,10 @@ These map well to both Bradley's real use and Axel SaaS positioning.
 ## Validation work required
 
 ### 1. Quality benchmark by task type
+
 Benchmark cheap lane vs premium lane on the first production task set.
 Measure:
+
 - usefulness
 - clarity
 - factual accuracy
@@ -177,24 +207,31 @@ Measure:
 - amount of premium cleanup still needed
 
 ### 2. Latency benchmark
+
 Measure cheap-lane latency under:
+
 - single request
 - burst traffic
 - concurrent free users
 
 ### 3. Failure-mode design
+
 Define what happens when cheap providers are:
+
 - unavailable
 - rate-limited
 - slow
 - inconsistent
 
 ### 4. Product messaging
+
 Ensure users understand the product promise:
+
 - free is helpful and bounded
 - paid is stronger, faster, and more reliable
 
 ### 5. Trust-preservation checks
+
 Confirm that no trust-critical outputs are accidentally routed to cheap/no-SLA models.
 
 ---
@@ -212,6 +249,7 @@ Confirm that no trust-critical outputs are accidentally routed to cheap/no-SLA m
 ## Engineering implications
 
 At implementation time, we likely need:
+
 - a task classifier
 - a routing policy layer
 - provider health / fallback checks
