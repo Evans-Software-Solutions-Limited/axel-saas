@@ -1,0 +1,25 @@
+{
+  "name": "@axel-saas/ui",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Shared UI primitives and tokens for axel-saas (consumers supply theme CSS)",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "clsx": "^2.1.1",
+    "tailwind-merge": "^3.4.0"
+  },
+  "devDependencies": {
+    "@axel-saas/eslint-config": "workspace:*",
+    "@axel-saas/typescript-config": "workspace:*",
+    "@types/node": "^22",
+    "eslint": "^9.39.1",
+    "typescript": "~5.9.3"
+  }
+}
