@@ -1,0 +1,31 @@
+---
+description: Conventional commits, branch-per-task, and PR-per-task workflow
+alwaysApply: true
+---
+
+# Git, branches, and pull requests
+
+## Commits
+
+- Use **Conventional Commits** only: `type(scope): description` (scope optional).
+- Common types: `feat`, `fix`, `docs`, `refactor`, `test`, `chore`, `ci`, `perf`, `build`.
+- Use imperative mood: `docs: add refactor roadmap` not `added`.
+- One logical change per commit when possible; stack commits if a task needs multiple steps.
+
+## Branches
+
+- **Create a branch for every task** — do not merge large unrelated work on `main` directly.
+- Prefer branch names that match the task: `docs/refactor-roadmap`, `feat/api-public-hono`, `chore/pin-node-version`.
+- Keep branch scope aligned with a single roadmap task or a single coherent change.
+
+## Pull requests
+
+- **Open one PR per task** (or per roadmap step). Avoid mega-PRs that mix phases.
+- PR title should follow conventional style (e.g. `docs: add refactor roadmap`).
+- Description should state what changed, why, and how to verify (tests, manual checks).
+
+## When helping in this repo
+
+- Propose or use conventional commit messages for all changes.
+- Assume a new branch from `main` for each distinct task unless the user is mid-task.
+- Prefer splitting work so each PR stays reviewable and revertible.
