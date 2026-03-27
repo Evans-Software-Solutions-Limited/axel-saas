@@ -1,0 +1,19 @@
+{
+  "name": "@axel-saas/typescript-config",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Shared TypeScript configuration presets for axel-saas workspaces",
+  "files": [
+    "*.json"
+  ],
+  "exports": {
+    "./node-library.json": "./node-library.json",
+    "./package.json": "./package.json"
+  },
+  "peerDependencies": {
+    "typescript": ">=5"
+  },
+  "dependencies": {
+    "@tsconfig/node22": "^22"
+  }
+}

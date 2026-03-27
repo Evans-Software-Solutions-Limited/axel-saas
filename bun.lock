@@ -49,6 +49,7 @@
         "sst": "*",
       },
       "devDependencies": {
+        "@axel-saas/typescript-config": "workspace:*",
         "@eslint/js": "^9.39.1",
         "@types/aws-lambda": "^8",
         "@types/node": "^22",
@@ -72,6 +73,16 @@
         "eslint": "^9.39.1",
         "typescript-eslint": "^8.48.0",
         "vitest": "^4.0.18",
+      },
+    },
+    "packages/typescript-config": {
+      "name": "@axel-saas/typescript-config",
+      "version": "0.0.0",
+      "dependencies": {
+        "@tsconfig/node22": "^22",
+      },
+      "peerDependencies": {
+        "typescript": ">=5",
       },
     },
     "packages/web": {
@@ -144,6 +155,8 @@
     "@axel-saas/core": ["@axel-saas/core@workspace:microservices/core"],
 
     "@axel-saas/db": ["@axel-saas/db@workspace:packages/db"],
+
+    "@axel-saas/typescript-config": ["@axel-saas/typescript-config@workspace:packages/typescript-config"],
 
     "@axel-saas/web": ["@axel-saas/web@workspace:packages/web"],
 

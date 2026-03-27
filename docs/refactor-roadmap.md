@@ -191,3 +191,4 @@ _Use this section to record completed steps and PR links as you go._
 | Date       | Phase | Step  | PR / notes                                                                                                                         |
 | ---------- | ----- | ----- | ---------------------------------------------------------------------------------------------------------------------------------- |
 | 2026-03-27 | A     | A1–A2 | [#67](https://github.com/Evans-Software-Solutions-Limited/axel-saas/pull/67) — Node 22 pin, exact install policy, Turbo `bun.lock` |
+| 2026-03-27 | A     | A3    | [#68](https://github.com/Evans-Software-Solutions-Limited/axel-saas/pull/68) — `typescript-config`; first consumer `api-utils`     |
