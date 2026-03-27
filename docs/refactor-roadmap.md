@@ -194,4 +194,4 @@ _Use this section to record completed steps and PR links as you go._
 | 2026-03-27 | A     | A3    | [#68](https://github.com/Evans-Software-Solutions-Limited/axel-saas/pull/68) — `typescript-config`; first consumer `api-utils`     |
 | 2026-03-27 | A     | A4    | [#69](https://github.com/Evans-Software-Solutions-Limited/axel-saas/pull/69) — `eslint-config`; first consumer `api-utils`         |
 | 2026-03-27 | A     | A3–A4 | [#70](https://github.com/Evans-Software-Solutions-Limited/axel-saas/pull/70) — migrate `db`, `core`, `web` to shared TS + ESLint   |
-| 2026-03-27 | B     | B1–B2 | `@axel-saas/ui` (`cn`) + `packages/web` consumer — PR pending                                                                      |
+| 2026-03-27 | B     | B1–B2 | [#71](https://github.com/Evans-Software-Solutions-Limited/axel-saas/pull/71) — `@axel-saas/ui` (`cn`) + `packages/web` consumer    |
