@@ -12,9 +12,9 @@ import {
   AlertDialogMedia,
   AlertDialogTitle,
   AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+} from "@axel-saas/ui/alert-dialog";
+import { Badge } from "@axel-saas/ui/badge";
+import { Button } from "@axel-saas/ui/button";
 import {
   Card,
   CardAction,
@@ -23,7 +23,7 @@ import {
   CardFooter,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card";
+} from "@axel-saas/ui/card";
 import {
   Combobox,
   ComboboxContent,
@@ -31,7 +31,7 @@ import {
   ComboboxInput,
   ComboboxItem,
   ComboboxList,
-} from "@/components/ui/combobox";
+} from "@axel-saas/ui/combobox";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -48,9 +48,9 @@ import {
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
+} from "@axel-saas/ui/dropdown-menu";
+import { Field, FieldGroup, FieldLabel } from "@axel-saas/ui/field";
+import { Input } from "@axel-saas/ui/input";
 import {
   Select,
   SelectContent,
@@ -58,8 +58,8 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
+} from "@axel-saas/ui/select";
+import { Textarea } from "@axel-saas/ui/textarea";
 import {
   IconPlus,
   IconBluetooth,

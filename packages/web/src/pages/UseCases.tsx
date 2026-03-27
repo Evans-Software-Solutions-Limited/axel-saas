@@ -1,7 +1,7 @@
 import { Link } from "react-router";
 import { MarketingLayout } from "@/components/MarketingLayout";
 import { PageMeta } from "@/components/PageMeta";
-import { Button } from "@/components/ui/button";
+import { Button } from "@axel-saas/ui/button";
 import { waitlistSignupHref } from "@/lib/waitlist";
 
 type SectionCta = { label: string; to: string };

@@ -1,12 +1,12 @@
-import { Button } from "@/components/ui/button";
+import { Button } from "@axel-saas/ui/button";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+} from "@axel-saas/ui/card";
+import { Badge } from "@axel-saas/ui/badge";
 import { IconCheck } from "@tabler/icons-react";
 import { PLANS, getRecommendedPlan } from "./planRecommendation";
 import { useCheckoutSelection } from "@/hooks/useCheckoutSelection";

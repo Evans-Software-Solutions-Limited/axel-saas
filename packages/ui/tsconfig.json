@@ -1,0 +1,8 @@
+{
+  "extends": "@axel-saas/typescript-config/react-vite-app.json",
+  "compilerOptions": {
+    "types": ["react", "react-dom"]
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules"]
+}

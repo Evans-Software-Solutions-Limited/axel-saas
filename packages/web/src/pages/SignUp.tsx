@@ -2,16 +2,16 @@ import { useState } from "react";
 import { useNavigate, Link } from "react-router";
 import { useAuth } from "@/hooks/useAuth";
 import { MarketingLayout } from "@/components/MarketingLayout";
-import { Button } from "@/components/ui/button";
+import { Button } from "@axel-saas/ui/button";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+} from "@axel-saas/ui/card";
+import { Input } from "@axel-saas/ui/input";
+import { Label } from "@axel-saas/ui/label";
 import { RELEASE_EXPECTATION_COPY, waitlistSignupHref } from "@/lib/waitlist";
 
 export function SignUp() {

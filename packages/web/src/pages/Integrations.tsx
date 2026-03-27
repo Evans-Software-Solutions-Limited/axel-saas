@@ -1,5 +1,5 @@
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@axel-saas/ui/button";
+import { Card, CardContent } from "@axel-saas/ui/card";
 
 export function Integrations() {
   const integrations = [

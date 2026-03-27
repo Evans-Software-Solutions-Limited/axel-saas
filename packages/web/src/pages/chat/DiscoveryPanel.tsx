@@ -1,5 +1,5 @@
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { Button } from "@axel-saas/ui/button";
+import { Badge } from "@axel-saas/ui/badge";
 import { IconCheck } from "@tabler/icons-react";
 import { PLANS, type Recommendation } from "../planRecommendation";
 

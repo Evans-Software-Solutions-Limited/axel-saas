@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { IconSend } from "@tabler/icons-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Button } from "@axel-saas/ui/button";
+import { Input } from "@axel-saas/ui/input";
 import type { OnboardingMessage } from "./onboardingApi";
 import { DiscoveryPanel } from "./DiscoveryPanel";
 import type { Recommendation } from "../planRecommendation";
