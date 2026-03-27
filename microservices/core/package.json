@@ -25,12 +25,12 @@
     "sst": "*"
   },
   "devDependencies": {
-    "@eslint/js": "^9.39.1",
+    "@axel-saas/eslint-config": "workspace:*",
+    "@axel-saas/typescript-config": "workspace:*",
     "@types/aws-lambda": "^8",
     "@types/node": "^22",
     "@vitest/coverage-v8": "2.1.9",
     "eslint": "^9.39.1",
-    "typescript-eslint": "^8.48.0",
     "vitest": "^2"
   }
 }

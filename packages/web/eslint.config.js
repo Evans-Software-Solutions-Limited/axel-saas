@@ -1,32 +1,3 @@
-import js from "@eslint/js";
-import globals from "globals";
-import reactHooks from "eslint-plugin-react-hooks";
-import reactRefresh from "eslint-plugin-react-refresh";
-import tseslint from "typescript-eslint";
-import { defineConfig, globalIgnores } from "eslint/config";
+import { reactVite } from "@axel-saas/eslint-config/react-vite";
 
-export default defineConfig([
-  globalIgnores(["dist", "coverage"]),
-  { ignores: ["**/sst-env.d.ts"] },
-  {
-    extends: [
-      js.configs.recommended,
-      tseslint.configs.recommended,
-      reactHooks.configs.flat.recommended,
-      reactRefresh.configs.vite,
-    ],
-    languageOptions: {
-      ecmaVersion: 2020,
-      globals: globals.browser,
-      parserOptions: {
-        tsconfigRootDir: import.meta.dirname,
-      },
-    },
-  },
-  {
-    files: ["src/components/theme-provider.tsx", "src/components/ui/**/*.tsx"],
-    rules: {
-      "react-refresh/only-export-components": "off",
-    },
-  },
-]);
+export default reactVite(import.meta.dirname);

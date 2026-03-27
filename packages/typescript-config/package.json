@@ -8,6 +8,8 @@
   ],
   "exports": {
     "./node-library.json": "./node-library.json",
+    "./react-vite-app.json": "./react-vite-app.json",
+    "./vite-node.json": "./vite-node.json",
     "./package.json": "./package.json"
   },
   "peerDependencies": {
