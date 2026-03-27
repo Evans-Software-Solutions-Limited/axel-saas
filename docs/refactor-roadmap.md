@@ -192,3 +192,4 @@ _Use this section to record completed steps and PR links as you go._
 | ---------- | ----- | ----- | ---------------------------------------------------------------------------------------------------------------------------------- |
 | 2026-03-27 | A     | A1–A2 | [#67](https://github.com/Evans-Software-Solutions-Limited/axel-saas/pull/67) — Node 22 pin, exact install policy, Turbo `bun.lock` |
 | 2026-03-27 | A     | A3    | [#68](https://github.com/Evans-Software-Solutions-Limited/axel-saas/pull/68) — `typescript-config`; first consumer `api-utils`     |
+| 2026-03-27 | A     | A4    | [#69](https://github.com/Evans-Software-Solutions-Limited/axel-saas/pull/69) — `eslint-config`; first consumer `api-utils`         |
