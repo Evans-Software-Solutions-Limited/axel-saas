@@ -1,0 +1,4 @@
+# https://bun.sh/docs/install/configuration
+[install]
+# Match npm-style save-exact: new deps are written without ^ / ~
+exact = true
