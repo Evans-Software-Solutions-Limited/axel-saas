@@ -6,6 +6,7 @@
   "type": "module",
   "exports": {
     "./node-library": "./node-library.js",
+    "./react-vite": "./react-vite.js",
     "./package.json": "./package.json"
   },
   "peerDependencies": {
@@ -13,6 +14,9 @@
   },
   "dependencies": {
     "@eslint/js": "^9.39.1",
+    "eslint-plugin-react-hooks": "^7.0.1",
+    "eslint-plugin-react-refresh": "^0.4.24",
+    "globals": "^16.5.0",
     "typescript-eslint": "^8.48.0"
   }
 }
