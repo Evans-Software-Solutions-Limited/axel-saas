@@ -188,10 +188,10 @@ Adjust numbering as you execute; check off steps in this doc or in linked issues
 
 _Use this section to record completed steps and PR links as you go._
 
-| Date       | Phase | Step  | PR / notes                                                                                                                         |
-| ---------- | ----- | ----- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| 2026-03-27 | A     | A1–A2 | [#67](https://github.com/Evans-Software-Solutions-Limited/axel-saas/pull/67) — Node 22 pin, exact install policy, Turbo `bun.lock` |
-| 2026-03-27 | A     | A3    | [#68](https://github.com/Evans-Software-Solutions-Limited/axel-saas/pull/68) — `typescript-config`; first consumer `api-utils`     |
-| 2026-03-27 | A     | A4    | [#69](https://github.com/Evans-Software-Solutions-Limited/axel-saas/pull/69) — `eslint-config`; first consumer `api-utils`         |
-| 2026-03-27 | A     | A3–A4 | [#70](https://github.com/Evans-Software-Solutions-Limited/axel-saas/pull/70) — migrate `db`, `core`, `web` to shared TS + ESLint   |
-| 2026-03-27 | B     | B1–B2 | [#71](https://github.com/Evans-Software-Solutions-Limited/axel-saas/pull/71) — `@axel-saas/ui` (`cn`) + `packages/web` consumer    |
+| Date       | Phase | Step  | PR / notes                                                                                                                                                          |
+| ---------- | ----- | ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-03-27 | A     | A1–A2 | [#67](https://github.com/Evans-Software-Solutions-Limited/axel-saas/pull/67) — Node 22 pin, exact install policy, Turbo `bun.lock`                                  |
+| 2026-03-27 | A     | A3    | [#68](https://github.com/Evans-Software-Solutions-Limited/axel-saas/pull/68) — `typescript-config`; first consumer `api-utils`                                      |
+| 2026-03-27 | A     | A4    | [#69](https://github.com/Evans-Software-Solutions-Limited/axel-saas/pull/69) — `eslint-config`; first consumer `api-utils`                                          |
+| 2026-03-27 | A     | A3–A4 | [#70](https://github.com/Evans-Software-Solutions-Limited/axel-saas/pull/70) — migrate `db`, `core`, `web` to shared TS + ESLint                                    |
+| 2026-03-27 | B     | B1–B2 | [#71](https://github.com/Evans-Software-Solutions-Limited/axel-saas/pull/71) — `@axel-saas/ui`: `cn` + all former `web` UI components; `web` uses `@axel-saas/ui/*` |

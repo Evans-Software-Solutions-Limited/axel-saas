@@ -82,7 +82,7 @@ export default defineConfig({
         "node_modules",
         "**/*.test.{ts,tsx}",
         "**/*.config.{ts,js}",
-        "**/components/ui/**",
+        "../../packages/ui/**",
         "**/components/*-example.tsx",
         "**/pages/**/__tests__/**",
         "**/App.css",

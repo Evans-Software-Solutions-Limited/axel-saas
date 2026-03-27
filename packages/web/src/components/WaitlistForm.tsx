@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Button } from "@axel-saas/ui/button";
+import { Input } from "@axel-saas/ui/input";
+import { Label } from "@axel-saas/ui/label";
 import { joinWaitlist, type WaitlistInterestedIn } from "@/lib/waitlistApi";
 
 const TIERS: { value: WaitlistInterestedIn; label: string }[] = [

@@ -1,14 +1,14 @@
 import { useState } from "react";
-import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import { Card } from "@axel-saas/ui/card";
+import { Input } from "@axel-saas/ui/input";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
+} from "@axel-saas/ui/select";
+import { Badge } from "@axel-saas/ui/badge";
 import {
   Table,
   TableBody,
@@ -16,7 +16,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
+} from "@axel-saas/ui/table";
 import { IconSearch } from "@tabler/icons-react";
 
 // ============================================================================

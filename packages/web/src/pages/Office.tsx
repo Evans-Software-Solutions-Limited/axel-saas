@@ -1,12 +1,12 @@
 import * as React from "react";
-import { Badge } from "@/components/ui/badge";
+import { Badge } from "@axel-saas/ui/badge";
 import {
   Accordion,
   AccordionContent,
   AccordionItem,
   AccordionTrigger,
-} from "@/components/ui/accordion";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+} from "@axel-saas/ui/accordion";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@axel-saas/ui/tabs";
 
 type AgentStatus = "idle" | "busy" | "working" | "special";
 

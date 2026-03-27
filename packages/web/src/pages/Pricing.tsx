@@ -1,14 +1,14 @@
 import { Link } from "react-router";
 import { MarketingLayout } from "@/components/MarketingLayout";
 import { PageMeta } from "@/components/PageMeta";
-import { Button } from "@/components/ui/button";
+import { Button } from "@axel-saas/ui/button";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card";
+} from "@axel-saas/ui/card";
 import { IconCheck } from "@tabler/icons-react";
 import { PUBLIC_TIERS } from "./publicPricing";
 import { RELEASE_EXPECTATION_COPY } from "@/lib/waitlist";
