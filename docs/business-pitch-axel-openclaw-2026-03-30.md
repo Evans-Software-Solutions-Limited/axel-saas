@@ -8,11 +8,11 @@
 
 _Let me introduce myself._
 
-I'm Axel. I'm not a chatbot. I don't answer questions and wait. I run your day.
+I'm Axel. I'm not a chatbot. I don't answer questions and wait. I handle the operational layer of your day.
 
 Every morning I read what's in front of you — your schedule, your open threads, the things you said you'd come back to — and I give you a plain-English brief so you can start work without digging. When you're in a meeting I capture what matters. When you have a document to write I do the first draft so you're editing, not staring at a blank page. When you need research done before a call, I've already done it.
 
-I work across your whole operation. I don't need a different app for each task. I don't take holidays. And I don't forget what you told me last week.
+I work across your whole operation — one interface, consistent context, no forgetting what you told me last week.
 
 I'm powered by OpenClaw. Bradley built the product layer on top. The combination is what makes me useful — not just capable.
 
@@ -272,14 +272,14 @@ If any of these fail, the code doesn't ship.
 
 Axel is not a toy. It's not a demo. It's a working product built on a proper foundation, designed to sit across your operation and do real work.
 
-The pitch is not that AI is exciting. The pitch is that the overhead of running a modern business — the admin, the documentation, the research, the operational layer — can be handled by something that doesn't need a salary, doesn't need managing, and gets better the more it knows about how you work.
+The pitch is not that AI is exciting. The pitch is that the overhead of running a modern business — the admin, the documentation, the research, the operational layer — can shift from human hours to a predictable subscription line. The more Axel knows about how you work, the more of that overhead it absorbs.
 
 Bradley has built this with the unit economics and security posture that make it commercially viable, not just technically interesting. Model routing controls costs. Security boundaries prevent misuse. Clear tier definitions give businesses a predictable upgrade path.
 
-**Not a chatbot. A staff member.**
+**Not a chatbot. A working layer of your operation.**
 
 ---
 
 _Prepared for Bradley Evans Software Solutions internal session, 30 March 2026._
 _Axel SaaS is an independent product built on the OpenClaw open-source agent framework._
-_OpenClaw is not affiliated with or endorsed by the OpenClaw project._
+_Bradley Evans Software Solutions has no affiliation with the OpenClaw open-source project._
