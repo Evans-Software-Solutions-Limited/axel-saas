@@ -87,7 +87,7 @@ Each Axel instance is bootstrapped with a workspace shape that includes files li
 - `TOOLS.md` — local tool/routing conventions
 - `HEARTBEAT.md` — periodic checks and operational watchpoints
 
-In the repo, these are not abstract ideas — they are represented directly as workspace templates in the container layer, alongside tier-specific OpenClaw config files for Starter/Pro/Business/Developer-style runtime control. That means Axel is provisioned with identity, memory structure, behaviour rules, and tool boundaries from the start.
+In the repo, these are not abstract ideas — they are represented directly as workspace templates in the container layer, alongside tiered OpenClaw runtime configuration for different product levels and deployment modes. That means Axel is provisioned with identity, memory structure, behaviour rules, and tool boundaries from the start.
 
 That is a genuine product layer on top of OpenClaw. OpenClaw provides the agent runtime; Axel provides the operational shape that makes the runtime usable, teachable, safer, and commercially deployable.
 
