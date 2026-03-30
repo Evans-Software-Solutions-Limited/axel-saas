@@ -74,28 +74,44 @@ When a user signs up, Axel doesn't drop them on a blank interface and wait. Ther
 
 That context persists. Axel doesn't start from scratch every session. It builds up a picture of how you work and applies it.
 
+### The Axel layer: structured workspace files, not just prompts
+
+One of the strongest technical differentiators in Axel SaaS is that Bradley has turned OpenClaw into a structured operating system for each user, not just a chat window with a long prompt.
+
+Each Axel instance is bootstrapped with a workspace shape that includes files like:
+
+- `SOUL.md` — who the agent is and how it should sound
+- `USER.md` — who it works for
+- `MEMORY.md` — durable context worth keeping
+- `AGENTS.md` — operational rules and division of labour
+- `TOOLS.md` — local tool/routing conventions
+- `HEARTBEAT.md` — periodic checks and operational watchpoints
+
+In the repo, these are not abstract ideas — they are represented directly as workspace templates in the container layer, alongside tier-specific OpenClaw config files for Starter/Pro/Business/Developer-style runtime control. That means Axel is provisioned with identity, memory structure, behaviour rules, and tool boundaries from the start.
+
+That is a genuine product layer on top of OpenClaw. OpenClaw provides the agent runtime; Axel provides the operational shape that makes the runtime usable, teachable, safer, and commercially deployable.
+
 ### Memory architecture
 
-Axel has a layered memory system:
+Axel has a layered memory approach, but it is important to describe it truthfully.
 
-- **Personal memory** — your preferences, communication style, recurring context. Belongs to you, visible only to you.
-- **Workspace memory** — project context, ongoing workstreams, tool state. Persists across sessions.
-- **Organisational memory** (B2B) — shared knowledge, templates, company context that the whole team can draw on.
+Today, the strongest proven layer is the per-user workspace: the files, notes, operating rules, and memory that shape how a specific Axel instance behaves over time. That includes durable context like preferences, ongoing work, recurring priorities, and operating guidance.
 
-These are kept strictly separate. Personal context never bleeds into a company channel. Company context doesn't follow you when you leave an organisation. This is intentional and enforced at the architecture level — not just a policy.
+In business deployments, the opportunity is to add shared organisational context deliberately — templates, shared knowledge, team conventions, and approved internal reference material — but that should be described as an implementation layer we control carefully, not as magic background memory.
 
-### Subscription tiers (Starter → Developer)
+The key commercial point is that Axel does not have to start cold every time. Bradley has structured the system so each Axel instance can accumulate the right context and use it consistently.
 
-Axel SaaS has four tiers designed for different use patterns:
+### Commercial model (Free, Pro, Enterprise)
 
-| Tier          | Core capability                                                           |
-| ------------- | ------------------------------------------------------------------------- |
-| **Starter**   | Daily brief, Telegram interface, basic task management, email triage      |
-| **Pro**       | + Calendar integration, email send/receive, tool integrations, sub-agents |
-| **Business**  | + Custom channels, multiple agents, priority support                      |
-| **Developer** | + Full execution access, code generation, API access, heavy sub-agent use |
+Axel SaaS is now positioned around three simpler commercial tiers:
 
-Feature access is enforced server-side. The product never trusts a client-side tier claim.
+| Tier | What it means in practice |
+| ---- | ------------------------- |
+| **Free** | A lightweight way to experience Axel, understand the workflow, and build trust in the product before committing. |
+| **Pro** | The core paid individual offering: deeper integrations, more useful automation, and a fuller day-to-day assistant experience. |
+| **Enterprise** | Organisational deployment: stronger controls, broader integration scope, business rollout, and company-level implementation. |
+
+The important point for stakeholders is not the exact feature checklist on this slide — it is that Axel can be packaged simply at the commercial level while still enforcing behaviour, tooling, and access boundaries server-side.
 
 ### Security posture
 
@@ -211,11 +227,11 @@ In a team deployment, Axel holds shared organisational context — templates, co
 
 **Who benefits:** Growing teams, businesses with recurring client deliverables, anyone who has lost knowledge when a person left.
 
-### Developer productivity (Developer tier)
+### Technical and operational leverage
 
-Sub-agent orchestration, code review support, API access. Technical users can extend Axel's behaviour, wire it into their own tooling, or use it as a platform for building their own automation.
+For technical teams, Axel can sit much closer to the work itself: structured research, drafting, review preparation, task tracking, and controlled automation around the edges of engineering and delivery workflows.
 
-**Who benefits:** Engineering leads, technical founders, teams that want Axel as infrastructure rather than just an assistant.
+**Who benefits:** Engineering leads, technical founders, and delivery teams who want an operational assistant with more structure than a normal chat tool.
 
 ---
 
