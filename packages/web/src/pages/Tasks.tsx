@@ -63,10 +63,10 @@ const SAMPLE_TASKS: Task[] = [
 ];
 
 const statusColors = {
-  pending: "bg-muted/20 text-muted",
-  "in-progress": "bg-accent/20 text-accent",
-  completed: "bg-success/20 text-success",
-  failed: "bg-destructive/20 text-destructive",
+  pending: "bg-muted/15 text-muted",
+  "in-progress": "bg-accent/15 text-accent",
+  completed: "bg-success/15 text-success",
+  failed: "bg-destructive/15 text-destructive",
 };
 
 const statusLabels = {
@@ -117,21 +117,29 @@ export function Tasks() {
       </div>
 
       {/* Tasks Table */}
-      <Card className="border border-border">
+      <Card className="border-border-subtle overflow-hidden">
         <Table>
           <TableHeader>
-            <TableRow className="border-border hover:bg-transparent">
-              <TableHead className="text-muted">Task</TableHead>
-              <TableHead className="text-muted">Agent</TableHead>
-              <TableHead className="text-muted">Status</TableHead>
-              <TableHead className="text-muted">Due Date</TableHead>
+            <TableRow className="border-border-subtle hover:bg-transparent">
+              <TableHead className="text-muted text-xs font-medium uppercase tracking-wider">
+                Task
+              </TableHead>
+              <TableHead className="text-muted text-xs font-medium uppercase tracking-wider">
+                Agent
+              </TableHead>
+              <TableHead className="text-muted text-xs font-medium uppercase tracking-wider">
+                Status
+              </TableHead>
+              <TableHead className="text-muted text-xs font-medium uppercase tracking-wider">
+                Due Date
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {filtered.map((task) => (
               <TableRow
                 key={task.id}
-                className="border-border hover:bg-surface-raised/50"
+                className="border-border-subtle hover:bg-surface-elevated/50 transition-colors duration-150"
               >
                 <TableCell className="text-text font-medium">
                   {task.name}

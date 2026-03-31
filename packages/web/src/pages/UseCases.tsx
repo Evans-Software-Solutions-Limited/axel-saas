@@ -61,8 +61,8 @@ function CtaButton({ cta }: Readonly<{ cta: SectionCta }>) {
         variant={cta.to === "/pricing" ? "outline" : "default"}
         className={
           cta.to === "/pricing"
-            ? "border-border text-text hover:bg-surface-raised"
-            : "bg-accent hover:bg-accent/90 text-white"
+            ? "border-border text-text hover:bg-surface-elevated hover:border-accent/30 transition-all duration-200"
+            : "bg-accent-strong hover:bg-accent-strong/90 text-white shadow-lg shadow-accent-strong/20 transition-all duration-200"
         }
       >
         {cta.label}
@@ -79,39 +79,46 @@ export function UseCases() {
         description="See how Axel fits your role: daily briefs and meeting prep for knowledge workers, async catch-up for operators, and task management for solopreneurs."
         path="/use-cases"
       />
-      <section className="py-16 px-4">
+      <section className="py-20 px-6">
         <div className="max-w-3xl mx-auto">
-          <div className="text-center mb-14">
-            <h1 className="text-4xl font-bold text-text mb-4">Use cases</h1>
-            <p className="text-muted text-lg">
+          <div className="text-center mb-16">
+            <h1 className="text-4xl md:text-5xl font-bold text-text mb-5 tracking-tight">
+              Use cases
+            </h1>
+            <p className="text-muted text-lg leading-relaxed">
               See whether Axel fits someone like you — outcomes first, feature
               lists live on pricing.
             </p>
           </div>
 
-          <div className="space-y-14">
-            {SECTIONS.map(({ title, body, cta }) => (
+          <div className="space-y-0">
+            {SECTIONS.map(({ title, body, cta }, i) => (
               <div
                 key={title}
-                className="border-b border-border pb-14 last:border-0 last:pb-0"
+                className="border-b border-border-subtle pb-14 pt-14 first:pt-0 last:border-0 last:pb-0"
               >
-                <h2 className="text-2xl font-semibold text-text mb-4">
-                  {title}
-                </h2>
-                <div className="space-y-3 text-muted leading-relaxed">
+                <div className="flex items-baseline gap-4 mb-5">
+                  <span className="text-xs font-mono text-accent/50 tabular-nums">
+                    {String(i + 1).padStart(2, "0")}
+                  </span>
+                  <h2 className="text-2xl font-semibold text-text tracking-tight">
+                    {title}
+                  </h2>
+                </div>
+                <div className="space-y-3 text-muted leading-relaxed ml-10">
                   <p>{body[0]}</p>
                   <p className="text-text font-medium">{body[1]}</p>
                 </div>
-                <div className="mt-6">
+                <div className="mt-6 ml-10">
                   <CtaButton cta={cta} />
                 </div>
               </div>
             ))}
           </div>
 
-          <div className="text-center mt-16">
+          <div className="text-center mt-20">
             <Link to={waitlistSignupHref()}>
-              <Button className="bg-accent hover:bg-accent/90 text-white px-8">
+              <Button className="bg-accent-strong hover:bg-accent-strong/90 text-white px-8 shadow-lg shadow-accent-strong/20 transition-all duration-200">
                 Join waitlist
               </Button>
             </Link>

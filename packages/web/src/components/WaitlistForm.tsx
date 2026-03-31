@@ -66,7 +66,10 @@ export function WaitlistForm() {
       className="space-y-4 text-left max-w-md mx-auto"
     >
       <div className="space-y-2">
-        <Label htmlFor="waitlist-email" className="text-text">
+        <Label
+          htmlFor="waitlist-email"
+          className="text-text text-sm font-medium"
+        >
           Email
         </Label>
         <Input
@@ -78,11 +81,14 @@ export function WaitlistForm() {
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           placeholder="you@example.com"
-          className="bg-surface-raised border-border text-text placeholder:text-muted"
+          className="bg-surface-raised border-border text-text placeholder:text-muted/50"
         />
       </div>
       <div className="space-y-2">
-        <Label htmlFor="waitlist-tier" className="text-text">
+        <Label
+          htmlFor="waitlist-tier"
+          className="text-text text-sm font-medium"
+        >
           I&apos;m interested in
         </Label>
         <select
@@ -92,7 +98,7 @@ export function WaitlistForm() {
           onChange={(e) =>
             setInterestedIn(e.target.value as WaitlistInterestedIn)
           }
-          className="w-full h-10 rounded-md border border-border bg-surface-raised px-3 text-sm text-text"
+          className="w-full h-10 rounded-lg border border-border bg-surface-raised px-3 text-sm text-text transition-colors duration-200 focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20"
         >
           {TIERS.map(({ value, label }) => (
             <option key={value} value={value}>
@@ -114,9 +120,9 @@ export function WaitlistForm() {
       <Button
         type="submit"
         disabled={submitState === "loading" || submitState === "success"}
-        className="w-full bg-accent hover:bg-accent/90 text-white"
+        className="w-full bg-accent-strong hover:bg-accent-strong/90 text-white shadow-lg shadow-accent-strong/20 transition-all duration-200"
       >
-        {submitState === "loading" ? "Submitting…" : "Join waitlist"}
+        {submitState === "loading" ? "Submitting..." : "Join waitlist"}
       </Button>
     </form>
   );

@@ -12,15 +12,15 @@ export function About() {
         description="Axel exists to end tool sprawl. One context-aware AI assistant built on OpenClaw — approachable for anyone, deep enough for developers."
         path="/about"
       />
-      <section className="py-16 px-4">
+      <section className="py-20 px-6">
         <div className="max-w-3xl mx-auto">
-          <h1 className="text-4xl font-bold text-text mb-10">
+          <h1 className="text-4xl md:text-5xl font-bold text-text mb-14 tracking-tight">
             Why Axel exists
           </h1>
 
-          <div className="space-y-10 text-muted leading-relaxed">
+          <div className="space-y-12 text-muted leading-relaxed">
             <div>
-              <h2 className="text-xl font-semibold text-text mb-3">
+              <h2 className="text-xl font-semibold text-text mb-3 tracking-tight">
                 The problem
               </h2>
               <p>
@@ -30,8 +30,10 @@ export function About() {
               </p>
             </div>
 
+            <div className="section-divider" />
+
             <div>
-              <h2 className="text-xl font-semibold text-text mb-3">
+              <h2 className="text-xl font-semibold text-text mb-3 tracking-tight">
                 A crowded landscape
               </h2>
               <p>
@@ -45,7 +47,7 @@ export function About() {
             </div>
 
             <div>
-              <h2 className="text-xl font-semibold text-text mb-3">
+              <h2 className="text-xl font-semibold text-text mb-3 tracking-tight">
                 What we believe
               </h2>
               <p>
@@ -56,8 +58,10 @@ export function About() {
               </p>
             </div>
 
+            <div className="section-divider" />
+
             <div>
-              <h2 className="text-xl font-semibold text-text mb-3">
+              <h2 className="text-xl font-semibold text-text mb-3 tracking-tight">
                 Personal assistant first
               </h2>
               <p>
@@ -69,7 +73,7 @@ export function About() {
             </div>
 
             <div>
-              <h2 className="text-xl font-semibold text-text mb-3">
+              <h2 className="text-xl font-semibold text-text mb-3 tracking-tight">
                 Integrations, not a public API product
               </h2>
               <p>
@@ -80,8 +84,10 @@ export function About() {
               </p>
             </div>
 
+            <div className="section-divider" />
+
             <div>
-              <h2 className="text-xl font-semibold text-text mb-3">
+              <h2 className="text-xl font-semibold text-text mb-3 tracking-tight">
                 Where Axel comes from
               </h2>
               <p>
@@ -90,7 +96,7 @@ export function About() {
                   href="https://openclaw.dev"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-accent hover:underline"
+                  className="text-accent hover:underline underline-offset-4 transition-colors duration-200"
                 >
                   OpenClaw
                 </a>{" "}
@@ -101,7 +107,7 @@ export function About() {
             </div>
 
             <div>
-              <h2 className="text-xl font-semibold text-text mb-3">
+              <h2 className="text-xl font-semibold text-text mb-3 tracking-tight">
                 Hosted solutions
               </h2>
               <p>
@@ -110,7 +116,7 @@ export function About() {
                 that&apos;s you, reach out at{" "}
                 <a
                   href="mailto:admin@evans-software-solutions.com?subject=Hosted%20Axel"
-                  className="text-accent hover:underline"
+                  className="text-accent hover:underline underline-offset-4 transition-colors duration-200"
                 >
                   admin@evans-software-solutions.com
                 </a>{" "}
@@ -118,8 +124,10 @@ export function About() {
               </p>
             </div>
 
+            <div className="section-divider" />
+
             <div>
-              <h2 className="text-xl font-semibold text-text mb-3">
+              <h2 className="text-xl font-semibold text-text mb-3 tracking-tight">
                 How we build
               </h2>
               <p>
@@ -130,7 +138,7 @@ export function About() {
             </div>
 
             <div>
-              <h2 className="text-xl font-semibold text-text mb-3">
+              <h2 className="text-xl font-semibold text-text mb-3 tracking-tight">
                 Who we are
               </h2>
               <p>
@@ -138,7 +146,7 @@ export function About() {
                 want to hear it — reach us at{" "}
                 <a
                   href="mailto:admin@evans-software-solutions.com"
-                  className="text-accent hover:underline"
+                  className="text-accent hover:underline underline-offset-4 transition-colors duration-200"
                 >
                   admin@evans-software-solutions.com
                 </a>
@@ -147,9 +155,9 @@ export function About() {
             </div>
           </div>
 
-          <div className="mt-10">
+          <div className="mt-14">
             <Link to={waitlistSignupHref()}>
-              <Button className="bg-accent hover:bg-accent/90 text-white px-8">
+              <Button className="bg-accent-strong hover:bg-accent-strong/90 text-white px-8 shadow-lg shadow-accent-strong/20 transition-all duration-200">
                 Join waitlist
               </Button>
             </Link>

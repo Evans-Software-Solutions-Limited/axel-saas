@@ -6,29 +6,34 @@
 @custom-variant dark (&:is(.dark *));
 
 /* ==========================================================================
-   AXEL SAAS DESIGN SYSTEM – Dark Premium Theme
+   AXEL SAAS DESIGN SYSTEM – Refined Night Theme
    ========================================================================== */
 :root {
-  /* Surfaces */
-  --color-surface: #0f1117;
-  --color-surface-raised: #1a1d2e;
-  --color-surface-elevated: #1e2130;
+  /* Surfaces — deeper, richer darks with subtle blue undertone */
+  --color-surface: #090c14;
+  --color-surface-raised: #111627;
+  --color-surface-elevated: #181d32;
 
-  /* Borders & Dividers */
-  --color-border: #2a2d3e;
+  /* Borders & Dividers — warmer, more visible */
+  --color-border: #232847;
+  --color-border-subtle: #1a1f3a;
 
-  /* Text */
-  --color-text: #e8e9f0;
-  --color-muted: #8b8fa8;
+  /* Text — slightly warmer whites */
+  --color-text: #eceef6;
+  --color-muted: #6d7399;
+
+  /* Accent — indigo replaces generic blue for stronger identity */
+  --color-accent: #818cf8;
+  --color-accent-strong: #6366f1;
+  --color-accent-glow: rgba(129, 140, 248, 0.15);
 
   /* Semantic Colors */
-  --color-accent: #3b82f6;
-  --color-success: #10b798;
-  --color-warning: #faa74a;
-  --color-destructive: #ef5e41;
+  --color-success: #34d399;
+  --color-warning: #fbbf24;
+  --color-destructive: #f87171;
 
   /* Radius */
-  --radius: 0.5rem;
+  --radius: 0.625rem;
 }
 
 /* shadcn/ui CSS Variables */
@@ -39,7 +44,7 @@
   --card-foreground: var(--color-text);
   --popover: var(--color-surface-raised);
   --popover-foreground: var(--color-text);
-  --primary: var(--color-accent);
+  --primary: var(--color-accent-strong);
   --primary-foreground: #ffffff;
   --secondary: var(--color-surface-elevated);
   --secondary-foreground: var(--color-text);
@@ -56,33 +61,161 @@
   --chart-2: var(--color-success);
   --chart-3: var(--color-warning);
   --chart-4: var(--color-destructive);
-  --chart-5: #8b5cf6;
+  --chart-5: #a78bfa;
 }
 
 @theme {
-  --font-sans: "Figtree Variable", sans-serif;
-  --color-surface: #0f1117;
-  --color-surface-raised: #1a1d2e;
-  --color-surface-elevated: #1e2130;
-  --color-border: #2a2d3e;
-  --color-text: #e8e9f0;
-  --color-muted: #8b8fa8;
-  --color-accent: #3b82f6;
-  --color-success: #10b798;
-  --color-warning: #faa74a;
-  --color-destructive: #ef5e41;
+  --font-sans: "Figtree Variable", ui-sans-serif, system-ui, sans-serif;
+  --color-surface: #090c14;
+  --color-surface-raised: #111627;
+  --color-surface-elevated: #181d32;
+  --color-border: #232847;
+  --color-border-subtle: #1a1f3a;
+  --color-text: #eceef6;
+  --color-muted: #6d7399;
+  --color-accent: #818cf8;
+  --color-accent-strong: #6366f1;
+  --color-accent-glow: rgba(129, 140, 248, 0.15);
+  --color-success: #34d399;
+  --color-warning: #fbbf24;
+  --color-destructive: #f87171;
+
+  --animate-fade-in: fade-in 0.5s ease-out both;
+  --animate-slide-up: slide-up 0.5s ease-out both;
+  --animate-fade-in-slow: fade-in 0.8s ease-out both;
 }
 
 @layer base {
   * {
     @apply border-border;
   }
+
   html,
   body {
     @apply font-sans bg-surface text-text m-0 p-0;
     height: 100%;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
+
   #root {
     min-height: 100%;
   }
+
+  /* Refined selection color */
+  ::selection {
+    background: var(--color-accent-strong);
+    color: #fff;
+  }
+
+  /* Refined scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--color-border);
+    border-radius: 3px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--color-muted);
+  }
+
+  /* Better focus ring */
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+}
+
+/* ==========================================================================
+   Keyframes
+   ========================================================================== */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ==========================================================================
+   Utility classes
+   ========================================================================== */
+
+/* Subtle noise grain overlay — apply to sections for texture */
+.bg-grain {
+  position: relative;
+}
+.bg-grain::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  opacity: 0.03;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+  background-size: 256px 256px;
+  pointer-events: none;
+  z-index: 0;
+}
+.bg-grain > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Subtle gradient border card effect */
+.card-glow {
+  position: relative;
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  transition:
+    border-color 0.3s ease,
+    box-shadow 0.3s ease;
+}
+.card-glow:hover {
+  border-color: var(--color-accent);
+  box-shadow:
+    0 0 20px var(--color-accent-glow),
+    0 4px 16px rgba(0, 0, 0, 0.3);
+}
+
+/* Gradient text utility */
+.text-gradient {
+  background: linear-gradient(
+    135deg,
+    var(--color-text) 0%,
+    var(--color-accent) 100%
+  );
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Section divider with gradient fade */
+.section-divider {
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--color-border) 20%,
+    var(--color-accent-strong) 50%,
+    var(--color-border) 80%,
+    transparent
+  );
+  border: none;
 }

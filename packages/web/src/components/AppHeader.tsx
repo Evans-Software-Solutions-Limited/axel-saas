@@ -23,17 +23,22 @@ export function AppHeader() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   return (
-    <header className="border-b border-border bg-surface-raised sticky top-0 z-10 shrink-0">
-      <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
-        <Link to="/" className="text-xl font-bold text-text flex items-center">
-          <img src="/axel-logo.png" alt="Axel" className="w-8 h-8 mr-2" />
-          Meet<span className="text-accent">Axel</span>
+    <header className="border-b border-border-subtle bg-surface/80 backdrop-blur-xl sticky top-0 z-10 shrink-0">
+      <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
+        <Link
+          to="/"
+          className="text-xl font-bold text-text flex items-center gap-2 tracking-tight"
+        >
+          <img src="/axel-logo.png" alt="Axel" className="w-8 h-8" />
+          <span>
+            Meet<span className="text-accent">Axel</span>
+          </span>
         </Link>
 
         {/* Desktop nav */}
         <nav
           aria-label="Main navigation"
-          className="hidden md:flex items-center gap-6"
+          className="hidden md:flex items-center gap-8"
         >
           {NAV_LINKS.map(({ label, to }) => {
             const isActive = getIsActive(to, location.pathname);
@@ -41,7 +46,7 @@ export function AppHeader() {
               <Link
                 key={to}
                 to={to}
-                className={`text-sm transition-colors ${
+                className={`text-sm transition-colors duration-200 ${
                   isActive
                     ? "text-text font-medium"
                     : "text-muted hover:text-text"
@@ -55,14 +60,14 @@ export function AppHeader() {
             <button
               type="button"
               onClick={() => void signOut()}
-              className="text-sm px-4 py-2 rounded-md border border-border text-text hover:bg-surface-elevated transition-colors font-medium"
+              className="text-sm px-4 py-2 rounded-lg border border-border text-text hover:bg-surface-elevated hover:border-accent/30 transition-all duration-200 font-medium"
             >
               Logout
             </button>
           ) : (
             <Link
               to={waitlistSignupHref()}
-              className="text-sm px-4 py-2 cursor-pointer rounded-md bg-accent text-white hover:bg-accent/90 transition-colors font-medium"
+              className="text-sm px-5 py-2 cursor-pointer rounded-lg bg-accent-strong text-white hover:bg-accent-strong/90 transition-all duration-200 font-medium shadow-lg shadow-accent-strong/20"
             >
               Join waitlist
             </Link>
@@ -75,14 +80,14 @@ export function AppHeader() {
             <button
               type="button"
               onClick={() => void signOut()}
-              className="text-sm px-3 py-1.5 rounded-md border border-border text-text hover:bg-surface-elevated"
+              className="text-sm px-3 py-1.5 rounded-lg border border-border text-text hover:bg-surface-elevated"
             >
               Logout
             </button>
           ) : (
             <Link
               to={waitlistSignupHref()}
-              className="text-sm px-3 py-1.5 rounded-md bg-accent text-white hover:bg-accent/90"
+              className="text-sm px-3 py-1.5 rounded-lg bg-accent-strong text-white hover:bg-accent-strong/90 shadow-lg shadow-accent-strong/20"
             >
               Join waitlist
             </Link>
@@ -93,7 +98,7 @@ export function AppHeader() {
             aria-expanded={isMenuOpen}
             aria-controls="mobile-nav"
             onClick={() => setIsMenuOpen((prev) => !prev)}
-            className="p-2 rounded-md text-text hover:bg-surface-elevated transition-colors"
+            className="p-2 rounded-lg text-text hover:bg-surface-elevated transition-colors"
           >
             {isMenuOpen ? (
               <svg
@@ -138,7 +143,7 @@ export function AppHeader() {
         <nav
           id="mobile-nav"
           aria-label="Mobile navigation"
-          className="md:hidden border-t border-border bg-surface-raised px-4 py-3 flex flex-col gap-1"
+          className="md:hidden border-t border-border-subtle bg-surface/95 backdrop-blur-xl px-6 py-3 flex flex-col gap-1"
         >
           {NAV_LINKS.map(({ label, to }) => {
             const isActive = getIsActive(to, location.pathname);
@@ -147,7 +152,7 @@ export function AppHeader() {
                 key={to}
                 to={to}
                 onClick={() => setIsMenuOpen(false)}
-                className={`text-sm py-2 px-3 rounded-md transition-colors ${
+                className={`text-sm py-2.5 px-3 rounded-lg transition-colors ${
                   isActive
                     ? "text-text font-medium bg-surface-elevated"
                     : "text-muted hover:text-text hover:bg-surface-elevated"

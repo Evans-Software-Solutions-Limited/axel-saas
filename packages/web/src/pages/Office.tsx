@@ -38,16 +38,16 @@ interface Agent {
 }
 
 const statusColours: Record<AgentStatus, string> = {
-  idle: "bg-green-500",
-  busy: "bg-yellow-500",
-  working: "bg-red-500",
-  special: "bg-purple-500",
+  idle: "bg-success",
+  busy: "bg-warning",
+  working: "bg-destructive",
+  special: "bg-purple-400",
 };
 
 const statusGlow: Record<AgentStatus, string> = {
   idle: "",
-  busy: "drop-shadow(0 0 6px rgba(234,179,8,0.9))",
-  working: "drop-shadow(0 0 6px rgba(239,68,68,0.9))",
+  busy: "drop-shadow(0 0 6px rgba(251,191,36,0.9))",
+  working: "drop-shadow(0 0 6px rgba(248,113,113,0.9))",
   special: "drop-shadow(0 0 6px rgba(168,85,247,0.9))",
 };
 
@@ -55,9 +55,9 @@ const statusGlow: Record<AgentStatus, string> = {
 const SPRITE_HEIGHT_RATIO = 0.12;
 
 const jobStatusColours: Record<RecentJob["status"], string> = {
-  Completed: "bg-green-500/20 text-green-400",
-  "In Progress": "bg-yellow-500/20 text-yellow-400",
-  Failed: "bg-red-500/20 text-red-400",
+  Completed: "bg-success/15 text-success",
+  "In Progress": "bg-warning/15 text-warning",
+  Failed: "bg-destructive/15 text-destructive",
 };
 
 const DeskPositions = [
@@ -101,7 +101,7 @@ const agents: Agent[] = [
     lastActive: "Just now",
     scenePosition: DeskPositions[0],
     spriteImage: "/sprites/sprite-axel.png",
-    avatarColour: "bg-blue-600",
+    avatarColour: "bg-accent-strong",
     stats: { totalTasks: 142, todayTasks: 7, avgDuration: "2m 14s" },
     recentJobs: [
       {
@@ -143,10 +143,9 @@ const agents: Agent[] = [
     status: "working",
     currentTask: "Drafting tenancy agreement",
     lastActive: "1 min ago",
-    // Top row, 4th cubicle from left
     scenePosition: DeskPositions[1],
     spriteImage: "/sprites/sprite-scribe.png",
-    avatarColour: "bg-emerald-600",
+    avatarColour: "bg-emerald-500",
     stats: { totalTasks: 38, todayTasks: 3, avgDuration: "5m 40s" },
     recentJobs: [
       {
@@ -188,10 +187,9 @@ const agents: Agent[] = [
     status: "busy",
     currentTask: "Processing 3 emails",
     lastActive: "30s ago",
-    // Bottom row, left L-desk
     scenePosition: DeskPositions[2],
     spriteImage: "/sprites/sprite-relay.png",
-    avatarColour: "bg-violet-600",
+    avatarColour: "bg-violet-500",
     stats: { totalTasks: 291, todayTasks: 12, avgDuration: "45s" },
     recentJobs: [
       {
@@ -233,10 +231,9 @@ const agents: Agent[] = [
     status: "idle",
     currentTask: "Ready and waiting",
     lastActive: "1 hour ago",
-    // Bottom row, center L-desk
     scenePosition: DeskPositions[3],
     spriteImage: "/sprites/sprite-keeper.png",
-    avatarColour: "bg-amber-600",
+    avatarColour: "bg-amber-500",
     stats: { totalTasks: 19, todayTasks: 1, avgDuration: "8m 20s" },
     recentJobs: [
       {
@@ -278,10 +275,9 @@ const agents: Agent[] = [
     status: "special",
     currentTask: "Running scheduled reports",
     lastActive: "5 min ago",
-    // Bottom row, right L-desk
     scenePosition: DeskPositions[4],
     spriteImage: "/sprites/sprite-ops.png",
-    avatarColour: "bg-rose-600",
+    avatarColour: "bg-rose-500",
     stats: { totalTasks: 84, todayTasks: 4, avgDuration: "3m 10s" },
     recentJobs: [
       {
@@ -377,13 +373,13 @@ export function Office({ onQuickChat }: OfficeProps) {
         onValueChange={handleTabChange}
         className="flex flex-col flex-1 min-h-0 w-full"
       >
-        <TabsList variant="line" className="mb-4 w-fit shrink-0">
+        <TabsList variant="line" className="mb-5 w-fit shrink-0">
           <TabsTrigger
             value="desk"
             className={
               viewMode === "desk"
                 ? "font-semibold text-accent border-b-2 border-accent rounded-none pb-1.5 -mb-px"
-                : ""
+                : "text-muted hover:text-text transition-colors duration-200"
             }
           >
             Desk view
@@ -393,7 +389,7 @@ export function Office({ onQuickChat }: OfficeProps) {
             className={
               viewMode === "list"
                 ? "font-semibold text-accent border-b-2 border-accent rounded-none pb-1.5 -mb-px"
-                : ""
+                : "text-muted hover:text-text transition-colors duration-200"
             }
           >
             List view
@@ -403,7 +399,7 @@ export function Office({ onQuickChat }: OfficeProps) {
         <TabsContent value="desk" className="mt-0 flex-1 min-h-0 flex flex-col">
           <div
             ref={sceneRef}
-            className="relative w-full flex-1 min-h-0 overflow-hidden rounded-xl border border-white/5 bg-transparent"
+            className="relative w-full flex-1 min-h-0 overflow-hidden rounded-xl border border-border-subtle bg-transparent"
           >
             <img
               src="/pixel-office-bg.png"
@@ -426,17 +422,17 @@ export function Office({ onQuickChat }: OfficeProps) {
                   }}
                   onClick={() => handleAgentClick(agent.id)}
                 >
-                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover:block bg-black/90 text-white text-xs p-3 rounded-lg shadow-xl z-20 min-w-44 border border-white/10 pointer-events-none">
+                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover:block bg-surface-raised/95 backdrop-blur-sm text-text text-xs p-3 rounded-xl shadow-xl z-20 min-w-44 border border-border pointer-events-none">
                     <div className="font-semibold">{agent.name}</div>
-                    <div className="text-white/60 mb-1 text-[10px]">
+                    <div className="text-muted mb-1 text-[10px]">
                       {agent.role}
                     </div>
-                    <div className="text-white/90">{agent.currentTask}</div>
-                    <div className="text-white/40 mt-1 text-[10px]">
+                    <div className="text-text/90">{agent.currentTask}</div>
+                    <div className="text-muted/60 mt-1 text-[10px]">
                       Last active: {agent.lastActive}
                     </div>
                   </div>
-                  <div className="flex items-center gap-1.5 mb-1 bg-black/75 px-2 py-0.5 rounded-full border border-white/10">
+                  <div className="flex items-center gap-1.5 mb-1 bg-surface/85 backdrop-blur-sm px-2 py-0.5 rounded-full border border-border-subtle">
                     <div className="relative shrink-0">
                       <div
                         className={`w-2 h-2 rounded-full ${statusColours[agent.status]}`}
@@ -447,7 +443,7 @@ export function Office({ onQuickChat }: OfficeProps) {
                         />
                       )}
                     </div>
-                    <span className="text-white text-[10px] whitespace-nowrap leading-tight">
+                    <span className="text-text text-[10px] whitespace-nowrap leading-tight">
                       {agent.name}
                     </span>
                   </div>
@@ -469,10 +465,10 @@ export function Office({ onQuickChat }: OfficeProps) {
               );
             })}
             <button
-              className="absolute bottom-4 right-4 z-10 bg-black/70 hover:bg-black/90 text-white text-sm px-4 py-2 rounded-full shadow-lg border border-white/10 transition-colors cursor-pointer"
+              className="absolute bottom-4 right-4 z-10 bg-surface/80 backdrop-blur-sm hover:bg-surface-elevated text-text text-sm px-4 py-2 rounded-full shadow-lg border border-border-subtle transition-all duration-200 cursor-pointer hover:border-accent/30"
               onClick={onQuickChat}
             >
-              💬 Quick Chat
+              Quick Chat
             </button>
           </div>
         </TabsContent>
@@ -500,10 +496,10 @@ export function Office({ onQuickChat }: OfficeProps) {
                         {agent.name[0]}
                       </div>
                       <div className="flex-1 text-left">
-                        <span className="font-semibold text-sm">
+                        <span className="font-semibold text-sm tracking-tight">
                           {agent.name}
                         </span>
-                        <span className="text-muted-foreground text-sm ml-2">
+                        <span className="text-muted text-sm ml-2">
                           {agent.role}
                         </span>
                       </div>
@@ -511,52 +507,49 @@ export function Office({ onQuickChat }: OfficeProps) {
                         <div
                           className={`w-2 h-2 rounded-full ${statusColours[agent.status]}`}
                         />
-                        <span className="text-xs text-muted-foreground capitalize">
+                        <span className="text-xs text-muted capitalize">
                           {agent.status}
                         </span>
                       </div>
                     </div>
                   </AccordionTrigger>
                   <AccordionContent className="px-2">
-                    <div className="flex gap-3 mb-4 flex-wrap">
-                      <div className="bg-card rounded-lg px-4 py-2 text-center min-w-20">
-                        <div className="text-lg font-bold">
+                    <div className="flex gap-3 mb-5 flex-wrap">
+                      <div className="bg-surface-elevated rounded-xl px-5 py-3 text-center min-w-20 border border-border-subtle">
+                        <div className="text-lg font-bold text-text">
                           {agent.stats.totalTasks}
                         </div>
-                        <div className="text-xs text-muted-foreground">
-                          Total tasks
-                        </div>
+                        <div className="text-xs text-muted">Total tasks</div>
                       </div>
-                      <div className="bg-card rounded-lg px-4 py-2 text-center min-w-20">
-                        <div className="text-lg font-bold">
+                      <div className="bg-surface-elevated rounded-xl px-5 py-3 text-center min-w-20 border border-border-subtle">
+                        <div className="text-lg font-bold text-text">
                           {agent.stats.todayTasks}
                         </div>
-                        <div className="text-xs text-muted-foreground">
-                          Today
-                        </div>
+                        <div className="text-xs text-muted">Today</div>
                       </div>
-                      <div className="bg-card rounded-lg px-4 py-2 text-center min-w-20">
-                        <div className="text-sm font-semibold">
+                      <div className="bg-surface-elevated rounded-xl px-5 py-3 text-center min-w-20 border border-border-subtle">
+                        <div className="text-sm font-semibold text-text">
                           {agent.stats.avgDuration}
                         </div>
-                        <div className="text-xs text-muted-foreground">
-                          Avg duration
-                        </div>
+                        <div className="text-xs text-muted">Avg duration</div>
                       </div>
                     </div>
                     <div className="space-y-0">
                       {agent.recentJobs.map((job, i) => (
                         <div
                           key={i}
-                          className="flex items-center gap-3 py-2 border-b border-border last:border-0"
+                          className="flex items-center gap-3 py-2.5 border-b border-border-subtle last:border-0"
                         >
-                          <Badge variant="outline" className="text-xs shrink-0">
+                          <Badge
+                            variant="outline"
+                            className="text-xs shrink-0 border-border-subtle"
+                          >
                             {job.type}
                           </Badge>
-                          <span className="text-sm flex-1 min-w-0 truncate">
+                          <span className="text-sm flex-1 min-w-0 truncate text-text/90">
                             {job.description}
                           </span>
-                          <span className="text-xs text-muted-foreground shrink-0 hidden sm:block">
+                          <span className="text-xs text-muted shrink-0 hidden sm:block">
                             {job.time}
                           </span>
                           <Badge
