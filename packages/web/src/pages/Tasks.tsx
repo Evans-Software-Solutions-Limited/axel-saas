@@ -90,23 +90,25 @@ export function Tasks() {
   });
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-8 space-y-6">
+      <h1 className="text-xl font-semibold text-text tracking-tight">Tasks</h1>
+
       {/* Filters */}
-      <div className="flex gap-4">
+      <div className="flex gap-3">
         <div className="flex-1 relative">
-          <IconSearch className="absolute left-3 top-3 w-4 h-4 text-muted" />
+          <IconSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted/60" />
           <Input
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="Search tasks..."
-            className="pl-10 bg-surface-raised border-border text-text"
+            className="pl-10 bg-surface border-border/60 text-text h-10"
           />
         </div>
         <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-40 bg-surface-raised border-border text-text">
+          <SelectTrigger className="w-40 bg-surface border-border/60 text-text h-10">
             <SelectValue placeholder="Filter by status" />
           </SelectTrigger>
-          <SelectContent className="bg-surface-raised border-border">
+          <SelectContent className="bg-surface-raised border-border/60">
             <SelectItem value="all">All statuses</SelectItem>
             <SelectItem value="pending">Pending</SelectItem>
             <SelectItem value="in-progress">In Progress</SelectItem>
@@ -117,34 +119,46 @@ export function Tasks() {
       </div>
 
       {/* Tasks Table */}
-      <Card className="border border-border">
+      <Card className="border border-border/50 overflow-hidden">
         <Table>
           <TableHeader>
-            <TableRow className="border-border hover:bg-transparent">
-              <TableHead className="text-muted">Task</TableHead>
-              <TableHead className="text-muted">Agent</TableHead>
-              <TableHead className="text-muted">Status</TableHead>
-              <TableHead className="text-muted">Due Date</TableHead>
+            <TableRow className="border-border/40 hover:bg-transparent">
+              <TableHead className="text-muted/70 text-xs font-medium uppercase tracking-wider">
+                Task
+              </TableHead>
+              <TableHead className="text-muted/70 text-xs font-medium uppercase tracking-wider">
+                Agent
+              </TableHead>
+              <TableHead className="text-muted/70 text-xs font-medium uppercase tracking-wider">
+                Status
+              </TableHead>
+              <TableHead className="text-muted/70 text-xs font-medium uppercase tracking-wider">
+                Due Date
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {filtered.map((task) => (
               <TableRow
                 key={task.id}
-                className="border-border hover:bg-surface-raised/50"
+                className="border-border/30 hover:bg-surface-elevated/30"
               >
-                <TableCell className="text-text font-medium">
+                <TableCell className="text-text font-medium text-sm">
                   {task.name}
                 </TableCell>
-                <TableCell className="text-muted">{task.agent}</TableCell>
+                <TableCell className="text-muted text-sm">
+                  {task.agent}
+                </TableCell>
                 <TableCell>
                   <Badge
-                    className={`${statusColors[task.status as keyof typeof statusColors]} border-0`}
+                    className={`${statusColors[task.status as keyof typeof statusColors]} border-0 text-xs`}
                   >
                     {statusLabels[task.status as keyof typeof statusLabels]}
                   </Badge>
                 </TableCell>
-                <TableCell className="text-muted">{task.dueDate}</TableCell>
+                <TableCell className="text-muted text-sm">
+                  {task.dueDate}
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>

@@ -49,19 +49,19 @@ export function SignUp() {
 
   return (
     <MarketingLayout>
-      <div className="flex-1 flex items-center justify-center p-4 py-12">
+      <div className="flex-1 flex items-center justify-center p-6 py-16">
         <div className="w-full max-w-md space-y-8">
           {/* Axel Wordmark & Tagline */}
-          <div className="text-center space-y-2">
-            <h1 className="text-3xl font-bold text-text">
+          <div className="text-center space-y-3">
+            <h1 className="text-4xl font-bold text-text tracking-tight">
               <span className="text-accent">A</span>xel
             </h1>
-            <p className="text-sm text-muted">
+            <p className="text-sm text-muted/80">
               One assistant. Every kind of work.
             </p>
           </div>
 
-          <div className="rounded-lg border border-border bg-surface-raised p-4 text-sm text-muted text-left space-y-2">
+          <div className="rounded-lg border border-accent/20 bg-accent/5 p-4 text-sm text-muted text-left space-y-2">
             <p className="font-medium text-text">Looking for access?</p>
             <p>
               {RELEASE_EXPECTATION_COPY}{" "}
@@ -76,19 +76,24 @@ export function SignUp() {
           </div>
 
           {/* Signup Card */}
-          <Card className="border border-border">
-            <CardHeader>
-              <CardTitle className="text-text">Create an account</CardTitle>
-              <CardDescription>
+          <Card className="border border-border/60 shadow-xl shadow-black/20">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-text text-lg">
+                Create an account
+              </CardTitle>
+              <CardDescription className="text-muted/80">
                 For invited users. Set up takes about two minutes. If we need to
                 verify your email, we&apos;ll send a quick confirmation message.
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-5 pt-4">
               <form onSubmit={handleSubmit} className="space-y-4">
                 {/* Name Field */}
                 <div className="space-y-2">
-                  <Label htmlFor="name" className="text-text">
+                  <Label
+                    htmlFor="name"
+                    className="text-muted text-xs font-medium uppercase tracking-wider"
+                  >
                     Full Name
                   </Label>
                   <Input
@@ -98,13 +103,16 @@ export function SignUp() {
                     onChange={(e) => setName(e.target.value)}
                     required
                     placeholder="John Doe"
-                    className="bg-surface-raised border-border text-text placeholder:text-muted"
+                    className="bg-surface border-border/60 text-text placeholder:text-muted/50 h-11"
                   />
                 </div>
 
                 {/* Email Field */}
                 <div className="space-y-2">
-                  <Label htmlFor="email" className="text-text">
+                  <Label
+                    htmlFor="email"
+                    className="text-muted text-xs font-medium uppercase tracking-wider"
+                  >
                     Email
                   </Label>
                   <Input
@@ -114,13 +122,16 @@ export function SignUp() {
                     onChange={(e) => setEmail(e.target.value)}
                     required
                     placeholder="you@example.com"
-                    className="bg-surface-raised border-border text-text placeholder:text-muted"
+                    className="bg-surface border-border/60 text-text placeholder:text-muted/50 h-11"
                   />
                 </div>
 
                 {/* Password Field */}
                 <div className="space-y-2">
-                  <Label htmlFor="password" className="text-text">
+                  <Label
+                    htmlFor="password"
+                    className="text-muted text-xs font-medium uppercase tracking-wider"
+                  >
                     Password
                   </Label>
                   <Input
@@ -130,13 +141,16 @@ export function SignUp() {
                     onChange={(e) => setPassword(e.target.value)}
                     required
                     placeholder="••••••••"
-                    className="bg-surface-raised border-border text-text placeholder:text-muted"
+                    className="bg-surface border-border/60 text-text placeholder:text-muted/50 h-11"
                   />
                 </div>
 
                 {/* Confirm Password Field */}
                 <div className="space-y-2">
-                  <Label htmlFor="confirmPassword" className="text-text">
+                  <Label
+                    htmlFor="confirmPassword"
+                    className="text-muted text-xs font-medium uppercase tracking-wider"
+                  >
                     Confirm Password
                   </Label>
                   <Input
@@ -146,13 +160,13 @@ export function SignUp() {
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     required
                     placeholder="••••••••"
-                    className="bg-surface-raised border-border text-text placeholder:text-muted"
+                    className="bg-surface border-border/60 text-text placeholder:text-muted/50 h-11"
                   />
                 </div>
 
                 {/* Error Message */}
                 {error && (
-                  <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive border border-destructive/30">
+                  <div className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive border border-destructive/20">
                     {error}
                   </div>
                 )}
@@ -161,7 +175,7 @@ export function SignUp() {
                 <Button
                   type="submit"
                   disabled={isLoading}
-                  className="w-full bg-accent hover:bg-accent/90 text-white"
+                  className="w-full bg-accent hover:bg-accent/85 text-white h-11 text-sm font-medium shadow-sm shadow-accent/20"
                 >
                   {isLoading ? "Creating account..." : "Create account"}
                 </Button>
@@ -178,13 +192,19 @@ export function SignUp() {
               </p>
 
               {/* Legal Links */}
-              <p className="text-center text-xs text-muted mt-4">
+              <p className="text-center text-xs text-muted/60 pt-2">
                 By signing up, you agree to our{" "}
-                <Link to="/terms" className="text-accent hover:underline">
+                <Link
+                  to="/terms"
+                  className="text-muted hover:text-text transition-colors"
+                >
                   Terms of Service
                 </Link>{" "}
                 and{" "}
-                <Link to="/privacy" className="text-accent hover:underline">
+                <Link
+                  to="/privacy"
+                  className="text-muted hover:text-text transition-colors"
+                >
                   Privacy Policy
                 </Link>
               </p>

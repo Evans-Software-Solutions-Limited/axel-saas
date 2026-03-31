@@ -12,15 +12,15 @@ export function About() {
         description="Axel exists to end tool sprawl. One context-aware AI assistant built on OpenClaw — approachable for anyone, deep enough for developers."
         path="/about"
       />
-      <section className="py-16 px-4">
+      <section className="py-20 px-6">
         <div className="max-w-3xl mx-auto">
-          <h1 className="text-4xl font-bold text-text mb-10">
+          <h1 className="text-4xl md:text-5xl font-bold text-text mb-12 tracking-tight">
             Why Axel exists
           </h1>
 
-          <div className="space-y-10 text-muted leading-relaxed">
+          <div className="space-y-12 text-muted leading-relaxed">
             <div>
-              <h2 className="text-xl font-semibold text-text mb-3">
+              <h2 className="text-xl font-semibold text-text mb-3 tracking-tight">
                 The problem
               </h2>
               <p>
@@ -31,7 +31,7 @@ export function About() {
             </div>
 
             <div>
-              <h2 className="text-xl font-semibold text-text mb-3">
+              <h2 className="text-xl font-semibold text-text mb-3 tracking-tight">
                 A crowded landscape
               </h2>
               <p>
@@ -45,7 +45,7 @@ export function About() {
             </div>
 
             <div>
-              <h2 className="text-xl font-semibold text-text mb-3">
+              <h2 className="text-xl font-semibold text-text mb-3 tracking-tight">
                 What we believe
               </h2>
               <p>
@@ -57,7 +57,7 @@ export function About() {
             </div>
 
             <div>
-              <h2 className="text-xl font-semibold text-text mb-3">
+              <h2 className="text-xl font-semibold text-text mb-3 tracking-tight">
                 Personal assistant first
               </h2>
               <p>
@@ -69,7 +69,7 @@ export function About() {
             </div>
 
             <div>
-              <h2 className="text-xl font-semibold text-text mb-3">
+              <h2 className="text-xl font-semibold text-text mb-3 tracking-tight">
                 Integrations, not a public API product
               </h2>
               <p>
@@ -81,7 +81,7 @@ export function About() {
             </div>
 
             <div>
-              <h2 className="text-xl font-semibold text-text mb-3">
+              <h2 className="text-xl font-semibold text-text mb-3 tracking-tight">
                 Where Axel comes from
               </h2>
               <p>
@@ -101,7 +101,7 @@ export function About() {
             </div>
 
             <div>
-              <h2 className="text-xl font-semibold text-text mb-3">
+              <h2 className="text-xl font-semibold text-text mb-3 tracking-tight">
                 Hosted solutions
               </h2>
               <p>
@@ -119,7 +119,7 @@ export function About() {
             </div>
 
             <div>
-              <h2 className="text-xl font-semibold text-text mb-3">
+              <h2 className="text-xl font-semibold text-text mb-3 tracking-tight">
                 How we build
               </h2>
               <p>
@@ -130,7 +130,7 @@ export function About() {
             </div>
 
             <div>
-              <h2 className="text-xl font-semibold text-text mb-3">
+              <h2 className="text-xl font-semibold text-text mb-3 tracking-tight">
                 Who we are
               </h2>
               <p>
@@ -147,9 +147,9 @@ export function About() {
             </div>
           </div>
 
-          <div className="mt-10">
+          <div className="mt-14 pt-10 border-t border-border/30">
             <Link to={waitlistSignupHref()}>
-              <Button className="bg-accent hover:bg-accent/90 text-white px-8">
+              <Button className="bg-accent hover:bg-accent/85 text-white px-8 shadow-sm shadow-accent/20">
                 Join waitlist
               </Button>
             </Link>

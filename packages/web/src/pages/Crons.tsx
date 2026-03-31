@@ -7,38 +7,49 @@ import { Badge } from "@axel-saas/ui/badge";
 
 export function Crons() {
   return (
-    <div className="p-6">
-      <Card className="border border-border">
+    <div className="p-8">
+      <h1 className="text-xl font-semibold text-text mb-6 tracking-tight">
+        Schedules
+      </h1>
+      <Card className="border border-border/50">
         <CardHeader>
-          <CardTitle className="text-text">Automated Schedules</CardTitle>
+          <CardTitle className="text-text text-base">
+            Automated Schedules
+          </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex items-center justify-between p-4 bg-surface-raised rounded border border-border">
+        <CardContent className="space-y-3">
+          <div className="flex items-center justify-between p-4 bg-surface/50 rounded-lg border border-border/40">
             <div>
-              <p className="text-text font-medium">Daily email digest</p>
-              <p className="text-sm text-muted">Every day at 9:00 AM</p>
+              <p className="text-text font-medium text-sm">
+                Daily email digest
+              </p>
+              <p className="text-xs text-muted mt-0.5">Every day at 9:00 AM</p>
             </div>
-            <Badge className="bg-success/20 text-success border-0">
+            <Badge className="bg-success/15 text-success border-0 text-xs">
               Active
             </Badge>
           </div>
 
-          <div className="flex items-center justify-between p-4 bg-surface-raised rounded border border-border">
+          <div className="flex items-center justify-between p-4 bg-surface/50 rounded-lg border border-border/40">
             <div>
-              <p className="text-text font-medium">Weekly report generation</p>
-              <p className="text-sm text-muted">Every Monday at 2:00 PM</p>
+              <p className="text-text font-medium text-sm">
+                Weekly report generation
+              </p>
+              <p className="text-xs text-muted mt-0.5">
+                Every Monday at 2:00 PM
+              </p>
             </div>
-            <Badge className="bg-success/20 text-success border-0">
+            <Badge className="bg-success/15 text-success border-0 text-xs">
               Active
             </Badge>
           </div>
 
-          <div className="flex items-center justify-between p-4 bg-surface-raised rounded border border-border">
+          <div className="flex items-center justify-between p-4 bg-surface/50 rounded-lg border border-border/40">
             <div>
-              <p className="text-text font-medium">Document indexing</p>
-              <p className="text-sm text-muted">Every 6 hours</p>
+              <p className="text-text font-medium text-sm">Document indexing</p>
+              <p className="text-xs text-muted mt-0.5">Every 6 hours</p>
             </div>
-            <Badge className="bg-success/20 text-success border-0">
+            <Badge className="bg-success/15 text-success border-0 text-xs">
               Active
             </Badge>
           </div>

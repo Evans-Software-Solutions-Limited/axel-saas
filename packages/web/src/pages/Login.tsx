@@ -35,29 +35,34 @@ export function Login() {
 
   return (
     <MarketingLayout>
-      <div className="flex-1 flex items-center justify-center p-4 py-12">
+      <div className="flex-1 flex items-center justify-center p-6 py-16">
         <div className="w-full max-w-md space-y-8">
           {/* Axel Wordmark & Tagline */}
-          <div className="text-center space-y-2">
-            <h1 className="text-3xl font-bold text-text">
+          <div className="text-center space-y-3">
+            <h1 className="text-4xl font-bold text-text tracking-tight">
               <span className="text-accent">A</span>xel
             </h1>
-            <p className="text-sm text-muted">
+            <p className="text-sm text-muted/80">
               One assistant. Every kind of work.
             </p>
           </div>
 
           {/* Auth Card */}
-          <Card className="border border-border">
-            <CardHeader>
-              <CardTitle className="text-text">Welcome back</CardTitle>
-              <CardDescription>Sign in to your Axel account</CardDescription>
+          <Card className="border border-border/60 shadow-xl shadow-black/20">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-text text-lg">Welcome back</CardTitle>
+              <CardDescription className="text-muted/80">
+                Sign in to your Axel account
+              </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-5 pt-4">
               <form onSubmit={handleSubmit} className="space-y-4">
                 {/* Email Field */}
                 <div className="space-y-2">
-                  <Label htmlFor="email" className="text-text">
+                  <Label
+                    htmlFor="email"
+                    className="text-muted text-xs font-medium uppercase tracking-wider"
+                  >
                     Email
                   </Label>
                   <Input
@@ -67,13 +72,16 @@ export function Login() {
                     onChange={(e) => setEmail(e.target.value)}
                     required
                     placeholder="you@example.com"
-                    className="bg-surface-raised border-border text-text placeholder:text-muted"
+                    className="bg-surface border-border/60 text-text placeholder:text-muted/50 h-11"
                   />
                 </div>
 
                 {/* Password Field */}
                 <div className="space-y-2">
-                  <Label htmlFor="password" className="text-text">
+                  <Label
+                    htmlFor="password"
+                    className="text-muted text-xs font-medium uppercase tracking-wider"
+                  >
                     Password
                   </Label>
                   <Input
@@ -83,13 +91,13 @@ export function Login() {
                     onChange={(e) => setPassword(e.target.value)}
                     required
                     placeholder="••••••••"
-                    className="bg-surface-raised border-border text-text placeholder:text-muted"
+                    className="bg-surface border-border/60 text-text placeholder:text-muted/50 h-11"
                   />
                 </div>
 
                 {/* Error Message */}
                 {error && (
-                  <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive border border-destructive/30">
+                  <div className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive border border-destructive/20">
                     {error}
                   </div>
                 )}
@@ -98,7 +106,7 @@ export function Login() {
                 <Button
                   type="submit"
                   disabled={isLoading}
-                  className="w-full bg-accent hover:bg-accent/90 text-white"
+                  className="w-full bg-accent hover:bg-accent/85 text-white h-11 text-sm font-medium shadow-sm shadow-accent/20"
                 >
                   {isLoading ? "Signing in..." : "Sign in"}
                 </Button>
@@ -107,17 +115,19 @@ export function Login() {
               {/* Divider */}
               <div className="relative">
                 <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-border" />
+                  <div className="w-full border-t border-border/50" />
                 </div>
                 <div className="relative flex justify-center text-xs">
-                  <span className="px-2 bg-surface-raised text-muted">Or</span>
+                  <span className="px-3 bg-surface-raised text-muted/60">
+                    Or
+                  </span>
                 </div>
               </div>
 
               {/* Google Sign In */}
               <Button
                 variant="outline"
-                className="w-full border-border text-text hover:bg-surface-raised"
+                className="w-full border-border/60 text-text hover:bg-surface-elevated h-11 text-sm"
                 disabled={isLoading}
               >
                 Sign in with Google
@@ -135,13 +145,19 @@ export function Login() {
               </p>
 
               {/* Legal Links */}
-              <p className="text-center text-xs text-muted mt-4">
+              <p className="text-center text-xs text-muted/60 pt-2">
                 By signing in, you agree to our{" "}
-                <Link to="/terms" className="text-accent hover:underline">
+                <Link
+                  to="/terms"
+                  className="text-muted hover:text-text transition-colors"
+                >
                   Terms of Service
                 </Link>{" "}
                 and{" "}
-                <Link to="/privacy" className="text-accent hover:underline">
+                <Link
+                  to="/privacy"
+                  className="text-muted hover:text-text transition-colors"
+                >
                   Privacy Policy
                 </Link>
               </p>

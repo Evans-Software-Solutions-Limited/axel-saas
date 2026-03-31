@@ -9,26 +9,26 @@
    AXEL SAAS DESIGN SYSTEM – Dark Premium Theme
    ========================================================================== */
 :root {
-  /* Surfaces */
-  --color-surface: #0f1117;
-  --color-surface-raised: #1a1d2e;
-  --color-surface-elevated: #1e2130;
+  /* Surfaces — subtle blue undertone for depth */
+  --color-surface: #0b0d14;
+  --color-surface-raised: #141724;
+  --color-surface-elevated: #1a1e2e;
 
-  /* Borders & Dividers */
-  --color-border: #2a2d3e;
+  /* Borders & Dividers — slightly cooler */
+  --color-border: #232738;
 
-  /* Text */
-  --color-text: #e8e9f0;
-  --color-muted: #8b8fa8;
+  /* Text — brighter primary, softer secondary */
+  --color-text: #edeef4;
+  --color-muted: #7b7f9a;
 
-  /* Semantic Colors */
-  --color-accent: #3b82f6;
-  --color-success: #10b798;
-  --color-warning: #faa74a;
-  --color-destructive: #ef5e41;
+  /* Semantic Colors — refined palette */
+  --color-accent: #4f8ff7;
+  --color-success: #34d399;
+  --color-warning: #fbbf24;
+  --color-destructive: #f87171;
 
   /* Radius */
-  --radius: 0.5rem;
+  --radius: 0.625rem;
 }
 
 /* shadcn/ui CSS Variables */
@@ -61,16 +61,16 @@
 
 @theme {
   --font-sans: "Figtree Variable", sans-serif;
-  --color-surface: #0f1117;
-  --color-surface-raised: #1a1d2e;
-  --color-surface-elevated: #1e2130;
-  --color-border: #2a2d3e;
-  --color-text: #e8e9f0;
-  --color-muted: #8b8fa8;
-  --color-accent: #3b82f6;
-  --color-success: #10b798;
-  --color-warning: #faa74a;
-  --color-destructive: #ef5e41;
+  --color-surface: #0b0d14;
+  --color-surface-raised: #141724;
+  --color-surface-elevated: #1a1e2e;
+  --color-border: #232738;
+  --color-text: #edeef4;
+  --color-muted: #7b7f9a;
+  --color-accent: #4f8ff7;
+  --color-success: #34d399;
+  --color-warning: #fbbf24;
+  --color-destructive: #f87171;
 }
 
 @layer base {
@@ -81,8 +81,40 @@
   body {
     @apply font-sans bg-surface text-text m-0 p-0;
     height: 100%;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
   #root {
     min-height: 100%;
+  }
+
+  /* Smoother transitions globally */
+  button,
+  a,
+  input,
+  select,
+  textarea {
+    @apply transition-colors duration-150;
+  }
+
+  /* Better focus rings */
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-accent;
+  }
+
+  /* Refined scrollbar for webkit */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--color-border);
+    border-radius: 3px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--color-muted);
   }
 }

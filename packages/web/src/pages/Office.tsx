@@ -371,19 +371,22 @@ export function Office({ onQuickChat }: OfficeProps) {
   }
 
   return (
-    <div className="flex flex-col flex-1 min-h-0 p-6">
+    <div className="flex flex-col flex-1 min-h-0 p-8">
+      <h1 className="text-xl font-semibold text-text mb-5 tracking-tight">
+        Office
+      </h1>
       <Tabs
         value={viewMode}
         onValueChange={handleTabChange}
         className="flex flex-col flex-1 min-h-0 w-full"
       >
-        <TabsList variant="line" className="mb-4 w-fit shrink-0">
+        <TabsList variant="line" className="mb-5 w-fit shrink-0">
           <TabsTrigger
             value="desk"
             className={
               viewMode === "desk"
-                ? "font-semibold text-accent border-b-2 border-accent rounded-none pb-1.5 -mb-px"
-                : ""
+                ? "font-semibold text-accent border-b-2 border-accent rounded-none pb-1.5 -mb-px text-sm"
+                : "text-sm text-muted"
             }
           >
             Desk view
@@ -392,8 +395,8 @@ export function Office({ onQuickChat }: OfficeProps) {
             value="list"
             className={
               viewMode === "list"
-                ? "font-semibold text-accent border-b-2 border-accent rounded-none pb-1.5 -mb-px"
-                : ""
+                ? "font-semibold text-accent border-b-2 border-accent rounded-none pb-1.5 -mb-px text-sm"
+                : "text-sm text-muted"
             }
           >
             List view
@@ -403,7 +406,7 @@ export function Office({ onQuickChat }: OfficeProps) {
         <TabsContent value="desk" className="mt-0 flex-1 min-h-0 flex flex-col">
           <div
             ref={sceneRef}
-            className="relative w-full flex-1 min-h-0 overflow-hidden rounded-xl border border-white/5 bg-transparent"
+            className="relative w-full flex-1 min-h-0 overflow-hidden rounded-xl border border-border/30 bg-transparent"
           >
             <img
               src="/pixel-office-bg.png"
@@ -518,30 +521,24 @@ export function Office({ onQuickChat }: OfficeProps) {
                     </div>
                   </AccordionTrigger>
                   <AccordionContent className="px-2">
-                    <div className="flex gap-3 mb-4 flex-wrap">
-                      <div className="bg-card rounded-lg px-4 py-2 text-center min-w-20">
-                        <div className="text-lg font-bold">
+                    <div className="flex gap-3 mb-5 flex-wrap">
+                      <div className="bg-surface-elevated/50 rounded-lg px-4 py-3 text-center min-w-20 border border-border/30">
+                        <div className="text-lg font-bold text-text">
                           {agent.stats.totalTasks}
                         </div>
-                        <div className="text-xs text-muted-foreground">
-                          Total tasks
-                        </div>
+                        <div className="text-xs text-muted">Total tasks</div>
                       </div>
-                      <div className="bg-card rounded-lg px-4 py-2 text-center min-w-20">
-                        <div className="text-lg font-bold">
+                      <div className="bg-surface-elevated/50 rounded-lg px-4 py-3 text-center min-w-20 border border-border/30">
+                        <div className="text-lg font-bold text-text">
                           {agent.stats.todayTasks}
                         </div>
-                        <div className="text-xs text-muted-foreground">
-                          Today
-                        </div>
+                        <div className="text-xs text-muted">Today</div>
                       </div>
-                      <div className="bg-card rounded-lg px-4 py-2 text-center min-w-20">
-                        <div className="text-sm font-semibold">
+                      <div className="bg-surface-elevated/50 rounded-lg px-4 py-3 text-center min-w-20 border border-border/30">
+                        <div className="text-sm font-semibold text-text">
                           {agent.stats.avgDuration}
                         </div>
-                        <div className="text-xs text-muted-foreground">
-                          Avg duration
-                        </div>
+                        <div className="text-xs text-muted">Avg duration</div>
                       </div>
                     </div>
                     <div className="space-y-0">

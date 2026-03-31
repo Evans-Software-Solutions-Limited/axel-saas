@@ -79,11 +79,13 @@ export function UseCases() {
         description="See how Axel fits your role: daily briefs and meeting prep for knowledge workers, async catch-up for operators, and task management for solopreneurs."
         path="/use-cases"
       />
-      <section className="py-16 px-4">
+      <section className="py-20 px-6">
         <div className="max-w-3xl mx-auto">
-          <div className="text-center mb-14">
-            <h1 className="text-4xl font-bold text-text mb-4">Use cases</h1>
-            <p className="text-muted text-lg">
+          <div className="text-center mb-16">
+            <h1 className="text-4xl md:text-5xl font-bold text-text mb-5 tracking-tight">
+              Use cases
+            </h1>
+            <p className="text-muted text-lg leading-relaxed">
               See whether Axel fits someone like you — outcomes first, feature
               lists live on pricing.
             </p>
@@ -93,9 +95,9 @@ export function UseCases() {
             {SECTIONS.map(({ title, body, cta }) => (
               <div
                 key={title}
-                className="border-b border-border pb-14 last:border-0 last:pb-0"
+                className="border-b border-border/40 pb-14 last:border-0 last:pb-0"
               >
-                <h2 className="text-2xl font-semibold text-text mb-4">
+                <h2 className="text-2xl font-semibold text-text mb-4 tracking-tight">
                   {title}
                 </h2>
                 <div className="space-y-3 text-muted leading-relaxed">
@@ -109,9 +111,9 @@ export function UseCases() {
             ))}
           </div>
 
-          <div className="text-center mt-16">
+          <div className="text-center mt-20 pt-10 border-t border-border/30">
             <Link to={waitlistSignupHref()}>
-              <Button className="bg-accent hover:bg-accent/90 text-white px-8">
+              <Button className="bg-accent hover:bg-accent/85 text-white px-8 shadow-sm shadow-accent/20">
                 Join waitlist
               </Button>
             </Link>

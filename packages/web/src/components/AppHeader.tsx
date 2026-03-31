@@ -23,10 +23,13 @@ export function AppHeader() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   return (
-    <header className="border-b border-border bg-surface-raised sticky top-0 z-10 shrink-0">
-      <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
-        <Link to="/" className="text-xl font-bold text-text flex items-center">
-          <img src="/axel-logo.png" alt="Axel" className="w-8 h-8 mr-2" />
+    <header className="border-b border-border/60 bg-surface-raised/80 backdrop-blur-xl sticky top-0 z-10 shrink-0">
+      <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
+        <Link
+          to="/"
+          className="text-xl font-bold text-text flex items-center gap-2.5 tracking-tight"
+        >
+          <img src="/axel-logo.png" alt="Axel" className="w-8 h-8" />
           Meet<span className="text-accent">Axel</span>
         </Link>
 
@@ -62,7 +65,7 @@ export function AppHeader() {
           ) : (
             <Link
               to={waitlistSignupHref()}
-              className="text-sm px-4 py-2 cursor-pointer rounded-md bg-accent text-white hover:bg-accent/90 transition-colors font-medium"
+              className="text-sm px-5 py-2 cursor-pointer rounded-lg bg-accent text-white hover:bg-accent/85 transition-all font-medium shadow-sm shadow-accent/20"
             >
               Join waitlist
             </Link>
@@ -138,7 +141,7 @@ export function AppHeader() {
         <nav
           id="mobile-nav"
           aria-label="Mobile navigation"
-          className="md:hidden border-t border-border bg-surface-raised px-4 py-3 flex flex-col gap-1"
+          className="md:hidden border-t border-border/60 bg-surface-raised/95 backdrop-blur-xl px-4 py-3 flex flex-col gap-1"
         >
           {NAV_LINKS.map(({ label, to }) => {
             const isActive = getIsActive(to, location.pathname);

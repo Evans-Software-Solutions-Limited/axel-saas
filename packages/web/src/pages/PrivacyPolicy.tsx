@@ -10,14 +10,14 @@ export function PrivacyPolicy() {
         path="/privacy"
       />
       {/* Header */}
-      <header className="border-b border-border bg-surface-raised">
-        <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
-          <Link to="/" className="text-xl font-bold text-text">
+      <header className="border-b border-border/60 bg-surface-raised/80 backdrop-blur-xl sticky top-0 z-10">
+        <div className="max-w-4xl mx-auto px-6 py-4 flex items-center justify-between">
+          <Link to="/" className="text-xl font-bold text-text tracking-tight">
             <span className="text-accent">A</span>xel
           </Link>
           <Link
             to="/#waitlist"
-            className="text-sm text-muted hover:text-accent transition-colors"
+            className="text-sm text-muted hover:text-text transition-colors"
           >
             Join waitlist
           </Link>
@@ -25,10 +25,12 @@ export function PrivacyPolicy() {
       </header>
 
       {/* Content */}
-      <main className="flex-1 py-12 px-4">
+      <main className="flex-1 py-16 px-6">
         <div className="max-w-4xl mx-auto prose prose-invert prose-slate">
-          <h1 className="text-3xl font-bold text-text">Privacy Policy</h1>
-          <p className="text-muted">
+          <h1 className="text-3xl font-bold text-text tracking-tight">
+            Privacy Policy
+          </h1>
+          <p className="text-muted/70 text-sm">
             Last updated: {new Date().toLocaleDateString()}
           </p>
 
@@ -146,14 +148,14 @@ export function PrivacyPolicy() {
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-border py-6 px-4">
+      <footer className="border-t border-border/50 py-8 px-6">
         <div className="max-w-4xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-muted">
           <p>© {new Date().getFullYear()} Axel. All rights reserved.</p>
           <div className="flex gap-6">
-            <Link to="/privacy" className="hover:text-accent transition-colors">
+            <Link to="/privacy" className="hover:text-text transition-colors">
               Privacy Policy
             </Link>
-            <Link to="/terms" className="hover:text-accent transition-colors">
+            <Link to="/terms" className="hover:text-text transition-colors">
               Terms of Service
             </Link>
           </div>

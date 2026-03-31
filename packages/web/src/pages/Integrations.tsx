@@ -10,26 +10,42 @@ export function Integrations() {
   ];
 
   return (
-    <div className="p-6">
+    <div className="p-8">
+      <h1 className="text-xl font-semibold text-text mb-6 tracking-tight">
+        Integrations
+      </h1>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {integrations.map((integration) => (
-          <Card key={integration.name} className="border border-border">
+          <Card
+            key={integration.name}
+            className="border border-border/50 hover:border-border/80 transition-colors"
+          >
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <span className="text-2xl">{integration.icon}</span>
+                  <div className="w-10 h-10 rounded-lg bg-surface-elevated/60 flex items-center justify-center text-xl">
+                    {integration.icon}
+                  </div>
                   <div>
-                    <p className="text-text font-medium">{integration.name}</p>
-                    <p className="text-xs text-muted">
-                      {integration.status === "connected"
-                        ? "Connected"
-                        : "Not connected"}
+                    <p className="text-text font-medium text-sm">
+                      {integration.name}
+                    </p>
+                    <p className="text-xs text-muted mt-0.5">
+                      {integration.status === "connected" ? (
+                        <span className="text-success">Connected</span>
+                      ) : (
+                        "Not connected"
+                      )}
                     </p>
                   </div>
                 </div>
                 <Button
                   variant="outline"
-                  className="border-border text-text text-xs"
+                  className={`text-xs h-8 ${
+                    integration.status === "connected"
+                      ? "border-border/60 text-muted hover:text-text"
+                      : "border-accent/40 text-accent hover:bg-accent/10"
+                  }`}
                 >
                   {integration.status === "connected" ? "Manage" : "Connect"}
                 </Button>
