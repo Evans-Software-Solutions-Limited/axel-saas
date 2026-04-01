@@ -63,10 +63,10 @@ export function WaitlistForm() {
   return (
     <form
       onSubmit={handleSubmit}
-      className="space-y-4 text-left max-w-md mx-auto"
+      className="space-y-5 text-left max-w-md mx-auto"
     >
       <div className="space-y-2">
-        <Label htmlFor="waitlist-email" className="text-text">
+        <Label htmlFor="waitlist-email" className="text-text text-sm">
           Email
         </Label>
         <Input
@@ -78,11 +78,11 @@ export function WaitlistForm() {
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           placeholder="you@example.com"
-          className="bg-surface-raised border-border text-text placeholder:text-muted"
+          className="bg-surface-raised border-border text-text placeholder:text-muted focus:border-accent focus:ring-accent-glow/30 transition-all duration-200"
         />
       </div>
       <div className="space-y-2">
-        <Label htmlFor="waitlist-tier" className="text-text">
+        <Label htmlFor="waitlist-tier" className="text-text text-sm">
           I&apos;m interested in
         </Label>
         <select
@@ -92,7 +92,7 @@ export function WaitlistForm() {
           onChange={(e) =>
             setInterestedIn(e.target.value as WaitlistInterestedIn)
           }
-          className="w-full h-10 rounded-md border border-border bg-surface-raised px-3 text-sm text-text"
+          className="w-full h-10 rounded-lg border border-border bg-surface-raised px-3 text-sm text-text focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent-glow/30 transition-all duration-200"
         >
           {TIERS.map(({ value, label }) => (
             <option key={value} value={value}>
@@ -102,21 +102,23 @@ export function WaitlistForm() {
         </select>
       </div>
       {feedback && (
-        <p
-          className={`text-sm ${
-            submitState === "success" ? "text-success" : "text-destructive"
+        <div
+          className={`text-sm rounded-lg px-4 py-3 ${
+            submitState === "success"
+              ? "bg-success/10 text-success border border-success/20"
+              : "bg-destructive/10 text-destructive border border-destructive/20"
           }`}
           role={submitState === "error" ? "alert" : "status"}
         >
           {feedback}
-        </p>
+        </div>
       )}
       <Button
         type="submit"
         disabled={submitState === "loading" || submitState === "success"}
-        className="w-full bg-accent hover:bg-accent/90 text-white"
+        className="w-full"
       >
-        {submitState === "loading" ? "Submitting…" : "Join waitlist"}
+        {submitState === "loading" ? "Submitting..." : "Join waitlist"}
       </Button>
     </form>
   );

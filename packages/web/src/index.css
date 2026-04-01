@@ -1,31 +1,60 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
+@import "@fontsource-variable/instrument-sans";
 @import "@fontsource-variable/figtree";
+
+/* Scan the shared UI package so its Tailwind classes get compiled */
+@source "../../ui/src";
 
 @custom-variant dark (&:is(.dark *));
 
 /* ==========================================================================
-   AXEL SAAS DESIGN SYSTEM – Dark Premium Theme
+   AXEL SAAS DESIGN SYSTEM – Refined Luxury Dark
    ========================================================================== */
 :root {
-  /* Surfaces */
-  --color-surface: #0f1117;
-  --color-surface-raised: #1a1d2e;
-  --color-surface-elevated: #1e2130;
+  /* Surfaces — deeper, richer blacks with blue undertone */
+  --color-surface: #08090d;
+  --color-surface-raised: #111318;
+  --color-surface-elevated: #181b24;
+  --color-surface-glass: rgba(17, 19, 24, 0.7);
 
   /* Borders & Dividers */
-  --color-border: #2a2d3e;
+  --color-border: #1e2230;
+  --color-border-subtle: #141720;
+  --color-border-accent: rgba(13, 211, 176, 0.15);
 
   /* Text */
-  --color-text: #e8e9f0;
-  --color-muted: #8b8fa8;
+  --color-text: #eef0f6;
+  --color-text-secondary: #8a8fa6;
+  --color-muted: #5c6178;
+
+  /* Accent — Teal/Cyan family */
+  --color-accent: #0dd3b0;
+  --color-accent-light: #2eecc8;
+  --color-accent-muted: rgba(13, 211, 176, 0.12);
+  --color-accent-glow: rgba(13, 211, 176, 0.25);
+  --color-secondary-accent: #c084fc;
 
   /* Semantic Colors */
-  --color-accent: #3b82f6;
-  --color-success: #10b798;
-  --color-warning: #faa74a;
-  --color-destructive: #ef5e41;
+  --color-success: #34d399;
+  --color-warning: #fbbf24;
+  --color-destructive: #f87171;
+
+  /* Gradients */
+  --gradient-surface: linear-gradient(135deg, #111318 0%, #0d1017 100%);
+  --gradient-accent: linear-gradient(135deg, #0dd3b0 0%, #06b698 100%);
+  --gradient-accent-hover: linear-gradient(135deg, #2eecc8 0%, #0dd3b0 100%);
+  --gradient-hero: radial-gradient(
+    ellipse at 50% 0%,
+    rgba(13, 211, 176, 0.08) 0%,
+    transparent 70%
+  );
+  --gradient-card: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.03) 0%,
+    transparent 100%
+  );
 
   /* Radius */
   --radius: 0.5rem;
@@ -40,13 +69,13 @@
   --popover: var(--color-surface-raised);
   --popover-foreground: var(--color-text);
   --primary: var(--color-accent);
-  --primary-foreground: #ffffff;
+  --primary-foreground: #08090d;
   --secondary: var(--color-surface-elevated);
   --secondary-foreground: var(--color-text);
   --muted: var(--color-muted);
-  --muted-foreground: var(--color-muted);
+  --muted-foreground: var(--color-text-secondary);
   --accent: var(--color-accent);
-  --accent-foreground: #ffffff;
+  --accent-foreground: #08090d;
   --destructive: var(--color-destructive);
   --destructive-foreground: #ffffff;
   --border: var(--color-border);
@@ -56,21 +85,40 @@
   --chart-2: var(--color-success);
   --chart-3: var(--color-warning);
   --chart-4: var(--color-destructive);
-  --chart-5: #8b5cf6;
+  --chart-5: var(--color-secondary-accent);
 }
 
 @theme {
+  --font-display: "Instrument Sans Variable", "Figtree Variable", sans-serif;
   --font-sans: "Figtree Variable", sans-serif;
-  --color-surface: #0f1117;
-  --color-surface-raised: #1a1d2e;
-  --color-surface-elevated: #1e2130;
-  --color-border: #2a2d3e;
-  --color-text: #e8e9f0;
-  --color-muted: #8b8fa8;
-  --color-accent: #3b82f6;
-  --color-success: #10b798;
-  --color-warning: #faa74a;
-  --color-destructive: #ef5e41;
+
+  --color-surface: #08090d;
+  --color-surface-raised: #111318;
+  --color-surface-elevated: #181b24;
+  --color-surface-glass: rgba(17, 19, 24, 0.7);
+
+  --color-border: #1e2230;
+  --color-border-subtle: #141720;
+  --color-border-accent: rgba(13, 211, 176, 0.15);
+
+  --color-text: #eef0f6;
+  --color-text-secondary: #8a8fa6;
+  --color-muted: #5c6178;
+
+  --color-accent: #0dd3b0;
+  --color-accent-light: #2eecc8;
+  --color-accent-muted: rgba(13, 211, 176, 0.12);
+  --color-accent-glow: rgba(13, 211, 176, 0.25);
+  --color-secondary-accent: #c084fc;
+
+  --color-success: #34d399;
+  --color-warning: #fbbf24;
+  --color-destructive: #f87171;
+
+  --animate-fade-up: fade-up 0.5s ease-out both;
+  --animate-fade-in: fade-in 0.4s ease-out both;
+  --animate-glow-pulse: glow-pulse 2s ease-in-out infinite;
+  --animate-shimmer: shimmer 2s linear infinite;
 }
 
 @layer base {
@@ -79,10 +127,138 @@
   }
   html,
   body {
-    @apply font-sans bg-surface text-text m-0 p-0;
+    @apply font-sans bg-surface text-text m-0 p-0 antialiased;
     height: 100%;
   }
   #root {
     min-height: 100%;
   }
+  h1,
+  h2,
+  h3 {
+    @apply font-display tracking-tight;
+  }
+}
+
+/* ==========================================================================
+   Keyframes
+   ========================================================================== */
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes glow-pulse {
+  0%,
+  100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+/* ==========================================================================
+   Utility classes
+   ========================================================================== */
+
+/* Glass-morphism panel */
+.glass {
+  background: var(--color-surface-glass);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid var(--color-border-accent);
+}
+
+/* Glass card with gradient overlay */
+.glass-card {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.03) 0%, transparent 100%),
+    var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.04);
+  transition: all 0.3s ease;
+}
+
+.glass-card:hover {
+  border-color: var(--color-border-accent);
+  transform: translateY(-1px);
+  box-shadow:
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.04),
+    0 8px 32px -8px rgba(0, 0, 0, 0.3);
+}
+
+/* shadcn Card hover — teal glow on all cards */
+[data-slot="card"]:hover {
+  border-color: rgba(13, 211, 176, 0.2) !important;
+  box-shadow:
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.06),
+    0 0 28px -4px rgba(13, 211, 176, 0.3) !important;
+}
+
+/* Accent glow effect */
+.glow-accent {
+  box-shadow: 0 0 40px -8px var(--color-accent-glow);
+}
+
+/* Ambient orb for hero backgrounds */
+.ambient-orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(100px);
+  pointer-events: none;
+}
+
+/* Grain texture overlay */
+.grain::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+  background-size: 256px 256px;
+  pointer-events: none;
+  z-index: 1;
+  mix-blend-mode: overlay;
+}
+
+/* Stagger animation delays */
+.stagger-1 {
+  animation-delay: 0ms;
+}
+.stagger-2 {
+  animation-delay: 100ms;
+}
+.stagger-3 {
+  animation-delay: 200ms;
+}
+.stagger-4 {
+  animation-delay: 300ms;
+}
+.stagger-5 {
+  animation-delay: 400ms;
 }

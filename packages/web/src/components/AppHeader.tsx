@@ -23,17 +23,23 @@ export function AppHeader() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   return (
-    <header className="border-b border-border bg-surface-raised sticky top-0 z-10 shrink-0">
+    <header className="border-b border-border-subtle bg-surface-glass/80 backdrop-blur-2xl sticky top-0 z-50 shrink-0">
       <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
-        <Link to="/" className="text-xl font-bold text-text flex items-center">
+        <Link
+          to="/"
+          className="text-xl font-display font-bold text-text flex items-center group"
+        >
           <img src="/axel-logo.png" alt="Axel" className="w-8 h-8 mr-2" />
-          Meet<span className="text-accent">Axel</span>
+          Meet
+          <span className="text-accent group-hover:drop-shadow-[0_0_8px_var(--color-accent-glow)] transition-all duration-300">
+            Axel
+          </span>
         </Link>
 
         {/* Desktop nav */}
         <nav
           aria-label="Main navigation"
-          className="hidden md:flex items-center gap-6"
+          className="hidden md:flex items-center gap-8"
         >
           {NAV_LINKS.map(({ label, to }) => {
             const isActive = getIsActive(to, location.pathname);
@@ -41,13 +47,16 @@ export function AppHeader() {
               <Link
                 key={to}
                 to={to}
-                className={`text-sm transition-colors ${
+                className={`relative text-sm transition-colors duration-200 ${
                   isActive
                     ? "text-text font-medium"
-                    : "text-muted hover:text-text"
+                    : "text-text-secondary hover:text-text"
                 }`}
               >
                 {label}
+                {isActive && (
+                  <span className="absolute -bottom-1 left-0 right-0 h-px bg-accent" />
+                )}
               </Link>
             );
           })}
@@ -55,14 +64,14 @@ export function AppHeader() {
             <button
               type="button"
               onClick={() => void signOut()}
-              className="text-sm px-4 py-2 rounded-md border border-border text-text hover:bg-surface-elevated transition-colors font-medium"
+              className="text-sm px-4 py-2 rounded-full border border-border text-text-secondary hover:text-text hover:border-border-accent hover:bg-white/[0.03] transition-all duration-200 font-medium"
             >
               Logout
             </button>
           ) : (
             <Link
               to={waitlistSignupHref()}
-              className="text-sm px-4 py-2 cursor-pointer rounded-md bg-accent text-white hover:bg-accent/90 transition-colors font-medium"
+              className="text-sm px-5 py-2 cursor-pointer rounded-full bg-gradient-to-br from-accent to-accent/80 text-[#08090d] font-semibold hover:from-accent-light hover:to-accent hover:shadow-[0_0_24px_-4px_var(--color-accent-glow)] transition-all duration-300"
             >
               Join waitlist
             </Link>
@@ -75,14 +84,14 @@ export function AppHeader() {
             <button
               type="button"
               onClick={() => void signOut()}
-              className="text-sm px-3 py-1.5 rounded-md border border-border text-text hover:bg-surface-elevated"
+              className="text-sm px-3 py-1.5 rounded-full border border-border text-text-secondary hover:text-text hover:border-border-accent"
             >
               Logout
             </button>
           ) : (
             <Link
               to={waitlistSignupHref()}
-              className="text-sm px-3 py-1.5 rounded-md bg-accent text-white hover:bg-accent/90"
+              className="text-sm px-4 py-1.5 rounded-full bg-gradient-to-br from-accent to-accent/80 text-[#08090d] font-semibold"
             >
               Join waitlist
             </Link>
@@ -93,7 +102,7 @@ export function AppHeader() {
             aria-expanded={isMenuOpen}
             aria-controls="mobile-nav"
             onClick={() => setIsMenuOpen((prev) => !prev)}
-            className="p-2 rounded-md text-text hover:bg-surface-elevated transition-colors"
+            className="p-2 rounded-lg text-text-secondary hover:text-text hover:bg-white/[0.04] transition-colors"
           >
             {isMenuOpen ? (
               <svg
@@ -138,7 +147,7 @@ export function AppHeader() {
         <nav
           id="mobile-nav"
           aria-label="Mobile navigation"
-          className="md:hidden border-t border-border bg-surface-raised px-4 py-3 flex flex-col gap-1"
+          className="md:hidden border-t border-border-subtle bg-surface-glass/90 backdrop-blur-2xl px-4 py-3 flex flex-col gap-1 animate-fade-in"
         >
           {NAV_LINKS.map(({ label, to }) => {
             const isActive = getIsActive(to, location.pathname);
@@ -147,10 +156,10 @@ export function AppHeader() {
                 key={to}
                 to={to}
                 onClick={() => setIsMenuOpen(false)}
-                className={`text-sm py-2 px-3 rounded-md transition-colors ${
+                className={`text-sm py-2.5 px-3 rounded-lg transition-colors duration-200 ${
                   isActive
-                    ? "text-text font-medium bg-surface-elevated"
-                    : "text-muted hover:text-text hover:bg-surface-elevated"
+                    ? "text-text font-medium bg-white/[0.04]"
+                    : "text-text-secondary hover:text-text hover:bg-white/[0.03]"
                 }`}
               >
                 {label}

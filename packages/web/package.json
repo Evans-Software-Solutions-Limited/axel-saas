@@ -13,10 +13,11 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@axel-saas/ui": "workspace:*",
     "@axel-saas/core": "workspace:*",
+    "@axel-saas/ui": "workspace:*",
     "@elysiajs/eden": "^1.4.8",
     "@fontsource-variable/figtree": "^5.2.10",
+    "@fontsource-variable/instrument-sans": "5.2.8",
     "@supabase/supabase-js": "^2.50.0",
     "@tabler/icons-react": "^3.36.1",
     "@tailwindcss/vite": "^4.1.18",

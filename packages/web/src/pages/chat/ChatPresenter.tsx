@@ -73,12 +73,7 @@ export function ChatPresenter({
     !isFailedMode;
 
   // Only show nextQuestion banner if the same question isn't already in the transcript.
-  // Extract the core question from nextQuestion to handle cases where the transcript wraps
-  // the question in greeting text (e.g., transcript has "what should I call you?" but
-  // nextQuestion has "Before I can be useful, what should I call you?").
   const getCoreQuestion = (question: string): string => {
-    // Split by common delimiters and find the last non-empty meaningful part
-    // Handles: "Before I can be useful, what should I call you?" -> "what should I call you?"
     const parts = question
       .split(/[,?]/)
       .map((p) => p.trim())
@@ -95,11 +90,9 @@ export function ChatPresenter({
     !messages.some((msg) => {
       if (msg.role !== "assistant") return false;
       const msgContent = msg.content.toLowerCase();
-      // Check if the core question appears anywhere in the transcript message
       return msgContent.includes(coreNextQuestion);
     });
 
-  // Input is disabled during loading, when already sending, when in confirming-payment/discovery/provisioning/failed, or when there's an error
   const inputDisabled =
     isLoadingState ||
     isSending ||
@@ -109,29 +102,36 @@ export function ChatPresenter({
     isFailedMode ||
     error !== null;
 
+  const modeLabel = isConfirmingPaymentMode
+    ? "Payment confirmed"
+    : isDiscoveryMode
+      ? "Choose your plan"
+      : isOnboardingMode
+        ? "Onboarding mode"
+        : isProvisioningMode
+          ? "Setting up"
+          : isFailedMode
+            ? "Setup failed"
+            : "Chat";
+
   return (
     <div className="h-full flex flex-col p-6">
-      <div className="mb-4">
-        <p className="text-xs uppercase tracking-wide text-muted">
-          {isConfirmingPaymentMode
-            ? "Payment confirmed"
-            : isDiscoveryMode
-              ? "Choose your plan"
-              : isOnboardingMode
-                ? "Onboarding mode"
-                : isProvisioningMode
-                  ? "Setting up"
-                  : isFailedMode
-                    ? "Setup failed"
-                    : "Chat"}
+      <div className="mb-5">
+        <p className="text-xs uppercase tracking-widest text-muted font-medium">
+          {modeLabel}
         </p>
       </div>
 
-      <div className="flex-1 overflow-y-auto mb-4 space-y-4">
-        {isLoadingState && <p className="text-sm text-muted">Loading...</p>}
+      <div className="flex-1 overflow-y-auto mb-5 space-y-4">
+        {isLoadingState && (
+          <div className="flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full bg-accent animate-glow-pulse" />
+            <p className="text-sm text-text-secondary">Loading...</p>
+          </div>
+        )}
 
         {isConfirmingPaymentMode && (
-          <p className="text-sm text-muted">
+          <p className="text-sm text-text-secondary">
             Payment confirmed. Activating your workspace — this usually takes
             just a moment...
           </p>
@@ -147,16 +147,23 @@ export function ChatPresenter({
         )}
 
         {isProvisioningMode && (
-          <p className="text-sm text-muted">
-            Your agent is being set up. This usually takes just a moment...
-          </p>
+          <div className="flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full bg-accent animate-glow-pulse" />
+            <p className="text-sm text-text-secondary">
+              Your agent is being set up. This usually takes just a moment...
+            </p>
+          </div>
         )}
 
-        {error && <p className="text-sm text-red-400">{error}</p>}
+        {error && (
+          <div className="text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-xl px-4 py-3">
+            {error}
+          </div>
+        )}
 
         {showNextQuestion && (
-          <div className="bg-surface-raised border border-border rounded-lg p-4">
-            <p className="text-xs uppercase tracking-wide text-muted mb-2">
+          <div className="glass-card rounded-xl p-4">
+            <p className="text-xs uppercase tracking-widest text-muted font-medium mb-2">
               Next question
             </p>
             <p className="text-sm text-text">{nextQuestion}</p>
@@ -169,14 +176,18 @@ export function ChatPresenter({
             className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
           >
             <div
-              className={`max-w-xs px-4 py-2 rounded-lg ${
+              className={`max-w-xs px-4 py-3 rounded-2xl ${
                 msg.role === "user"
-                  ? "bg-accent text-white rounded-br-none"
-                  : "bg-surface-raised text-text rounded-bl-none"
+                  ? "bg-gradient-to-br from-accent to-accent/80 text-[#08090d] rounded-br-md"
+                  : "glass-card rounded-bl-md"
               }`}
             >
-              <p className="text-sm">{msg.content}</p>
-              <p className="text-xs mt-1 opacity-70">
+              <p className="text-sm leading-relaxed">{msg.content}</p>
+              <p
+                className={`text-xs mt-1.5 ${
+                  msg.role === "user" ? "text-[#08090d]/60" : "text-muted"
+                }`}
+              >
                 {new Date(msg.createdAt).toLocaleTimeString([], {
                   hour: "2-digit",
                   minute: "2-digit",
@@ -209,14 +220,10 @@ export function ChatPresenter({
                       ? "Agent setup failed — chat unavailable"
                       : "Ask Axel to help..."
           }
-          className="bg-surface-raised border-border text-text"
+          className="bg-surface-raised border-border text-text focus:border-accent focus:ring-accent-glow/30 transition-all duration-200"
           disabled={inputDisabled}
         />
-        <Button
-          onClick={onSend}
-          className="bg-accent hover:bg-accent/90 text-white px-4"
-          disabled={!canSend}
-        >
+        <Button onClick={onSend} className="px-4" disabled={!canSend}>
           <IconSend className="w-4 h-4" />
         </Button>
       </div>
