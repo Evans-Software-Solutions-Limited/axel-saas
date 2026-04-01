@@ -1,4 +1,13 @@
-# Monorepo Template
+# Axel SaaS
+
+Axel SaaS is the public product layer around dedicated Axel instances: signup, subscriptions, onboarding, provisioning, and the user dashboard.
+
+## Key docs
+
+- `docs/signup-payments-api-spec.md` — source of truth for public website signup, billing, webhook activation, and post-payment handoff
+- `docs/next-steps-deployments.md` — deployment and environment setup checklist
+
+---
 
 A template to create a monorepo SST v3 project. [Learn more](https://sst.dev/docs/set-up-a-monorepo).
 
