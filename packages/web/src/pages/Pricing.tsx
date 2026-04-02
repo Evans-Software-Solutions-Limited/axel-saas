@@ -91,6 +91,7 @@ export function Pricing() {
                     </div>
                   )}
                   <Card
+                    data-highlight={isHighlight ? "true" : undefined}
                     className={`flex flex-col flex-1 transition-all duration-300 ${
                       isHighlight
                         ? "border-accent/30 shadow-[0_0_40px_-8px_var(--color-accent-glow)]"

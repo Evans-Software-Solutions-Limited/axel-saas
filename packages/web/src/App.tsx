@@ -57,7 +57,7 @@ function App() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-[#0f0f0f] dark flex items-center justify-center text-white">
+      <div className="min-h-screen bg-[#08090d] dark flex items-center justify-center text-white">
         Loading...
       </div>
     );
