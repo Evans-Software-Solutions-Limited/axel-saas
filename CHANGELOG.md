@@ -1,5 +1,27 @@
 # Changelog
 
+## [1.2.0](https://github.com/Evans-Software-Solutions-Limited/axel-saas/compare/axel-saas-v1.1.0...axel-saas-v1.2.0) (2026-04-02)
+
+
+### Features
+
+* add @axel-saas/eslint-config (api-utils first) ([23eab86](https://github.com/Evans-Software-Solutions-Limited/axel-saas/commit/23eab86d80c74b20f888a74bbc83301142a5c850))
+* add @axel-saas/eslint-config (api-utils first) ([e804535](https://github.com/Evans-Software-Solutions-Limited/axel-saas/commit/e804535dfd5a3424a4013331a2e90fcae91ba648))
+* add @axel-saas/typescript-config (api-utils first) ([561a7e0](https://github.com/Evans-Software-Solutions-Limited/axel-saas/commit/561a7e0972d5e96cc29d84322f85afc507f8eb56))
+* add @axel-saas/typescript-config (api-utils first) ([b613b05](https://github.com/Evans-Software-Solutions-Limited/axel-saas/commit/b613b055add6662c428d0f09f4d70a42b1119085))
+* add @axel-saas/ui package and wire web cn consumer ([859e702](https://github.com/Evans-Software-Solutions-Limited/axel-saas/commit/859e702bf8401d619e373837aecc75b75e4b21bf))
+* add @axel-saas/ui with shared primitives and wire packages/web ([a4fe784](https://github.com/Evans-Software-Solutions-Limited/axel-saas/commit/a4fe78455516083738d2c578fe6cf718c90367d2))
+* add mobile navigation hamburger menu ([#53](https://github.com/Evans-Software-Solutions-Limited/axel-saas/issues/53)) ([0d86da1](https://github.com/Evans-Software-Solutions-Limited/axel-saas/commit/0d86da18eccfdb385fb7d9c0160030595f56e3e0))
+* cost/privacy routing — typed matrix, classifier, task envelope ([#56](https://github.com/Evans-Software-Solutions-Limited/axel-saas/issues/56)) ([fb1ac11](https://github.com/Evans-Software-Solutions-Limited/axel-saas/commit/fb1ac119b4c609fe19aca6dd66a74a06d74fb0d7))
+* design redesign luxury teal ([#80](https://github.com/Evans-Software-Solutions-Limited/axel-saas/issues/80)) ([d2eae85](https://github.com/Evans-Software-Solutions-Limited/axel-saas/commit/d2eae8546013d20da62eebb8b782924c5757de17))
+* task identity, append-only task events, and projected state (v1) ([#58](https://github.com/Evans-Software-Solutions-Limited/axel-saas/issues/58)) ([208e68b](https://github.com/Evans-Software-Solutions-Limited/axel-saas/commit/208e68ba71dc8951a0d43ac08ad47e0a627c50d2))
+* **ui:** move shadcn components into @axel-saas/ui for cross-app reuse ([24b8a5c](https://github.com/Evans-Software-Solutions-Limited/axel-saas/commit/24b8a5cda24a5960bdefc4ee76fd6835cae31766))
+
+
+### Bug Fixes
+
+* staging chat handoff and input polish ([#43](https://github.com/Evans-Software-Solutions-Limited/axel-saas/issues/43)) ([683a306](https://github.com/Evans-Software-Solutions-Limited/axel-saas/commit/683a30686acf2832fa2d768692c8805ea3f039b8))
+
 ## [1.1.0](https://github.com/Evans-Software-Solutions-Limited/axel-saas/compare/axel-saas-v1.0.0...axel-saas-v1.1.0) (2026-03-23)
 
 
