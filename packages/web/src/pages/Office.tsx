@@ -38,26 +38,26 @@ interface Agent {
 }
 
 const statusColours: Record<AgentStatus, string> = {
-  idle: "bg-green-500",
-  busy: "bg-yellow-500",
-  working: "bg-red-500",
-  special: "bg-purple-500",
+  idle: "bg-success",
+  busy: "bg-warning",
+  working: "bg-destructive",
+  special: "bg-secondary-accent",
 };
 
 const statusGlow: Record<AgentStatus, string> = {
   idle: "",
-  busy: "drop-shadow(0 0 6px rgba(234,179,8,0.9))",
-  working: "drop-shadow(0 0 6px rgba(239,68,68,0.9))",
-  special: "drop-shadow(0 0 6px rgba(168,85,247,0.9))",
+  busy: "drop-shadow(0 0 6px rgba(251,191,36,0.9))",
+  working: "drop-shadow(0 0 6px rgba(248,113,113,0.9))",
+  special: "drop-shadow(0 0 6px rgba(192,132,252,0.9))",
 };
 
 /** Sprite height as fraction of the scene container height (0.15 = 15%). */
 const SPRITE_HEIGHT_RATIO = 0.12;
 
 const jobStatusColours: Record<RecentJob["status"], string> = {
-  Completed: "bg-green-500/20 text-green-400",
-  "In Progress": "bg-yellow-500/20 text-yellow-400",
-  Failed: "bg-red-500/20 text-red-400",
+  Completed: "bg-success/15 text-success",
+  "In Progress": "bg-warning/15 text-warning",
+  Failed: "bg-destructive/15 text-destructive",
 };
 
 const DeskPositions = [
@@ -382,8 +382,8 @@ export function Office({ onQuickChat }: OfficeProps) {
             value="desk"
             className={
               viewMode === "desk"
-                ? "font-semibold text-accent border-b-2 border-accent rounded-none pb-1.5 -mb-px"
-                : ""
+                ? "font-semibold text-accent border-b-2 border-accent rounded-none pb-1.5 -mb-px font-display"
+                : "text-text-secondary font-display"
             }
           >
             Desk view
@@ -392,8 +392,8 @@ export function Office({ onQuickChat }: OfficeProps) {
             value="list"
             className={
               viewMode === "list"
-                ? "font-semibold text-accent border-b-2 border-accent rounded-none pb-1.5 -mb-px"
-                : ""
+                ? "font-semibold text-accent border-b-2 border-accent rounded-none pb-1.5 -mb-px font-display"
+                : "text-text-secondary font-display"
             }
           >
             List view
@@ -403,7 +403,7 @@ export function Office({ onQuickChat }: OfficeProps) {
         <TabsContent value="desk" className="mt-0 flex-1 min-h-0 flex flex-col">
           <div
             ref={sceneRef}
-            className="relative w-full flex-1 min-h-0 overflow-hidden rounded-xl border border-white/5 bg-transparent"
+            className="relative w-full flex-1 min-h-0 overflow-hidden rounded-2xl border border-border-subtle bg-transparent"
           >
             <img
               src="/pixel-office-bg.png"
@@ -426,7 +426,7 @@ export function Office({ onQuickChat }: OfficeProps) {
                   }}
                   onClick={() => handleAgentClick(agent.id)}
                 >
-                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover:block bg-black/90 text-white text-xs p-3 rounded-lg shadow-xl z-20 min-w-44 border border-white/10 pointer-events-none">
+                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover:block bg-surface-raised/95 backdrop-blur-xl text-white text-xs p-3 rounded-xl shadow-xl z-20 min-w-44 border border-border-accent pointer-events-none">
                     <div className="font-semibold">{agent.name}</div>
                     <div className="text-white/60 mb-1 text-[10px]">
                       {agent.role}
@@ -436,7 +436,7 @@ export function Office({ onQuickChat }: OfficeProps) {
                       Last active: {agent.lastActive}
                     </div>
                   </div>
-                  <div className="flex items-center gap-1.5 mb-1 bg-black/75 px-2 py-0.5 rounded-full border border-white/10">
+                  <div className="flex items-center gap-1.5 mb-1 bg-surface-raised/80 backdrop-blur-sm px-2 py-0.5 rounded-full border border-border-accent">
                     <div className="relative shrink-0">
                       <div
                         className={`w-2 h-2 rounded-full ${statusColours[agent.status]}`}
@@ -469,7 +469,7 @@ export function Office({ onQuickChat }: OfficeProps) {
               );
             })}
             <button
-              className="absolute bottom-4 right-4 z-10 bg-black/70 hover:bg-black/90 text-white text-sm px-4 py-2 rounded-full shadow-lg border border-white/10 transition-colors cursor-pointer"
+              className="absolute bottom-4 right-4 z-10 bg-surface-raised/80 backdrop-blur-xl hover:bg-surface-elevated text-text text-sm px-4 py-2 rounded-full shadow-lg border border-border-accent transition-all duration-200 cursor-pointer hover:shadow-[0_0_20px_-4px_var(--color-accent-glow)]"
               onClick={onQuickChat}
             >
               💬 Quick Chat
@@ -503,7 +503,7 @@ export function Office({ onQuickChat }: OfficeProps) {
                         <span className="font-semibold text-sm">
                           {agent.name}
                         </span>
-                        <span className="text-muted-foreground text-sm ml-2">
+                        <span className="text-text-secondary text-sm ml-2">
                           {agent.role}
                         </span>
                       </div>
@@ -511,7 +511,7 @@ export function Office({ onQuickChat }: OfficeProps) {
                         <div
                           className={`w-2 h-2 rounded-full ${statusColours[agent.status]}`}
                         />
-                        <span className="text-xs text-muted-foreground capitalize">
+                        <span className="text-xs text-text-secondary capitalize">
                           {agent.status}
                         </span>
                       </div>
@@ -519,27 +519,25 @@ export function Office({ onQuickChat }: OfficeProps) {
                   </AccordionTrigger>
                   <AccordionContent className="px-2">
                     <div className="flex gap-3 mb-4 flex-wrap">
-                      <div className="bg-card rounded-lg px-4 py-2 text-center min-w-20">
+                      <div className="glass-card rounded-xl px-4 py-2.5 text-center min-w-20">
                         <div className="text-lg font-bold">
                           {agent.stats.totalTasks}
                         </div>
-                        <div className="text-xs text-muted-foreground">
+                        <div className="text-xs text-text-secondary">
                           Total tasks
                         </div>
                       </div>
-                      <div className="bg-card rounded-lg px-4 py-2 text-center min-w-20">
+                      <div className="glass-card rounded-xl px-4 py-2.5 text-center min-w-20">
                         <div className="text-lg font-bold">
                           {agent.stats.todayTasks}
                         </div>
-                        <div className="text-xs text-muted-foreground">
-                          Today
-                        </div>
+                        <div className="text-xs text-text-secondary">Today</div>
                       </div>
-                      <div className="bg-card rounded-lg px-4 py-2 text-center min-w-20">
+                      <div className="glass-card rounded-xl px-4 py-2.5 text-center min-w-20">
                         <div className="text-sm font-semibold">
                           {agent.stats.avgDuration}
                         </div>
-                        <div className="text-xs text-muted-foreground">
+                        <div className="text-xs text-text-secondary">
                           Avg duration
                         </div>
                       </div>
@@ -548,7 +546,7 @@ export function Office({ onQuickChat }: OfficeProps) {
                       {agent.recentJobs.map((job, i) => (
                         <div
                           key={i}
-                          className="flex items-center gap-3 py-2 border-b border-border last:border-0"
+                          className="flex items-center gap-3 py-2 border-b border-border-subtle last:border-0"
                         >
                           <Badge variant="outline" className="text-xs shrink-0">
                             {job.type}
@@ -556,7 +554,7 @@ export function Office({ onQuickChat }: OfficeProps) {
                           <span className="text-sm flex-1 min-w-0 truncate">
                             {job.description}
                           </span>
-                          <span className="text-xs text-muted-foreground shrink-0 hidden sm:block">
+                          <span className="text-xs text-text-secondary shrink-0 hidden sm:block">
                             {job.time}
                           </span>
                           <Badge

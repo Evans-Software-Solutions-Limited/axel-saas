@@ -1,8 +1,17 @@
 import "./App.css";
 import { Routes, Route, Navigate, useLocation } from "react-router";
+import { useEffect } from "react";
 import { ThemeProvider } from "./components/theme-provider";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
+
+function ScrollToTop() {
+  const { pathname } = useLocation();
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [pathname]);
+  return null;
+}
 
 import Subscribe from "./pages/Subscribe";
 import Dashboard from "./pages/Dashboard";
@@ -48,7 +57,7 @@ function App() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-[#0f0f0f] dark flex items-center justify-center text-white">
+      <div className="min-h-screen bg-[#08090d] dark flex items-center justify-center text-white">
         Loading...
       </div>
     );
@@ -57,6 +66,7 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
+        <ScrollToTop />
         <Routes>
           {/* Root: marketing home when logged out, redirect to dashboard when logged in */}
           <Route

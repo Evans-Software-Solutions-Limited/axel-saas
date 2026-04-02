@@ -5,28 +5,44 @@ export function MarketingLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <div className="min-h-screen bg-surface flex flex-col">
+    <div className="min-h-screen bg-surface flex flex-col relative">
       <AppHeader />
 
-      <main className="flex-1 flex flex-col min-h-0">{children}</main>
+      {/* Ambient hero glow */}
+      <div
+        className="ambient-orb w-[800px] h-[600px] -top-[200px] left-1/2 -translate-x-1/2 fixed opacity-40"
+        style={{
+          background:
+            "radial-gradient(ellipse, rgba(13, 211, 176, 0.07) 0%, transparent 70%)",
+        }}
+      />
 
-      <footer className="border-t border-border py-10 px-4">
+      <main className="flex-1 flex flex-col min-h-0 relative grain">
+        {children}
+      </main>
+
+      <footer className="border-t border-border-subtle py-10 px-4 relative z-10">
         <div className="max-w-6xl mx-auto space-y-8">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 text-sm text-muted">
-            <p>© {new Date().getFullYear()} Axel. All rights reserved.</p>
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 text-sm text-text-secondary">
+            <p className="font-display">
+              &copy; {new Date().getFullYear()} Axel. All rights reserved.
+            </p>
             <div className="flex flex-wrap gap-6">
               <Link
                 to="/privacy"
-                className="hover:text-accent transition-colors"
+                className="hover:text-accent transition-colors duration-200"
               >
                 Privacy Policy
               </Link>
-              <Link to="/terms" className="hover:text-accent transition-colors">
+              <Link
+                to="/terms"
+                className="hover:text-accent transition-colors duration-200"
+              >
                 Terms of Service
               </Link>
               <a
                 href="mailto:admin@evans-software-solutions.com"
-                className="hover:text-accent transition-colors"
+                className="hover:text-accent transition-colors duration-200"
               >
                 Contact
               </a>

@@ -19,10 +19,6 @@ import {
 } from "@axel-saas/ui/table";
 import { IconSearch } from "@tabler/icons-react";
 
-// ============================================================================
-// TASKS TAB
-// ============================================================================
-
 interface Task {
   id: string;
   name: string;
@@ -63,10 +59,10 @@ const SAMPLE_TASKS: Task[] = [
 ];
 
 const statusColors = {
-  pending: "bg-muted/20 text-muted",
-  "in-progress": "bg-accent/20 text-accent",
-  completed: "bg-success/20 text-success",
-  failed: "bg-destructive/20 text-destructive",
+  pending: "bg-muted/15 text-text-secondary",
+  "in-progress": "bg-accent-muted text-accent",
+  completed: "bg-success/15 text-success",
+  failed: "bg-destructive/15 text-destructive",
 };
 
 const statusLabels = {
@@ -91,15 +87,23 @@ export function Tasks() {
 
   return (
     <div className="p-6 space-y-6">
+      {/* Page header */}
+      <div>
+        <h1 className="text-2xl font-display font-bold text-text">Tasks</h1>
+        <p className="text-sm text-text-secondary mt-1">
+          Track what your agents are working on
+        </p>
+      </div>
+
       {/* Filters */}
       <div className="flex gap-4">
         <div className="flex-1 relative">
-          <IconSearch className="absolute left-3 top-3 w-4 h-4 text-muted" />
+          <IconSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
           <Input
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="Search tasks..."
-            className="pl-10 bg-surface-raised border-border text-text"
+            className="pl-10 bg-surface-raised border-border text-text focus:border-accent focus:ring-accent-glow/30 transition-all duration-200"
           />
         </div>
         <Select value={statusFilter} onValueChange={setStatusFilter}>
@@ -117,34 +121,44 @@ export function Tasks() {
       </div>
 
       {/* Tasks Table */}
-      <Card className="border border-border">
+      <Card>
         <Table>
           <TableHeader>
-            <TableRow className="border-border hover:bg-transparent">
-              <TableHead className="text-muted">Task</TableHead>
-              <TableHead className="text-muted">Agent</TableHead>
-              <TableHead className="text-muted">Status</TableHead>
-              <TableHead className="text-muted">Due Date</TableHead>
+            <TableRow className="border-border-subtle hover:bg-transparent">
+              <TableHead className="text-text-secondary text-xs uppercase tracking-wider font-medium">
+                Task
+              </TableHead>
+              <TableHead className="text-text-secondary text-xs uppercase tracking-wider font-medium">
+                Agent
+              </TableHead>
+              <TableHead className="text-text-secondary text-xs uppercase tracking-wider font-medium">
+                Status
+              </TableHead>
+              <TableHead className="text-text-secondary text-xs uppercase tracking-wider font-medium">
+                Due Date
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {filtered.map((task) => (
               <TableRow
                 key={task.id}
-                className="border-border hover:bg-surface-raised/50"
+                className="border-border-subtle hover:bg-white/[0.02] transition-colors duration-150"
               >
                 <TableCell className="text-text font-medium">
                   {task.name}
                 </TableCell>
-                <TableCell className="text-muted">{task.agent}</TableCell>
+                <TableCell className="text-text-secondary">
+                  {task.agent}
+                </TableCell>
                 <TableCell>
-                  <Badge
-                    className={`${statusColors[task.status as keyof typeof statusColors]} border-0`}
-                  >
-                    {statusLabels[task.status as keyof typeof statusLabels]}
+                  <Badge className={`${statusColors[task.status]} border-0`}>
+                    {statusLabels[task.status]}
                   </Badge>
                 </TableCell>
-                <TableCell className="text-muted">{task.dueDate}</TableCell>
+                <TableCell className="text-text-secondary">
+                  {task.dueDate}
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>

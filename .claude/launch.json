@@ -1,0 +1,23 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "web",
+      "runtimeExecutable": "bun",
+      "runtimeArgs": ["--filter", "@axel-saas/web", "run", "dev"],
+      "port": 5173
+    },
+    {
+      "name": "sst-dev",
+      "runtimeExecutable": "bun",
+      "runtimeArgs": ["run", "dev"],
+      "port": 3000
+    },
+    {
+      "name": "db-studio",
+      "runtimeExecutable": "bun",
+      "runtimeArgs": ["--filter", "@axel-saas/db", "run", "db:studio"],
+      "port": 5555
+    }
+  ]
+}
