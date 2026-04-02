@@ -25,11 +25,18 @@ function TierCta({
   highlight?: boolean;
 }>) {
   const btn = highlight ? (
-    <Button type="button" className="w-full h-12 text-sm font-semibold tracking-wide">
+    <Button
+      type="button"
+      className="w-full h-12 text-sm font-semibold tracking-wide"
+    >
       {label}
     </Button>
   ) : (
-    <Button type="button" variant="outline" className="w-full h-12 text-sm font-medium tracking-wide">
+    <Button
+      type="button"
+      variant="outline"
+      className="w-full h-12 text-sm font-medium tracking-wide"
+    >
       {label}
     </Button>
   );
@@ -90,45 +97,48 @@ export function Pricing() {
                         : ""
                     }`}
                   >
-                  <CardHeader className="px-8 pt-8">
-                    <CardTitle className="text-text text-xl font-display">
-                      {tier.name}
-                    </CardTitle>
-                    <CardDescription className="text-muted text-xs font-medium uppercase tracking-wider">
-                      {tier.targetUser}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="flex flex-col flex-1 px-8 pb-8">
-                    <div className="mb-4">
-                      <div className="text-3xl font-display font-bold text-text">
-                        {tier.price}
-                        {tier.period ? (
-                          <span className="text-sm text-text-secondary font-normal ml-1">
-                            {tier.period}
-                          </span>
-                        ) : null}
+                    <CardHeader className="px-8 pt-8">
+                      <CardTitle className="text-text text-xl font-display">
+                        {tier.name}
+                      </CardTitle>
+                      <CardDescription className="text-muted text-xs font-medium uppercase tracking-wider">
+                        {tier.targetUser}
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="flex flex-col flex-1 px-8 pb-8">
+                      <div className="mb-4">
+                        <div className="text-3xl font-display font-bold text-text">
+                          {tier.price}
+                          {tier.period ? (
+                            <span className="text-sm text-text-secondary font-normal ml-1">
+                              {tier.period}
+                            </span>
+                          ) : null}
+                        </div>
                       </div>
-                    </div>
-                    <p className="text-xs text-text-secondary mb-5 leading-relaxed">
-                      {tier.description}
-                    </p>
-                    <ul className="space-y-3 mb-6 flex-1">
-                      {tier.features.map((feature) => (
-                        <li key={feature} className="flex items-start gap-2.5">
-                          <div className="w-4 h-4 rounded-full bg-accent/10 flex items-center justify-center mt-0.5 flex-shrink-0">
-                            <IconCheck className="w-2.5 h-2.5 text-accent" />
-                          </div>
-                          <span className="text-sm text-text">{feature}</span>
-                        </li>
-                      ))}
-                    </ul>
-                    <TierCta
-                      label={tier.ctaLabel}
-                      href={tier.ctaHref}
-                      external={tier.ctaExternal}
-                      highlight={isHighlight}
-                    />
-                  </CardContent>
+                      <p className="text-xs text-text-secondary mb-5 leading-relaxed">
+                        {tier.description}
+                      </p>
+                      <ul className="space-y-3 mb-6 flex-1">
+                        {tier.features.map((feature) => (
+                          <li
+                            key={feature}
+                            className="flex items-start gap-2.5"
+                          >
+                            <div className="w-4 h-4 rounded-full bg-accent/10 flex items-center justify-center mt-0.5 flex-shrink-0">
+                              <IconCheck className="w-2.5 h-2.5 text-accent" />
+                            </div>
+                            <span className="text-sm text-text">{feature}</span>
+                          </li>
+                        ))}
+                      </ul>
+                      <TierCta
+                        label={tier.ctaLabel}
+                        href={tier.ctaHref}
+                        external={tier.ctaExternal}
+                        highlight={isHighlight}
+                      />
+                    </CardContent>
                   </Card>
                 </div>
               );
