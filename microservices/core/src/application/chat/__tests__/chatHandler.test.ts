@@ -564,6 +564,43 @@ describe("ChatHandler", () => {
       expect(typeof body.handoffGreeting).toBe("string");
     });
 
+    it("should return workspace_ready when container status is workspace_ready", async () => {
+      const mockUser = {
+        id: "db-user-123",
+        supabaseUserId: "supabase-123",
+        email: "test@example.com",
+        fullName: "Test User",
+        onboardingCompleted: true,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      const mockContainer = {
+        taskArn: null,
+        status: "workspace_ready",
+        gatewayUrl: null,
+        workspacePath: "/workspace/user123",
+      };
+
+      vi.mocked(userRepository.getUserBySupabaseId).mockResolvedValue(mockUser);
+      mockGetContainerByUserId.mockResolvedValue(mockContainer);
+
+      const result = await chatHandler.handle(
+        new Request("http://localhost/users/me/agent", {
+          method: "GET",
+          headers: { Authorization: "Bearer test-token" },
+        }),
+      );
+
+      expect(result.status).toBe(200);
+      const body = (await result.json()) as {
+        status: string;
+        handoffGreeting?: string;
+      };
+      expect(body.status).toBe("workspace_ready");
+      expect(body.handoffGreeting).toBeUndefined();
+    });
+
     it("should not include handoffGreeting when status is provisioning", async () => {
       const mockUser = {
         id: "db-user-123",
@@ -733,6 +770,46 @@ describe("ChatHandler", () => {
 
       expect(container?.status).toBe("pending");
       expect(container?.gatewayUrl).toBeNull();
+    });
+
+    it("should return 503 when container is workspace_ready (no gateway URL yet)", async () => {
+      const mockUser = {
+        id: "db-user-123",
+        supabaseUserId: "supabase-123",
+        email: "test@example.com",
+        fullName: "Test User",
+        onboardingCompleted: true,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      const mockContainer = {
+        taskArn: null,
+        status: "workspace_ready",
+        gatewayUrl: null,
+        workspacePath: "/workspace/user123",
+      };
+
+      vi.mocked(userRepository.getUserBySupabaseId).mockResolvedValue(mockUser);
+      mockGetContainerByUserId.mockResolvedValue(mockContainer);
+
+      const result = await chatHandler.handle(
+        new Request("http://localhost/users/chat/message", {
+          method: "POST",
+          headers: {
+            Authorization: "Bearer test-token",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ message: "hello" }),
+        }),
+      );
+
+      // workspace_ready !== "active" → 503
+      expect(result.status).toBe(503);
+      await expect(result.json()).resolves.toMatchObject({
+        success: false,
+        error: "Agent is not ready. Please try again later.",
+      });
     });
 
     it("should return contextual response in development when active container has no gateway URL", async () => {

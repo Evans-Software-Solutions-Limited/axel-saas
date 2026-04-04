@@ -28,6 +28,7 @@ export interface AgentStatusResponse {
   success: boolean;
   status:
     | "active"
+    | "workspace_ready"
     | "provisioning"
     | "failed"
     | "not_found"
@@ -217,6 +218,11 @@ export const chatHandler = new Elysia({ name: "ChatHandler" })
 
         if (container.status === "failed") {
           return { success: true, status: "failed" as const };
+        }
+
+        // workspace_ready: files on disk, container not yet launched
+        if (container.status === "workspace_ready") {
+          return { success: true, status: "workspace_ready" as const };
         }
 
         const isActive =

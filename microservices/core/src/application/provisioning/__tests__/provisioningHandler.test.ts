@@ -10,7 +10,14 @@ const { mockFindByUserId, mockActivateGateway } = vi.hoisted(() => ({
 vi.mock("@axel-saas/db", () => ({
   getDb: vi.fn(() => ({})),
   provisioningStatusEnum: {
-    enumValues: ["pending", "provisioning", "active", "failed"],
+    enumValues: [
+      "pending",
+      "workspace_ready",
+      "provisioning",
+      "active",
+      "failed",
+      "deprovisioned",
+    ],
   },
 }));
 

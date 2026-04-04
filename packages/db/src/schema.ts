@@ -30,6 +30,7 @@ export const subscriptionStatusEnum = pgEnum("subscription_status", [
 
 export const provisioningStatusEnum = pgEnum("provisioning_status", [
   "pending",
+  "workspace_ready",
   "provisioning",
   "active",
   "failed",

@@ -64,13 +64,18 @@ export class ProvisioningRepository {
     provisioningId: string,
     workspacePath: string,
   ): Promise<void> {
-    // Never overwrite a "failed" status back to "active": doing so leaves no
-    // running container behind and strands the user in permanent provisioning
-    // (the Stripe webhook that triggers container launch fires only once).
+    // Mark workspace files as written without implying a live agent container.
+    // "workspace_ready" means files are on disk but the container has not yet
+    // been launched or registered.
+    //
+    // Never overwrite a "failed" status: doing so leaves no running container
+    // behind and strands the user (the Stripe webhook fires only once).
+    // Also never regress from "provisioning" or "active" — those mean the
+    // container launch pipeline is already in progress or complete.
     await this.db
       .update(provisioningState)
       .set({
-        status: "active" as const,
+        status: "workspace_ready" as const,
         workspacePath,
         provisionedAt: new Date(),
         updatedAt: new Date(),
@@ -79,6 +84,8 @@ export class ProvisioningRepository {
         and(
           eq(provisioningState.id, provisioningId),
           ne(provisioningState.status, "failed" as const),
+          ne(provisioningState.status, "provisioning" as const),
+          ne(provisioningState.status, "active" as const),
         ),
       );
   }

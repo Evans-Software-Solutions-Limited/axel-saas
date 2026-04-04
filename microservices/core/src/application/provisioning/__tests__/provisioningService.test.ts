@@ -147,21 +147,22 @@ describe("triggerContainerLaunch", () => {
       expect(global.fetch).not.toHaveBeenCalled();
     });
 
-    it("triggers launch when status is active but gatewayUrl is null (onboarding completed before Stripe webhook)", async () => {
-      // Race: onboarding called updateProvisioned() which sets status="active"
-      // but no container has registered yet (gatewayUrl is null).
+    it("triggers launch when status is workspace_ready (onboarding completed before Stripe webhook)", async () => {
+      // Onboarding called updateProvisioned() which now sets status="workspace_ready"
+      // — files are on disk but no container has been launched yet.
       // The Stripe checkout.session.completed webhook must still launch the container.
       vi.stubEnv(
         "PROVISIONING_WEBHOOK_URL",
         "https://provisioner.internal/launch",
       );
-      const onboardingActiveProv = {
+      const workspaceReadyProv = {
         ...PROV,
-        status: "active" as const,
+        status: "workspace_ready" as const,
+        workspacePath: "/tmp/workspace/user-id-1/workspace",
         gatewayUrl: null,
       };
       const repo = makeRepo({
-        findByUserId: vi.fn().mockResolvedValue(onboardingActiveProv),
+        findByUserId: vi.fn().mockResolvedValue(workspaceReadyProv),
       });
       global.fetch = vi.fn().mockResolvedValue({ ok: true });
 
@@ -178,6 +179,26 @@ describe("triggerContainerLaunch", () => {
         "https://provisioner.internal/launch",
         expect.objectContaining({ method: "POST" }),
       );
+    });
+
+    it("no-ops when status is 'provisioning' (webhook already fired — Stripe retry safety)", async () => {
+      // A replayed Stripe webhook must not re-fire the orchestrator when
+      // a launch is already in progress.
+      const provisioningProv = {
+        ...PROV,
+        status: "provisioning" as const,
+        gatewayUrl: null,
+      };
+      const repo = makeRepo({
+        findByUserId: vi.fn().mockResolvedValue(provisioningProv),
+      });
+
+      await expect(
+        triggerContainerLaunch(repo, PARAMS),
+      ).resolves.toBeUndefined();
+
+      expect(repo.updateStatus).not.toHaveBeenCalled();
+      expect(global.fetch).not.toHaveBeenCalled();
     });
   });
 
