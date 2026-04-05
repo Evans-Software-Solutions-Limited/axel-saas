@@ -95,43 +95,27 @@ export class IntegrationRepository {
   }
 
   async upsert(input: NewUserIntegration): Promise<UserIntegration> {
-    const existing = await this.findByUserAndIntegration(
-      input.userId,
-      input.integrationId,
-    );
-
-    if (existing) {
-      await this.db
-        .update(userIntegrations)
-        .set({
-          status: input.status,
-          keyHint: input.keyHint,
-          label: input.label,
-          secretPath: input.secretPath,
-          connectedAt: input.connectedAt,
-          accountMetadata: input.accountMetadata,
-          lastErrorCode: null,
-          lastErrorMessageSafe: null,
-          updatedAt: new Date(),
-        })
-        .where(eq(userIntegrations.id, existing.id));
-      return {
-        ...existing,
-        status: input.status ?? existing.status,
-        keyHint: input.keyHint ?? existing.keyHint,
-        label: input.label !== undefined ? input.label : existing.label,
-        secretPath: input.secretPath,
-        connectedAt: input.connectedAt ?? existing.connectedAt,
-        accountMetadata: input.accountMetadata ?? existing.accountMetadata,
-        lastErrorCode: null,
-        lastErrorMessageSafe: null,
-        updatedAt: new Date(),
-      };
-    }
-
     const [row] = await this.db
       .insert(userIntegrations)
       .values(input)
+      .onConflictDoUpdate({
+        target: [userIntegrations.userId, userIntegrations.integrationId],
+        set: {
+          status: input.status ?? userIntegrations.status,
+          keyHint: input.keyHint ?? userIntegrations.keyHint,
+          label:
+            input.label === undefined ? userIntegrations.label : input.label,
+          secretPath: input.secretPath,
+          connectedAt: input.connectedAt ?? userIntegrations.connectedAt,
+          accountMetadata:
+            input.accountMetadata === undefined
+              ? userIntegrations.accountMetadata
+              : input.accountMetadata,
+          lastErrorCode: null,
+          lastErrorMessageSafe: null,
+          updatedAt: new Date(),
+        },
+      })
       .returning();
     if (!row) throw new Error("Failed to create integration — no row returned");
     return row;

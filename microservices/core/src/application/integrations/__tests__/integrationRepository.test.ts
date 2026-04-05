@@ -16,6 +16,7 @@ function mockChain<T>(result: T) {
     "orderBy",
     "leftJoin",
     "innerJoin",
+    "onConflictDoUpdate",
   ];
 
   for (const method of fluent) {
@@ -127,10 +128,6 @@ describe("IntegrationRepository", () => {
 
   describe("upsert", () => {
     it("inserts new integration when not exists", async () => {
-      (mockDb.select as ReturnType<typeof vi.fn>).mockReturnValue(
-        mockChain([]),
-      );
-
       const result = await repo.upsert({
         userId: "user-uuid-1",
         integrationId: "openai",
@@ -142,10 +139,11 @@ describe("IntegrationRepository", () => {
       });
 
       expect(mockDb.insert).toHaveBeenCalledOnce();
+      expect(mockDb.select).not.toHaveBeenCalled();
       expect(result.integrationId).toBe("openai");
     });
 
-    it("updates existing integration", async () => {
+    it("applies onConflictDoUpdate when row already exists", async () => {
       await repo.upsert({
         userId: "user-uuid-1",
         integrationId: "openai",
@@ -156,18 +154,20 @@ describe("IntegrationRepository", () => {
         connectedAt: NOW,
       });
 
-      expect(mockDb.update).toHaveBeenCalledOnce();
+      expect(mockDb.insert).toHaveBeenCalledOnce();
+      expect(mockDb.select).not.toHaveBeenCalled();
     });
 
     it("clears error fields in return value after upsert update", async () => {
-      // Existing row has error fields set
-      const existingWithError = {
+      const clearedRow = {
         ...mockIntegrationRow,
-        lastErrorCode: "INVALID_KEY",
-        lastErrorMessageSafe: "The API key is invalid",
+        keyHint: "...efgh",
+        lastErrorCode: null,
+        lastErrorMessageSafe: null,
+        updatedAt: NOW,
       };
-      (mockDb.select as ReturnType<typeof vi.fn>).mockReturnValue(
-        mockChain([existingWithError]),
+      (mockDb.insert as ReturnType<typeof vi.fn>).mockReturnValue(
+        mockChain([clearedRow]),
       );
 
       const result = await repo.upsert({
@@ -186,13 +186,9 @@ describe("IntegrationRepository", () => {
     });
 
     it("preserves explicit null label in return value after upsert update", async () => {
-      // Existing row has a label
-      const existingWithLabel = {
-        ...mockIntegrationRow,
-        label: "Old label",
-      };
-      (mockDb.select as ReturnType<typeof vi.fn>).mockReturnValue(
-        mockChain([existingWithLabel]),
+      const rowWithNullLabel = { ...mockIntegrationRow, label: null };
+      (mockDb.insert as ReturnType<typeof vi.fn>).mockReturnValue(
+        mockChain([rowWithNullLabel]),
       );
 
       const result = await repo.upsert({
@@ -208,6 +204,47 @@ describe("IntegrationRepository", () => {
 
       // Explicit null should override old label, not fall back to existing
       expect(result.label).toBeNull();
+    });
+
+    it("uses explicit accountMetadata in conflict set when provided", async () => {
+      const rowWithMeta = {
+        ...mockIntegrationRow,
+        accountMetadata: { region: "eu" },
+      };
+      (mockDb.insert as ReturnType<typeof vi.fn>).mockReturnValue(
+        mockChain([rowWithMeta]),
+      );
+
+      const result = await repo.upsert({
+        userId: "user-uuid-1",
+        integrationId: "openai",
+        status: "connected",
+        keyHint: "...abcd",
+        secretPath:
+          "/axel-saas/users/user-uuid-1/integrations/openai/credential",
+        connectedAt: NOW,
+        accountMetadata: { region: "eu" },
+      });
+
+      expect(result.accountMetadata).toEqual({ region: "eu" });
+    });
+
+    it("throws when insert returns no row", async () => {
+      (mockDb.insert as ReturnType<typeof vi.fn>).mockReturnValue(
+        mockChain([]),
+      );
+
+      await expect(
+        repo.upsert({
+          userId: "user-uuid-1",
+          integrationId: "openai",
+          status: "connected",
+          keyHint: "...abcd",
+          secretPath:
+            "/axel-saas/users/user-uuid-1/integrations/openai/credential",
+          connectedAt: NOW,
+        }),
+      ).rejects.toThrow("Failed to create integration — no row returned");
     });
   });
 

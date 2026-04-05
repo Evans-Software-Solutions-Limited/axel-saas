@@ -10,12 +10,12 @@ import { IntegrationRepository } from "./integrationRepository";
 import { IntegrationService } from "./integrationService";
 import { AwsSecretsClient } from "./secretsClient";
 
-function getService() {
-  const db = getDb();
-  const repo = new IntegrationRepository(db);
-  const secrets = new AwsSecretsClient();
-  return new IntegrationService(repo, secrets);
-}
+const integrationRepository = new IntegrationRepository();
+const awsSecretsClient = new AwsSecretsClient();
+const integrationService = new IntegrationService(
+  integrationRepository,
+  awsSecretsClient,
+);
 
 export const integrationHandler = new Elysia({
   name: "IntegrationHandler",
@@ -38,8 +38,7 @@ export const integrationHandler = new Elysia({
         return { success: false, error: "User not found" };
       }
 
-      const service = getService();
-      const result = await service.connect(
+      const result = await integrationService.connect(
         dbUser.id,
         params.integrationId,
         body.credential,
@@ -76,8 +75,7 @@ export const integrationHandler = new Elysia({
         return { success: false, error: "User not found" };
       }
 
-      const service = getService();
-      const integrations = await service.list(dbUser.id);
+      const integrations = await integrationService.list(dbUser.id);
       return { success: true, integrations };
     },
     {
@@ -102,8 +100,10 @@ export const integrationHandler = new Elysia({
         return { success: false, error: "User not found" };
       }
 
-      const service = getService();
-      const integration = await service.get(dbUser.id, params.integrationId);
+      const integration = await integrationService.get(
+        dbUser.id,
+        params.integrationId,
+      );
       if (!integration) {
         set.status = 404;
         return { success: false, error: "Integration not found" };
@@ -131,8 +131,10 @@ export const integrationHandler = new Elysia({
         return { success: false, error: "User not found" };
       }
 
-      const service = getService();
-      const result = await service.revoke(dbUser.id, params.integrationId);
+      const result = await integrationService.revoke(
+        dbUser.id,
+        params.integrationId,
+      );
 
       if (!result.success) {
         set.status = result.error === "Integration not found" ? 404 : 400;
