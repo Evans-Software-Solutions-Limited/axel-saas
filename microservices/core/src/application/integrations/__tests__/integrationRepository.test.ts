@@ -158,6 +158,57 @@ describe("IntegrationRepository", () => {
 
       expect(mockDb.update).toHaveBeenCalledOnce();
     });
+
+    it("clears error fields in return value after upsert update", async () => {
+      // Existing row has error fields set
+      const existingWithError = {
+        ...mockIntegrationRow,
+        lastErrorCode: "INVALID_KEY",
+        lastErrorMessageSafe: "The API key is invalid",
+      };
+      (mockDb.select as ReturnType<typeof vi.fn>).mockReturnValue(
+        mockChain([existingWithError]),
+      );
+
+      const result = await repo.upsert({
+        userId: "user-uuid-1",
+        integrationId: "openai",
+        status: "connected",
+        keyHint: "...efgh",
+        secretPath:
+          "/axel-saas/users/user-uuid-1/integrations/openai/credential",
+        connectedAt: NOW,
+      });
+
+      // Return value must reflect cleared error fields (matching what DB writes)
+      expect(result.lastErrorCode).toBeNull();
+      expect(result.lastErrorMessageSafe).toBeNull();
+    });
+
+    it("preserves explicit null label in return value after upsert update", async () => {
+      // Existing row has a label
+      const existingWithLabel = {
+        ...mockIntegrationRow,
+        label: "Old label",
+      };
+      (mockDb.select as ReturnType<typeof vi.fn>).mockReturnValue(
+        mockChain([existingWithLabel]),
+      );
+
+      const result = await repo.upsert({
+        userId: "user-uuid-1",
+        integrationId: "openai",
+        status: "connected",
+        keyHint: "...efgh",
+        label: null,
+        secretPath:
+          "/axel-saas/users/user-uuid-1/integrations/openai/credential",
+        connectedAt: NOW,
+      });
+
+      // Explicit null should override old label, not fall back to existing
+      expect(result.label).toBeNull();
+    });
   });
 
   describe("markRevoked", () => {

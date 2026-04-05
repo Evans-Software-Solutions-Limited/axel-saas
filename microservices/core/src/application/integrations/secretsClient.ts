@@ -90,7 +90,7 @@ export class AwsSecretsClient implements SecretsClient {
       await client.send(
         new DeleteSecretCommand({
           SecretId: path,
-          ForceDeleteWithoutRecovery: false,
+          ForceDeleteWithoutRecovery: true,
         }),
       );
     } catch (err: unknown) {

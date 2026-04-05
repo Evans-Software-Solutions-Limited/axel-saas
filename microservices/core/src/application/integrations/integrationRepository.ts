@@ -119,9 +119,12 @@ export class IntegrationRepository {
         ...existing,
         status: input.status ?? existing.status,
         keyHint: input.keyHint ?? existing.keyHint,
-        label: input.label ?? existing.label,
+        label: input.label !== undefined ? input.label : existing.label,
         secretPath: input.secretPath,
         connectedAt: input.connectedAt ?? existing.connectedAt,
+        accountMetadata: input.accountMetadata ?? existing.accountMetadata,
+        lastErrorCode: null,
+        lastErrorMessageSafe: null,
         updatedAt: new Date(),
       };
     }
@@ -158,6 +161,7 @@ export class IntegrationRepository {
       .set({
         status: "revoked",
         keyHint: null,
+        secretPath: "",
         lastErrorCode: null,
         lastErrorMessageSafe: null,
         updatedAt: new Date(),

@@ -254,6 +254,39 @@ describe("IntegrationService", () => {
       }
       expect(mockSecrets.deleteSecret).not.toHaveBeenCalled();
     });
+
+    it("revoke then reconnect succeeds (no pending-deletion conflict)", async () => {
+      // First revoke
+      mockRepo.findByUserAndIntegration.mockResolvedValue(makeRow());
+      const revokeResult = await service.revoke("user-uuid-1", "openai");
+      expect(revokeResult.success).toBe(true);
+
+      // Reconnect should work because ForceDeleteWithoutRecovery=true
+      // means no recovery window blocking CreateSecret/PutSecretValue
+      mockRepo.findByUserAndIntegration.mockResolvedValue(null);
+      const connectResult = await service.connect(
+        "user-uuid-1",
+        "openai",
+        "sk-new-key-12345678",
+      );
+      expect(connectResult.success).toBe(true);
+      expect(mockSecrets.putSecret).toHaveBeenCalledWith(
+        "/axel-saas/users/user-uuid-1/integrations/openai/credential",
+        "sk-new-key-12345678",
+      );
+    });
+
+    it("marks revoked in DB after secret deletion", async () => {
+      mockRepo.findByUserAndIntegration.mockResolvedValue(makeRow());
+
+      await service.revoke("user-uuid-1", "openai");
+
+      // deleteSecret must be called before markRevoked
+      const deleteOrder = (mockSecrets.deleteSecret as ReturnType<typeof vi.fn>)
+        .mock.invocationCallOrder[0]!;
+      const markOrder = mockRepo.markRevoked.mock.invocationCallOrder[0]!;
+      expect(deleteOrder).toBeLessThan(markOrder);
+    });
   });
 
   describe("secret safety invariants", () => {
