@@ -31,10 +31,13 @@ export function isValidIntegrationId(id: string): id is IntegrationId {
 }
 
 export class IntegrationService {
-  constructor(
-    private repo: IntegrationRepository,
-    private secrets: SecretsClient,
-  ) {}
+  private repo: IntegrationRepository;
+  private secrets: SecretsClient;
+
+  constructor(repo: IntegrationRepository, secrets: SecretsClient) {
+    this.repo = repo;
+    this.secrets = secrets;
+  }
 
   async connect(
     userId: string,
