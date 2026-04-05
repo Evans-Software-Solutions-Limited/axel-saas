@@ -61,13 +61,14 @@ export class IntegrationService {
 
     const connectedAt = new Date();
 
-    // Upsert metadata in DB — no plaintext secret stored
+    // Upsert metadata in DB — no plaintext secret stored.
+    // Omit label when unset so repository upsert preserves an existing label on reconnect.
     await this.repo.upsert({
       userId,
       integrationId,
       status: "connected",
       keyHint,
-      label: label ?? null,
+      ...(label !== undefined ? { label: label ?? null } : {}),
       secretPath,
       connectedAt,
     });

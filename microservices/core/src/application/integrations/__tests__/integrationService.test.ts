@@ -141,6 +141,13 @@ describe("IntegrationService", () => {
       expect(upsertArg.label).toBe("Production key");
     });
 
+    it("omits label on upsert when not provided so reconnect can preserve existing label", async () => {
+      await service.connect("user-uuid-1", "openai", "sk-abcdefghijklmnop");
+
+      const upsertArg = mockRepo.upsert.mock.calls[0]![0];
+      expect("label" in upsertArg).toBe(false);
+    });
+
     it("accepts all valid integration IDs", async () => {
       const validIds = [
         "openai",
