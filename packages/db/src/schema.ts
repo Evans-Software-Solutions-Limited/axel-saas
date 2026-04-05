@@ -327,6 +327,56 @@ export const taskEvents = pgTable(
 export type TaskEvent = typeof taskEvents.$inferSelect;
 export type NewTaskEvent = typeof taskEvents.$inferInsert;
 
+// ─── User Integrations ───────────────────────────────────────────────────────
+
+export const integrationStatusEnum = pgEnum("integration_status", [
+  "connected",
+  "error",
+  "revoked",
+  "pending",
+]);
+
+export const userIntegrations = pgTable(
+  "user_integrations",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id").notNull(),
+    integrationId: text("integration_id").notNull(),
+    status: integrationStatusEnum("status").notNull().default("pending"),
+    keyHint: text("key_hint"),
+    label: text("label"),
+    secretPath: text("secret_path").notNull(),
+    connectedAt: timestamp("connected_at", { withTimezone: true }),
+    lastCheckedAt: timestamp("last_checked_at", { withTimezone: true }),
+    lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+    lastErrorCode: text("last_error_code"),
+    lastErrorMessageSafe: text("last_error_message_safe"),
+    accountMetadata: jsonb("account_metadata")
+      .$type<Record<string, unknown>>()
+      .default({}),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => ({
+    userIdIdx: index("user_integrations_user_id_idx").on(table.userId),
+    userIntegrationIdx: uniqueIndex(
+      "user_integrations_user_integration_idx",
+    ).on(table.userId, table.integrationId),
+    userIntegrationsUserFk: foreignKey({
+      columns: [table.userId],
+      foreignColumns: [users.id],
+      name: "user_integrations_user_id_fkey",
+    }).onDelete("cascade"),
+  }),
+);
+
+export type UserIntegration = typeof userIntegrations.$inferSelect;
+export type NewUserIntegration = typeof userIntegrations.$inferInsert;
+
 // ─── Waitlist ──────────────────────────────────────────────────────────────────
 
 export const waitlistInterestedInEnum = pgEnum("waitlist_interested_in", [

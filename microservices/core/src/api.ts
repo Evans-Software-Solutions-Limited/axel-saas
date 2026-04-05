@@ -14,6 +14,7 @@ import { chatHandler } from "./application/chat/chatHandler";
 import { provisioningHandler } from "./application/provisioning/provisioningHandler";
 import { waitlistHandler } from "./application/waitlist/waitlistHandler";
 import { taskHandler } from "./application/tasks/taskHandler";
+import { integrationHandler } from "./application/integrations/integrationHandler";
 
 const getAllowedOrigins = (): string[] => {
   const origins: string[] = [];
@@ -61,7 +62,8 @@ const app = new Elysia()
   .use(chatHandler)
   .use(subscriptionHandler)
   .use(provisioningHandler)
-  .use(taskHandler);
+  .use(taskHandler)
+  .use(integrationHandler);
 
 export type CoreApi = typeof app;
 

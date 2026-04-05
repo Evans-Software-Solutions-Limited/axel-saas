@@ -13,6 +13,7 @@
     "build": "tsc --noEmit"
   },
   "dependencies": {
+    "@aws-sdk/client-secrets-manager": "3.1024.0",
     "@axel-saas/api-utils": "workspace:*",
     "@axel-saas/db": "workspace:*",
     "@elysiajs/openapi": "^1.4.14",
@@ -21,8 +22,8 @@
     "hono": "^4.11.9",
     "jose": "^5.9.6",
     "jwt-decode": "^4.0.0",
-    "stripe": "^16.9.1",
-    "sst": "*"
+    "sst": "*",
+    "stripe": "^16.9.1"
   },
   "devDependencies": {
     "@axel-saas/eslint-config": "workspace:*",
