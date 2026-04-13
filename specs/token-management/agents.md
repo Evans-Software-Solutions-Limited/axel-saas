@@ -8,23 +8,23 @@ Refer to `docs/model-routing-and-cost-policy.md` for the strategic background on
 
 ## Key Files to Create
 
-| File | Purpose |
-|---|---|
-| `microservices/core/src/application/usage/usageRepository.ts` | DB access for token_usage |
-| `microservices/core/src/application/usage/usageService.ts` | Cap checking logic |
-| `microservices/core/src/application/usage/usageHandler.ts` | API routes for usage data |
-| `packages/web/src/components/UsageBar.tsx` | Usage indicator component |
-| `packages/web/src/pages/chat/RateLimitBanner.tsx` | In-chat rate limit message |
+| File                                                          | Purpose                    |
+| ------------------------------------------------------------- | -------------------------- |
+| `microservices/core/src/application/usage/usageRepository.ts` | DB access for token_usage  |
+| `microservices/core/src/application/usage/usageService.ts`    | Cap checking logic         |
+| `microservices/core/src/application/usage/usageHandler.ts`    | API routes for usage data  |
+| `packages/web/src/components/UsageBar.tsx`                    | Usage indicator component  |
+| `packages/web/src/pages/chat/RateLimitBanner.tsx`             | In-chat rate limit message |
 
 ## Key Files to Modify
 
-| File | What to change |
-|---|---|
-| `packages/db/src/schema.ts` | Add token_usage and usage_caps tables |
+| File                                                     | What to change                              |
+| -------------------------------------------------------- | ------------------------------------------- |
+| `packages/db/src/schema.ts`                              | Add token_usage and usage_caps tables       |
 | `microservices/core/src/application/chat/chatHandler.ts` | Check usage before processing, record after |
-| `microservices/core/src/api.ts` | Mount usage handler |
-| `packages/web/src/pages/Settings.tsx` | Add usage section to billing |
-| `packages/web/src/pages/Dashboard.tsx` | Add usage bar for free tier |
+| `microservices/core/src/api.ts`                          | Mount usage handler                         |
+| `packages/web/src/pages/Settings.tsx`                    | Add usage section to billing                |
+| `packages/web/src/pages/Dashboard.tsx`                   | Add usage bar for free tier                 |
 
 ## Usage Recording Pattern
 
@@ -32,11 +32,11 @@ Refer to `docs/model-routing-and-cost-policy.md` for the strategic background on
 // After chat message processed
 await usageRepository.recordUsage({
   userId,
-  date: new Date().toISOString().split('T')[0], // YYYY-MM-DD
+  date: new Date().toISOString().split("T")[0], // YYYY-MM-DD
   model: "anthropic/haiku",
   inputTokens: response.usage.input_tokens,
   outputTokens: response.usage.output_tokens,
-  source: "chat"
+  source: "chat",
 });
 ```
 
@@ -48,12 +48,15 @@ Use UPSERT with increment — don't create a new row per message. Aggregate by u
 // Before processing chat message
 const usage = await usageService.checkUsage(userId, userTier);
 if (!usage.allowed) {
-  return { status: 429, body: {
-    error: "usage_limit_reached",
-    message: "You've reached your daily limit. It resets at midnight UTC.",
-    resetAt: usage.resetAt,
-    tier: userTier
-  }};
+  return {
+    status: 429,
+    body: {
+      error: "usage_limit_reached",
+      message: "You've reached your daily limit. It resets at midnight UTC.",
+      resetAt: usage.resetAt,
+      tier: userTier,
+    },
+  };
 }
 ```
 
@@ -69,10 +72,10 @@ if (!usage.allowed) {
 
 ## Cost Model (for reference)
 
-| Model | Input (per 1M) | Output (per 1M) |
-|---|---|---|
-| Claude Haiku | ~$0.25 | ~$1.25 |
-| Claude Sonnet | ~$3.00 | ~$15.00 |
+| Model         | Input (per 1M) | Output (per 1M) |
+| ------------- | -------------- | --------------- |
+| Claude Haiku  | ~$0.25         | ~$1.25          |
+| Claude Sonnet | ~$3.00         | ~$15.00         |
 
 Free tier at 50K input + 25K output daily on Haiku ≈ $0.04/day ≈ $1.25/month per user.
 Premium tier at 2M input + 1M output monthly on Sonnet ≈ $21/month per user (healthy margin on £49).

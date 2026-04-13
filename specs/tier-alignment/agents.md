@@ -6,19 +6,19 @@ You are working on collapsing a 4-tier subscription model (Starter/Pro/Business/
 
 ## Key Files
 
-| File | What to change |
-|---|---|
-| `packages/db/src/schema.ts` | Update `subscription_tier` enum |
-| `packages/db/migrations/` | New migration for enum change + data migration |
-| `microservices/core/src/application/subscriptions/subscriptionHandler.ts` | Replace TIERS array, update checkout logic |
-| `microservices/core/src/application/stripe/stripeHandler.ts` | Update webhook tier mapping |
-| `microservices/core/src/application/workspace/workspaceGenerator.ts` | Update tier references |
-| `infra/api.ts` | Replace 4 Stripe price env vars with 1 |
-| `packages/web/src/pages/planRecommendation.ts` | Rewrite PLANS array and keyword matching |
-| `packages/web/src/pages/chat/DiscoveryPanel.tsx` | 3-card layout |
-| `packages/web/src/pages/subscribeApi.ts` | Simplify to single tier |
-| `packages/web/src/pages/Settings.tsx` | Wire billing to real API data |
-| `docker/user-container/workspace-templates/` | Replace 4 tier configs with 2 |
+| File                                                                      | What to change                                 |
+| ------------------------------------------------------------------------- | ---------------------------------------------- |
+| `packages/db/src/schema.ts`                                               | Update `subscription_tier` enum                |
+| `packages/db/migrations/`                                                 | New migration for enum change + data migration |
+| `microservices/core/src/application/subscriptions/subscriptionHandler.ts` | Replace TIERS array, update checkout logic     |
+| `microservices/core/src/application/stripe/stripeHandler.ts`              | Update webhook tier mapping                    |
+| `microservices/core/src/application/workspace/workspaceGenerator.ts`      | Update tier references                         |
+| `infra/api.ts`                                                            | Replace 4 Stripe price env vars with 1         |
+| `packages/web/src/pages/planRecommendation.ts`                            | Rewrite PLANS array and keyword matching       |
+| `packages/web/src/pages/chat/DiscoveryPanel.tsx`                          | 3-card layout                                  |
+| `packages/web/src/pages/subscribeApi.ts`                                  | Simplify to single tier                        |
+| `packages/web/src/pages/Settings.tsx`                                     | Wire billing to real API data                  |
+| `docker/user-container/workspace-templates/`                              | Replace 4 tier configs with 2                  |
 
 ## Rules
 

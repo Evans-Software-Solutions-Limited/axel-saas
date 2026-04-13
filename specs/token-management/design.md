@@ -5,6 +5,7 @@
 Axel is OpenClaw-as-a-Service. OpenClaw uses a pay-per-token model with AI providers. We absorb this cost and offer flat-rate subscriptions (Free at £0, Premium at £49/month). This means we need tight control over token usage to protect unit economics.
 
 This spec covers:
+
 1. How we track token usage per user
 2. How we enforce daily caps on Free tier
 3. How we route to cost-appropriate models per tier
@@ -27,27 +28,30 @@ User sends message (chat or scheduled task)
 
 Aligned with existing `docs/model-routing-and-cost-policy.md`:
 
-| Tier | Primary Model | Background/Prep | Trust-Critical |
-|---|---|---|---|
-| **Free** | Cheap lane (Haiku / free hosted) | Same | Same (limited daily budget) |
-| **Premium** | Stronger (Sonnet) | Cheap lane (Haiku) | Premium lane (Sonnet/Opus) |
-| **BYOM** | User's model | User's model | User's model |
+| Tier        | Primary Model                    | Background/Prep    | Trust-Critical              |
+| ----------- | -------------------------------- | ------------------ | --------------------------- |
+| **Free**    | Cheap lane (Haiku / free hosted) | Same               | Same (limited daily budget) |
+| **Premium** | Stronger (Sonnet)                | Cheap lane (Haiku) | Premium lane (Sonnet/Opus)  |
+| **BYOM**    | User's model                     | User's model       | User's model                |
 
 ### Free Tier Cost Budget
 
 **Goal:** Free tier is genuinely useful but cheap to serve.
 
 Daily token budget (platform-funded):
+
 - **Input tokens:** ~50,000/day (~25 substantial interactions)
 - **Output tokens:** ~25,000/day
 - **Rough cost:** ~$0.02-0.05/day per free user using Haiku
 
 This allows a free user to:
+
 - Get a daily brief
 - Have 10-20 short conversations
 - Run 2-3 light automations
 
 When the daily budget is exhausted:
+
 - User sees "Daily limit reached — resets at midnight UTC"
 - Agent stops responding to new requests
 - Scheduled tasks are deferred to next day
@@ -56,17 +60,20 @@ When the daily budget is exhausted:
 ### Premium Tier Cost Budget
 
 Monthly token budget (funded by £49 subscription):
+
 - **Input tokens:** ~2,000,000/month
 - **Output tokens:** ~1,000,000/month
 - **Rough cost:** ~$15-25/month using Sonnet mix (healthy margin on £49)
 
 Soft limits:
+
 - Warning at 80% monthly usage
 - Hard cap at 100% (with option to purchase add-on — post-MVP)
 
 ### BYOM (Bring Your Own Model)
 
 When a user provides their own API key:
+
 - All token costs go to their account (we don't pay)
 - No usage caps from our side
 - We still track usage for visibility
@@ -176,6 +183,7 @@ For Premium tier: show in Settings → Billing section.
 ### Rate Limit Message (Chat)
 
 When daily/monthly cap is hit:
+
 ```
 ┌─────────────────────────────────────┐
 │  You've reached your daily limit.   │
@@ -190,6 +198,7 @@ When daily/monthly cap is hit:
 ### Usage in Settings
 
 In the Settings → Billing section, show:
+
 - Current month's usage (tokens + estimated cost for BYOM)
 - Daily usage chart (last 7/30 days)
 - Current limits based on tier
@@ -228,6 +237,7 @@ In the Settings → Billing section, show:
 ### BYOM override
 
 When user provides their own key, the config is updated:
+
 ```json
 {
   "agents": {

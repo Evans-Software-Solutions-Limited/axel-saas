@@ -3,6 +3,7 @@
 ## Overview
 
 Multiple features need to write to a user's OpenClaw workspace after initial onboarding:
+
 - **Integrations** — update TOOLS.md + openclaw.json when credentials change
 - **BYOM** — update openclaw.json model config when user provides their own API key
 - **Schedules** — update HEARTBEAT.md when crons are created/changed
@@ -36,6 +37,7 @@ Development: /tmp/workspace/{userId}/workspace/{filename}
 The backend Lambda/service has write access to the same EFS volume that the container reads from. This is the simplest path — no intermediate storage, no message queue.
 
 **If EFS is not accessible from Lambda** (architecture constraint), the fallback is:
+
 - Backend calls `POST /api/config` on the gateway with file contents in the body
 - Gateway writes files to its local workspace
 - This adds complexity but avoids EFS-from-Lambda
@@ -60,34 +62,33 @@ Central service that all features call when they need to update workspace config
 // microservices/core/src/application/workspace/workspaceConfigService.ts
 
 interface FileUpdate {
-  filename: string;   // e.g. "TOOLS.md", "openclaw.json", "HEARTBEAT.md"
-  content: string;    // Full file content (not a diff)
+  filename: string; // e.g. "TOOLS.md", "openclaw.json", "HEARTBEAT.md"
+  content: string; // Full file content (not a diff)
 }
 
 export class WorkspaceConfigService {
-  
   async updateFiles(
     userId: string,
     updates: FileUpdate[],
-    reason: string
+    reason: string,
   ): Promise<void> {
     // 1. Resolve workspace path
     const workspacePath = resolveWorkspacePath(userId);
-    
+
     // 2. Write files to EFS (or /tmp in dev)
     await Promise.all(
       updates.map(({ filename, content }) =>
-        fs.writeFile(path.join(workspacePath, filename), content, "utf-8")
-      )
+        fs.writeFile(path.join(workspacePath, filename), content, "utf-8"),
+      ),
     );
-    
+
     // 3. Signal container to reload (fire-and-forget)
     const container = await provisioningRepo.getContainerByUserId(userId);
     if (container?.gatewayUrl && container.status === "active") {
       await triggerConfigReload(
         container.gatewayUrl,
         reason,
-        updates.map(u => u.filename)
+        updates.map((u) => u.filename),
       );
     }
     // If container not active, files will be read on next startup
@@ -127,6 +128,7 @@ Called when integrations change.
 Called when integrations, BYOM, or tier changes.
 
 Must merge with the base tier config (openclaw-free.json or openclaw-premium.json) and add:
+
 - Channel configs for connected communication channels
 - Skill configs for connected tool integrations
 - Model overrides for BYOM
@@ -194,35 +196,38 @@ Called when tier changes (upgrade/downgrade). Re-inject tier-specific rules usin
 When generating `openclaw.json`, credentials must be decrypted from the `integration_credentials` table:
 
 ```typescript
-async function buildOpenClawConfig(userId: string, tier: string): Promise<string> {
+async function buildOpenClawConfig(
+  userId: string,
+  tier: string,
+): Promise<string> {
   const credentials = await integrationRepo.findByUserId(userId);
   const baseConfig = loadTierConfig(tier); // openclaw-free.json or openclaw-premium.json
-  
+
   for (const cred of credentials) {
     const plaintext = decrypt(cred.encryptedValue, cred.iv, encryptionKey);
     // Add to config based on integration type
     addToConfig(baseConfig, cred.integrationId, plaintext);
   }
-  
+
   return JSON.stringify(baseConfig, null, 2);
 }
 ```
 
 ## When Each File is Updated
 
-| Trigger | Files Updated | Reason |
-|---|---|---|
-| Integration connected/disconnected | TOOLS.md, openclaw.json | integration_changed |
-| BYOM key added/removed | TOOLS.md, openclaw.json | byom_changed |
-| Schedule created/updated/deleted | HEARTBEAT.md | schedule_changed |
-| Tier upgraded/downgraded | SOUL.md, AGENTS.md, openclaw.json | tier_changed |
-| Onboarding complete (initial) | All files | onboarding_complete |
+| Trigger                            | Files Updated                     | Reason              |
+| ---------------------------------- | --------------------------------- | ------------------- |
+| Integration connected/disconnected | TOOLS.md, openclaw.json           | integration_changed |
+| BYOM key added/removed             | TOOLS.md, openclaw.json           | byom_changed        |
+| Schedule created/updated/deleted   | HEARTBEAT.md                      | schedule_changed    |
+| Tier upgraded/downgraded           | SOUL.md, AGENTS.md, openclaw.json | tier_changed        |
+| Onboarding complete (initial)      | All files                         | onboarding_complete |
 
 ## Failure Modes
 
-| Failure | Impact | Recovery |
-|---|---|---|
-| EFS write fails | Config not updated | Retry once, then log error. User sees "Integration connected" but agent doesn't have it yet. |
-| Reload endpoint fails | Container running stale config | OpenClaw reads files on next heartbeat (2-4x/day). No user action needed. |
-| Container not running | Files written but not read | Container reads on next startup. |
-| Decryption fails | Can't write credential to config | Log error, skip this credential, write partial config. Alert user that integration may not work. |
+| Failure               | Impact                           | Recovery                                                                                         |
+| --------------------- | -------------------------------- | ------------------------------------------------------------------------------------------------ |
+| EFS write fails       | Config not updated               | Retry once, then log error. User sees "Integration connected" but agent doesn't have it yet.     |
+| Reload endpoint fails | Container running stale config   | OpenClaw reads files on next heartbeat (2-4x/day). No user action needed.                        |
+| Container not running | Files written but not read       | Container reads on next startup.                                                                 |
+| Decryption fails      | Can't write credential to config | Log error, skip this credential, write partial config. Alert user that integration may not work. |

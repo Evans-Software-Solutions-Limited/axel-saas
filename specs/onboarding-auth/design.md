@@ -9,6 +9,7 @@ The goal: a frictionless path from "I found this product" to "I'm talking to my 
 ## Current State
 
 **Working:**
+
 - Supabase auth (sign up, sign in, sign out, JWT)
 - Auth context + provider in React
 - Protected routes with `ProtectedRoute` wrapper
@@ -18,6 +19,7 @@ The goal: a frictionless path from "I found this product" to "I'm talking to my 
 - Chat with 7-state machine
 
 **Needs enabling:**
+
 - Login and Signup page routes (currently redirect to `/`)
 - The actual auth UI (forms exist in `Login.tsx` and `SignUp.tsx`)
 
@@ -59,11 +61,13 @@ Onboarding complete + user selects Free
 ### Frontend
 
 **Re-enable auth routes:**
+
 - `/signup` — Sign up form (email + password)
 - `/login` — Login form (email + password)
 - Remove the redirect-to-home logic
 
 **Sign Up page:**
+
 - Clean form: name, email, password
 - "Create account" button
 - Link to login ("Already have an account?")
@@ -72,6 +76,7 @@ Onboarding complete + user selects Free
 - Or if auto-confirm is on: redirect to dashboard
 
 **Login page:**
+
 - Clean form: email, password
 - "Sign in" button
 - Link to signup ("Don't have an account?")
@@ -80,10 +85,12 @@ Onboarding complete + user selects Free
 - After login: redirect to dashboard
 
 **Marketing page CTAs:**
+
 - Update "Join waitlist" buttons to "Get started" / "Sign up" where appropriate
 - Keep waitlist as a secondary option if you want to gate access
 
 **Post-onboarding discovery panel:**
+
 - Update for new 3-tier model (Free / Premium / Enterprise)
 - Free: "Get started" → triggers free provisioning
 - Premium: "Get started" → Stripe checkout
@@ -91,6 +98,7 @@ Onboarding complete + user selects Free
 ### Backend
 
 **Free tier provisioning:**
+
 - After onboarding complete + user selects "Free":
   - Create subscription record: `{ userId, tier: "free", status: "active" }`
   - Trigger container launch with free tier config
@@ -111,6 +119,7 @@ The `AuthProvider` currently only calls `/users/me` on `SIGNED_IN` event. This i
 ## Password Reset Flow
 
 Supabase handles this natively:
+
 1. User clicks "Forgot password?" on login page
 2. Frontend calls `supabase.auth.resetPasswordForEmail(email)`
 3. Supabase sends reset email

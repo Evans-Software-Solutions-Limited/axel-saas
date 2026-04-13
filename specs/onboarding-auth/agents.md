@@ -6,19 +6,19 @@ The auth infrastructure (Supabase JWT, auth context, protected routes) is fully 
 
 ## Key Files to Modify
 
-| File | What to change |
-|---|---|
-| `packages/web/src/App.tsx` | Re-enable `/login` and `/signup` routes, add `/reset-password` route |
-| `packages/web/src/pages/Login.tsx` | Remove redirect logic, ensure form works |
-| `packages/web/src/pages/SignUp.tsx` | Remove redirect logic, add name field, ensure form works |
-| `packages/web/src/pages/Home.tsx` | Update primary CTA from waitlist to signup |
-| `packages/web/src/pages/Pricing.tsx` | Update tier CTAs to link to signup |
-| `packages/web/src/pages/Dashboard.tsx` | Verify redirect logic handles all user states |
+| File                                   | What to change                                                       |
+| -------------------------------------- | -------------------------------------------------------------------- |
+| `packages/web/src/App.tsx`             | Re-enable `/login` and `/signup` routes, add `/reset-password` route |
+| `packages/web/src/pages/Login.tsx`     | Remove redirect logic, ensure form works                             |
+| `packages/web/src/pages/SignUp.tsx`    | Remove redirect logic, add name field, ensure form works             |
+| `packages/web/src/pages/Home.tsx`      | Update primary CTA from waitlist to signup                           |
+| `packages/web/src/pages/Pricing.tsx`   | Update tier CTAs to link to signup                                   |
+| `packages/web/src/pages/Dashboard.tsx` | Verify redirect logic handles all user states                        |
 
 ## Key Files to Create
 
-| File | Purpose |
-|---|---|
+| File                                       | Purpose             |
+| ------------------------------------------ | ------------------- |
 | `packages/web/src/pages/ResetPassword.tsx` | Password reset form |
 
 ## Auth Flow (Already Working)
@@ -40,7 +40,7 @@ When a user completes onboarding and selects "Free" in the discovery panel:
 async function handleFreePlanSelected() {
   // 1. Create free subscription
   await api.core.subscriptions.free.post();
-  
+
   // 2. Enter provisioning mode (same as post-checkout)
   setMode("provisioning");
   startPollingAgentStatus();
@@ -48,6 +48,7 @@ async function handleFreePlanSelected() {
 ```
 
 Backend needs a new endpoint:
+
 ```
 POST /subscriptions/free
   → Creates subscription { tier: "free", status: "active" }

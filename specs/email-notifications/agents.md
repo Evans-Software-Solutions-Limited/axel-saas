@@ -6,20 +6,20 @@ The waitlist handler has email stubs (logging only). Multiple features need real
 
 ## Key Files to Create
 
-| File | Purpose |
-|---|---|
-| `microservices/core/src/application/email/emailService.ts` | Send email via Resend SDK |
+| File                                                         | Purpose                             |
+| ------------------------------------------------------------ | ----------------------------------- |
+| `microservices/core/src/application/email/emailService.ts`   | Send email via Resend SDK           |
 | `microservices/core/src/application/email/emailTemplates.ts` | Template rendering (subject + HTML) |
 
 ## Key Files to Modify
 
-| File | What to change |
-|---|---|
+| File                                                             | What to change                                |
+| ---------------------------------------------------------------- | --------------------------------------------- |
 | `microservices/core/src/application/waitlist/waitlistHandler.ts` | Replace console.info with emailService.send() |
-| `microservices/core/src/application/waitlist/waitlistEmail.ts` | Rewrite or replace with emailService |
-| `microservices/core/src/application/stripe/stripeHandler.ts` | Add email sends on webhook events |
-| `infra/secrets.ts` | Add RESEND_API_KEY secret |
-| `infra/api.ts` | Bind RESEND_API_KEY env var |
+| `microservices/core/src/application/waitlist/waitlistEmail.ts`   | Rewrite or replace with emailService          |
+| `microservices/core/src/application/stripe/stripeHandler.ts`     | Add email sends on webhook events             |
+| `infra/secrets.ts`                                               | Add RESEND_API_KEY secret                     |
+| `infra/api.ts`                                                   | Bind RESEND_API_KEY env var                   |
 
 ## Rules
 
@@ -36,7 +36,7 @@ The waitlist handler has email stubs (logging only). Multiple features need real
 // emailTemplates.ts
 export function renderTemplate(
   template: EmailTemplate,
-  data: Record<string, string>
+  data: Record<string, string>,
 ): { subject: string; html: string } {
   const base = (body: string) => `
     <!DOCTYPE html>
@@ -47,7 +47,7 @@ export function renderTemplate(
         ${body}
       </div>
       <p style="text-align: center; color: #8a8fa6; font-size: 12px; margin-top: 24px;">
-        Axel by Evans Software Solutions · <a href="${data.unsubscribeUrl ?? '#'}">Unsubscribe</a>
+        Axel by Evans Software Solutions · <a href="${data.unsubscribeUrl ?? "#"}">Unsubscribe</a>
       </p>
     </body>
     </html>
@@ -61,7 +61,7 @@ export function renderTemplate(
           <h1 style="color: #111;">Hey ${data.name},</h1>
           <p>Your Axel account is ready. Start your onboarding conversation and let Axel learn how to help you.</p>
           <a href="${data.dashboardUrl}" style="display: inline-block; background: #0dd3b0; color: #fff; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600;">Open Dashboard</a>
-        `)
+        `),
       };
     // ... other templates
   }

@@ -1,11 +1,13 @@
 # Crons & Schedules — Tasks
 
 ## Database
+
 - [ ] Add `schedules` table to `packages/db/src/schema.ts`
 - [ ] Create migration for `schedules` table
 - [ ] Add index on `user_id`
 
 ## Backend
+
 - [ ] Create `microservices/core/src/application/schedules/` module
 - [ ] Create `scheduleRepository.ts` — CRUD for schedules
 - [ ] Create `scheduleHandler.ts` with routes:
@@ -20,9 +22,11 @@
 - [ ] Implement workspace propagation: write schedules to HEARTBEAT.md / openclaw config
 
 ## Frontend — API Client
+
 - [ ] Create `packages/web/src/pages/crons/schedulesApi.ts` — eden client calls
 
 ## Frontend — Schedule List
+
 - [ ] Rewrite `packages/web/src/pages/Crons.tsx` — replace hardcoded SCHEDULES with API data
 - [ ] Show: name, human-readable frequency, last run status, next run time, enabled toggle
 - [ ] Implement enable/disable toggle (calls PUT with `{ enabled: true/false }`)
@@ -33,6 +37,7 @@
 - [ ] Add empty state with CTA
 
 ## Frontend — Create/Edit Modal
+
 - [ ] Create `ScheduleFormModal` component
 - [ ] Preset frequency selector: Daily, Weekday, Weekly, Hourly, Custom
 - [ ] Time picker for scheduled time
@@ -43,13 +48,16 @@
 - [ ] Pre-fill values for edit mode
 
 ## Frontend — Delete Confirmation
+
 - [ ] Create confirmation dialog for schedule deletion
 - [ ] Show schedule name in confirmation
 
 ## Frontend — Execution History Link
+
 - [ ] "View history" links to Tasks page filtered by schedule source
 
 ## Tests
+
 - [ ] Unit tests for cron expression validation
 - [ ] Unit tests for nextRunAt calculation
 - [ ] Unit tests for schedule repository CRUD
@@ -60,6 +68,7 @@
 - [ ] Frontend tests for empty state
 
 ## Quality Gates
+
 - [ ] `bun run prettier:check`
 - [ ] `bun run typecheck`
 - [ ] `bun run lint`

@@ -24,33 +24,33 @@ The frontend is a **management layer**. It does not run integrations — it conf
 
 These are OpenClaw's native channels. Each needs platform-specific credentials.
 
-| Channel | Auth Type | Credential Required | MVP |
-|---|---|---|---|
-| **Telegram** | Bot token | `TELEGRAM_BOT_TOKEN` | Yes |
-| **Slack** | OAuth 2.0 | OAuth app install → token | Yes |
-| **Email (Gmail)** | OAuth 2.0 | Google OAuth → refresh token | Yes |
-| **Google Calendar** | OAuth 2.0 | Google OAuth (same consent as Gmail) | Yes |
-| **WhatsApp** | Phone pairing | QR code / phone number | Post-MVP |
-| **Discord** | Bot token | `DISCORD_BOT_TOKEN` | Post-MVP |
-| **Microsoft Teams** | OAuth 2.0 | Azure AD app | Post-MVP |
-| **WebChat** | Built-in | No credential needed (gateway serves it) | Yes (free) |
+| Channel             | Auth Type     | Credential Required                      | MVP        |
+| ------------------- | ------------- | ---------------------------------------- | ---------- |
+| **Telegram**        | Bot token     | `TELEGRAM_BOT_TOKEN`                     | Yes        |
+| **Slack**           | OAuth 2.0     | OAuth app install → token                | Yes        |
+| **Email (Gmail)**   | OAuth 2.0     | Google OAuth → refresh token             | Yes        |
+| **Google Calendar** | OAuth 2.0     | Google OAuth (same consent as Gmail)     | Yes        |
+| **WhatsApp**        | Phone pairing | QR code / phone number                   | Post-MVP   |
+| **Discord**         | Bot token     | `DISCORD_BOT_TOKEN`                      | Post-MVP   |
+| **Microsoft Teams** | OAuth 2.0     | Azure AD app                             | Post-MVP   |
+| **WebChat**         | Built-in      | No credential needed (gateway serves it) | Yes (free) |
 
 ### Tool Integrations (MCP Skills)
 
-| Integration | Auth Type | Credential Required | MVP |
-|---|---|---|---|
-| **Notion** | API key | `NOTION_API_KEY` (internal integration token) | Yes |
-| **Google Drive** | OAuth 2.0 | Same Google OAuth consent | Yes |
-| **GitHub** | Personal access token | `GITHUB_TOKEN` | Post-MVP |
-| **Linear** | API key | `LINEAR_API_KEY` | Post-MVP |
-| **Custom webhook** | URL + optional secret | `WEBHOOK_URL`, `WEBHOOK_SECRET` | Post-MVP |
+| Integration        | Auth Type             | Credential Required                           | MVP      |
+| ------------------ | --------------------- | --------------------------------------------- | -------- |
+| **Notion**         | API key               | `NOTION_API_KEY` (internal integration token) | Yes      |
+| **Google Drive**   | OAuth 2.0             | Same Google OAuth consent                     | Yes      |
+| **GitHub**         | Personal access token | `GITHUB_TOKEN`                                | Post-MVP |
+| **Linear**         | API key               | `LINEAR_API_KEY`                              | Post-MVP |
+| **Custom webhook** | URL + optional secret | `WEBHOOK_URL`, `WEBHOOK_SECRET`               | Post-MVP |
 
 ### BYOM (Bring Your Own Model) — Premium only
 
-| Provider | Credential | MVP |
-|---|---|---|
-| **OpenAI** | `OPENAI_API_KEY` | Yes |
-| **Anthropic** | `ANTHROPIC_API_KEY` | Yes |
+| Provider            | Credential          | MVP      |
+| ------------------- | ------------------- | -------- |
+| **OpenAI**          | `OPENAI_API_KEY`    | Yes      |
+| **Anthropic**       | `ANTHROPIC_API_KEY` | Yes      |
 | **Google (Gemini)** | `GOOGLE_AI_API_KEY` | Post-MVP |
 
 ## Credential Storage
@@ -107,6 +107,7 @@ CREATE TABLE oauth_state (
 ## API Endpoints
 
 ### Integration Registry
+
 ```
 GET /integrations
   → Returns list of available integrations with:
@@ -115,6 +116,7 @@ GET /integrations
 ```
 
 ### Credential Management
+
 ```
 POST /integrations/:integrationId/connect
   Body: { credential: "sk-..." }  (for API key types)
@@ -129,6 +131,7 @@ DELETE /integrations/:integrationId/disconnect
 ```
 
 ### OAuth Flow
+
 ```
 GET /integrations/:integrationId/oauth/start
   → Generates state token, stores in oauth_state
@@ -142,7 +145,9 @@ GET /integrations/:integrationId/oauth/callback?code=...&state=...
 ```
 
 ### Workspace Propagation
+
 When a credential is added/removed, the backend must:
+
 1. Update the user's workspace `TOOLS.md` with the integration status
 2. Update the user's `openclaw.json` with the MCP skill config or channel config
 3. Signal the container to reload config (via gateway API or file watch)
@@ -173,6 +178,7 @@ When a credential is added/removed, the backend must:
 ```
 
 Each integration card shows:
+
 - Icon + name
 - Connection status (green dot = connected, grey = not connected, red = error)
 - "Connect" / "Manage" / "Upgrade to unlock" button

@@ -9,6 +9,7 @@ The Office is the home screen for authenticated users. It shows their AI agents 
 ### Data Source
 
 Agent data comes from two sources:
+
 1. **Agent roster** — which agents the user has (based on their OpenClaw workspace config)
 2. **Task activity** — what each agent is doing (from the existing `/users/me/tasks` API + task events)
 
@@ -17,9 +18,11 @@ Agent data comes from two sources:
 Every user gets **Axel** (the primary agent). Sub-agents are spawned by Axel via OpenClaw's multi-agent orchestration. The sub-agents available depend on tier and what the user has configured.
 
 **Fixed agents (all tiers):**
+
 - **Axel** — Chief coordinator. Always present. Routes work to sub-agents.
 
 **Dynamic sub-agents (provisioned based on integrations + tier):**
+
 - **Scribe** — Document writer. Active when file/doc integrations are connected.
 - **Relay** — Comms manager. Active when email/messaging channels are connected.
 - **Keeper** — Knowledge manager. Active when knowledge sources (Notion, Drive) are connected.
@@ -55,12 +58,14 @@ GET /users/me/agents
 ```
 
 This endpoint aggregates:
+
 - Agent roster from provisioning state / workspace config
 - Task data from existing `tasks` + `task_events` tables
 - Status derived from: any in-progress task → "busy", recent task (< 5 min) → "working", else → "idle"
 
 **Alternative (simpler MVP approach):**
 Skip the dedicated endpoint. Derive agent data entirely from `/users/me/tasks`:
+
 - Group tasks by agent/source
 - Infer which agents exist from task sources
 - Calculate stats from task events
@@ -73,6 +78,7 @@ This is simpler and avoids a new backend endpoint. The office just becomes a **v
 ### Desk View (existing, needs wiring)
 
 The pixel-art office with sprite characters is already built. Changes:
+
 - Replace hardcoded `agents` array with API-driven data
 - Dynamic agent count (don't show agents that aren't active for this user)
 - Desk positions assigned dynamically based on how many agents are active
@@ -82,6 +88,7 @@ The pixel-art office with sprite characters is already built. Changes:
 ### List View (existing, needs wiring)
 
 The accordion list with stats and recent jobs is already built. Changes:
+
 - Replace hardcoded data with real task history
 - Stats computed from task events
 - "Recent jobs" pulled from `/users/me/tasks` filtered per agent
@@ -111,6 +118,7 @@ When user has no tasks yet (fresh after onboarding):
 ## Sprite Assets
 
 Existing sprites in `/public/sprites/`:
+
 - `sprite-axel.png`
 - `sprite-scribe.png`
 - `sprite-relay.png`

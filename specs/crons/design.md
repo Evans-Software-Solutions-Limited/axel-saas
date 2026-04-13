@@ -19,6 +19,7 @@ User creates schedule in frontend
 ### OpenClaw Cron Model
 
 OpenClaw supports cron via:
+
 1. **HEARTBEAT.md** — periodic check-in tasks (2-4x/day, already templated)
 2. **Cron/wakeup skill** — built-in tool for scheduled execution
 
@@ -134,17 +135,18 @@ POST /users/me/schedules/:id/run
 
 Instead of raw cron expressions, offer friendly presets:
 
-| Preset | Cron Expression |
-|---|---|
-| Every day at [time] | `0 {H} * * *` |
+| Preset                  | Cron Expression |
+| ----------------------- | --------------- |
+| Every day at [time]     | `0 {H} * * *`   |
 | Every weekday at [time] | `0 {H} * * 1-5` |
-| Every [day] at [time] | `0 {H} * * {D}` |
-| Every [N] hours | `0 */{N} * * *` |
-| Custom (advanced) | Raw cron input |
+| Every [day] at [time]   | `0 {H} * * {D}` |
+| Every [N] hours         | `0 */{N} * * *` |
+| Custom (advanced)       | Raw cron input  |
 
 ## Workspace Propagation
 
 When a schedule is created/updated/deleted:
+
 1. Update the user's `HEARTBEAT.md` with human-readable schedule list
 2. Update `openclaw.json` cron config if OpenClaw supports declarative cron entries
 3. Or use OpenClaw's wakeup skill to register the cron
@@ -152,5 +154,6 @@ When a schedule is created/updated/deleted:
 ## Relationship to Tasks
 
 Each cron execution creates a task (via the existing task system). The Crons page shows schedules; the Tasks page shows individual executions. Link between them:
+
 - Schedule card shows "Last run" status with link to task
 - Task detail shows "Triggered by: Daily email digest" with link to schedule

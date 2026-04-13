@@ -6,15 +6,16 @@ The routing classifier detects PII and applies tier-based data handling policies
 
 ## Key Files to Modify
 
-| File | What to change |
-|---|---|
-| `microservices/core/src/application/routing/routingTypes.ts` | Update SubscriptionTier type and ROUTING_POLICIES |
-| `microservices/core/src/application/routing/routingClassifier.ts` | Update policy lookup functions |
-| `microservices/core/src/application/chat/chatHandler.ts` | Add classification before gateway proxy |
+| File                                                              | What to change                                    |
+| ----------------------------------------------------------------- | ------------------------------------------------- |
+| `microservices/core/src/application/routing/routingTypes.ts`      | Update SubscriptionTier type and ROUTING_POLICIES |
+| `microservices/core/src/application/routing/routingClassifier.ts` | Update policy lookup functions                    |
+| `microservices/core/src/application/chat/chatHandler.ts`          | Add classification before gateway proxy           |
 
 ## This is a Small Change
 
 The classifier is pure functions with no DB/network dependencies. The core work is:
+
 1. Change 3 type definitions
 2. Replace 4 policy objects with 3
 3. Add 5-10 lines to the chat handler for classification gating
@@ -29,11 +30,15 @@ const classification = classifyData(body.message);
 const policy = getRoutingPolicy(subscription.tier);
 
 if (!policy.allowedDataClassifications.includes(classification)) {
-  return ctx.set.status = 422, {
-    error: "data_classification_blocked",
-    message: "Your message contains what looks like personal information. On the Free plan, Axel can't process this directly. Try rephrasing without specific details, or upgrade to Premium for full capability.",
-    classification, // label only, not the detected values
-  };
+  return (
+    (ctx.set.status = 422),
+    {
+      error: "data_classification_blocked",
+      message:
+        "Your message contains what looks like personal information. On the Free plan, Axel can't process this directly. Try rephrasing without specific details, or upgrade to Premium for full capability.",
+      classification, // label only, not the detected values
+    }
+  );
 }
 
 // After gateway response, attach to task event:
@@ -41,10 +46,10 @@ await taskRepo.appendEvent({
   taskId,
   eventType: "task.completed",
   source: "chat",
-  payload: { 
+  payload: {
     dataClassification: classification,
     // ... other metadata
-  }
+  },
 });
 ```
 

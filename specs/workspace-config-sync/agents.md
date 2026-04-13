@@ -10,22 +10,22 @@ After onboarding, the user's OpenClaw workspace files need to be updated wheneve
 
 ## Key Files to Create
 
-| File | Purpose |
-|---|---|
-| `microservices/core/src/application/workspace/workspaceConfigService.ts` | Central write + reload service |
-| `microservices/core/src/application/workspace/toolsGenerator.ts` | TOOLS.md from integration state |
+| File                                                                      | Purpose                                       |
+| ------------------------------------------------------------------------- | --------------------------------------------- |
+| `microservices/core/src/application/workspace/workspaceConfigService.ts`  | Central write + reload service                |
+| `microservices/core/src/application/workspace/toolsGenerator.ts`          | TOOLS.md from integration state               |
 | `microservices/core/src/application/workspace/openclawConfigGenerator.ts` | openclaw.json from tier + integrations + BYOM |
-| `microservices/core/src/application/workspace/heartbeatGenerator.ts` | HEARTBEAT.md from schedules |
-| `microservices/core/src/application/workspace/tierConfigUpdater.ts` | SOUL.md + AGENTS.md tier rules |
+| `microservices/core/src/application/workspace/heartbeatGenerator.ts`      | HEARTBEAT.md from schedules                   |
+| `microservices/core/src/application/workspace/tierConfigUpdater.ts`       | SOUL.md + AGENTS.md tier rules                |
 
 ## Key Files to Modify
 
-| File | What to change |
-|---|---|
-| Integration handler (from integrations spec) | Call configService after connect/disconnect |
-| Schedule handler (from crons spec) | Call configService after CRUD |
-| Stripe webhook handler | Call configService after tier change |
-| Settings handler | Call configService after tier change via cancel/upgrade |
+| File                                         | What to change                                          |
+| -------------------------------------------- | ------------------------------------------------------- |
+| Integration handler (from integrations spec) | Call configService after connect/disconnect             |
+| Schedule handler (from crons spec)           | Call configService after CRUD                           |
+| Stripe webhook handler                       | Call configService after tier change                    |
+| Settings handler                             | Call configService after tier change via cancel/upgrade |
 
 ## Existing Code to Reuse
 

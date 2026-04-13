@@ -6,24 +6,25 @@ The Crons page lets users create and manage recurring automated tasks. OpenClaw 
 
 ## Key Files to Create
 
-| File | Purpose |
-|---|---|
-| `packages/db/src/schema.ts` | Add `schedules` table (modify existing) |
-| `microservices/core/src/application/schedules/scheduleHandler.ts` | Elysia route handler |
-| `microservices/core/src/application/schedules/scheduleRepository.ts` | DB access |
-| `packages/web/src/pages/Crons.tsx` | Rewrite existing page |
-| `packages/web/src/pages/crons/schedulesApi.ts` | API client |
-| `packages/web/src/pages/crons/ScheduleFormModal.tsx` | Create/edit modal |
+| File                                                                 | Purpose                                 |
+| -------------------------------------------------------------------- | --------------------------------------- |
+| `packages/db/src/schema.ts`                                          | Add `schedules` table (modify existing) |
+| `microservices/core/src/application/schedules/scheduleHandler.ts`    | Elysia route handler                    |
+| `microservices/core/src/application/schedules/scheduleRepository.ts` | DB access                               |
+| `packages/web/src/pages/Crons.tsx`                                   | Rewrite existing page                   |
+| `packages/web/src/pages/crons/schedulesApi.ts`                       | API client                              |
+| `packages/web/src/pages/crons/ScheduleFormModal.tsx`                 | Create/edit modal                       |
 
 ## Key Files to Modify
 
-| File | What to change |
-|---|---|
+| File                            | What to change         |
+| ------------------------------- | ---------------------- |
 | `microservices/core/src/api.ts` | Mount schedule handler |
 
 ## Cron Expression Handling
 
 Use `cron-parser` (or similar) for:
+
 1. Validating cron expressions
 2. Calculating `nextRunAt` from expression + timezone
 3. Generating human-readable descriptions
@@ -54,6 +55,7 @@ When a schedule changes, update the user's workspace:
 2. Each schedule entry in HEARTBEAT.md should describe what to do in natural language
 
 Example HEARTBEAT.md content:
+
 ```markdown
 # HEARTBEAT.md
 

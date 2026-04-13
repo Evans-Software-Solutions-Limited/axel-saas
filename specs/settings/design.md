@@ -12,6 +12,7 @@ The Settings page is the user's account management hub. Currently hardcoded with
 **Update:** `PUT /users/me` (needs creating or extending)
 
 Fields:
+
 - Name (editable)
 - Email (read-only — managed by Supabase auth)
 - Avatar (stretch — not MVP)
@@ -19,10 +20,12 @@ Fields:
 ### 2. Billing & Subscription
 
 **Data sources:**
+
 - `GET /subscriptions/status` — current tier, status, period end
 - `GET /stripe/invoices` — invoice history (already exists)
 
 **Actions:**
+
 - Upgrade to Premium (→ Stripe checkout)
 - Cancel subscription (→ Stripe customer portal or direct API)
 - View invoices
@@ -57,6 +60,7 @@ Fields:
 ### 3. Notification Preferences
 
 **Needs backend support.** For MVP, keep it simple:
+
 - Email notifications toggle (on/off)
 - Stored as a JSON column on the users table or a separate `user_preferences` record
 

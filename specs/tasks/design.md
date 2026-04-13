@@ -7,6 +7,7 @@ The Tasks page shows everything the user's agents have worked on — a filterabl
 ## Current State
 
 **Backend (done):**
+
 - `GET /users/me/tasks` — returns tasks with projected state from events
 - `GET /users/me/tasks/:taskId` — returns single task with events
 - Task states: `unknown`, `running`, `completed`, `failed`, `review_ready`, `no_changes`
@@ -14,6 +15,7 @@ The Tasks page shows everything the user's agents have worked on — a filterabl
 - Tasks have: `id`, `userId`, `source`, `taskSummary`, `repo`, `branch`, `createdAt`
 
 **Frontend (scaffolded but hardcoded):**
+
 - Table with columns: Task, Agent, Status, Due Date
 - Search + status filter
 - Sample data array
@@ -45,6 +47,7 @@ Replace `SAMPLE_TASKS` with real API data from `/users/me/tasks`.
 ### Task Detail
 
 Clicking a task row should expand or navigate to show:
+
 - Full task summary
 - Event timeline (from `task_events`)
 - Source agent
@@ -56,6 +59,7 @@ Clicking a task row should expand or navigate to show:
 ### Filters
 
 Keep existing search + status filter. Add:
+
 - Agent filter dropdown (derived from task sources)
 - Date range (today / 7 days / 30 days / all)
 

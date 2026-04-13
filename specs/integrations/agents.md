@@ -7,42 +7,45 @@ Axel uses OpenClaw under the hood. Every OpenClaw integration is an MCP server (
 ## Key Architectural Decision
 
 **The frontend never runs integrations.** It only:
+
 1. Collects credentials (API keys via form, OAuth tokens via redirect)
 2. Sends them to the backend for encrypted storage
 3. Displays connection status
 
 **The backend:**
+
 1. Encrypts credentials with AES-256-GCM (per-environment key from SST secret)
 2. Stores in `integration_credentials` table
 3. Propagates config to user's OpenClaw workspace (TOOLS.md + openclaw.json)
 
 **OpenClaw:**
+
 1. Reads workspace config
 2. Connects to services using the credentials
 3. Handles the actual integration work
 
 ## Key Files to Create
 
-| File | Purpose |
-|---|---|
-| `microservices/core/src/application/integrations/integrationHandler.ts` | Elysia route handler |
-| `microservices/core/src/application/integrations/integrationRegistry.ts` | Static catalogue of integrations |
-| `microservices/core/src/application/integrations/integrationRepository.ts` | DB access for credentials |
-| `microservices/core/src/application/integrations/oauthStateRepository.ts` | OAuth state management |
-| `microservices/core/src/application/integrations/encryption.ts` | AES-256-GCM encrypt/decrypt |
-| `packages/web/src/pages/Integrations.tsx` | Rewrite existing page |
-| `packages/web/src/pages/integrations/integrationsApi.ts` | API client |
-| `packages/web/src/pages/integrations/ConnectApiKeyModal.tsx` | Credential input modal |
-| `packages/web/src/pages/integrations/ManageIntegrationModal.tsx` | View/disconnect modal |
+| File                                                                       | Purpose                          |
+| -------------------------------------------------------------------------- | -------------------------------- |
+| `microservices/core/src/application/integrations/integrationHandler.ts`    | Elysia route handler             |
+| `microservices/core/src/application/integrations/integrationRegistry.ts`   | Static catalogue of integrations |
+| `microservices/core/src/application/integrations/integrationRepository.ts` | DB access for credentials        |
+| `microservices/core/src/application/integrations/oauthStateRepository.ts`  | OAuth state management           |
+| `microservices/core/src/application/integrations/encryption.ts`            | AES-256-GCM encrypt/decrypt      |
+| `packages/web/src/pages/Integrations.tsx`                                  | Rewrite existing page            |
+| `packages/web/src/pages/integrations/integrationsApi.ts`                   | API client                       |
+| `packages/web/src/pages/integrations/ConnectApiKeyModal.tsx`               | Credential input modal           |
+| `packages/web/src/pages/integrations/ManageIntegrationModal.tsx`           | View/disconnect modal            |
 
 ## Key Files to Modify
 
-| File | What to change |
-|---|---|
-| `packages/db/src/schema.ts` | Add `integrationCredentials` and `oauthState` tables |
-| `microservices/core/src/api.ts` | Mount integration handler |
-| `infra/api.ts` | Add encryption key + OAuth client env vars |
-| `infra/secrets.ts` | Add `CREDENTIAL_ENCRYPTION_KEY` secret |
+| File                            | What to change                                       |
+| ------------------------------- | ---------------------------------------------------- |
+| `packages/db/src/schema.ts`     | Add `integrationCredentials` and `oauthState` tables |
+| `microservices/core/src/api.ts` | Mount integration handler                            |
+| `infra/api.ts`                  | Add encryption key + OAuth client env vars           |
+| `infra/secrets.ts`              | Add `CREDENTIAL_ENCRYPTION_KEY` secret               |
 
 ## Security Rules — Non-Negotiable
 

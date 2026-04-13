@@ -8,17 +8,17 @@ The current chat handler already proxies to `${gatewayUrl}/api/chat`. Your job i
 
 ## Key Files to Modify
 
-| File | What to change |
-|---|---|
-| `microservices/core/src/application/chat/chatHandler.ts` | Parse usage block, add X-Request-Id, sessionId, improve error mapping |
-| `microservices/core/src/application/provisioning/provisioningService.ts` | Add health check utility |
+| File                                                                     | What to change                                                        |
+| ------------------------------------------------------------------------ | --------------------------------------------------------------------- |
+| `microservices/core/src/application/chat/chatHandler.ts`                 | Parse usage block, add X-Request-Id, sessionId, improve error mapping |
+| `microservices/core/src/application/provisioning/provisioningService.ts` | Add health check utility                                              |
 
 ## Key Files to Create
 
-| File | Purpose |
-|---|---|
+| File                                                          | Purpose                                                                 |
+| ------------------------------------------------------------- | ----------------------------------------------------------------------- |
 | `microservices/core/src/application/gateway/gatewayClient.ts` | Shared gateway HTTP client with timeout, error handling, URL validation |
-| `microservices/core/src/application/gateway/gatewayTypes.ts` | TypeScript types for gateway request/response shapes |
+| `microservices/core/src/application/gateway/gatewayTypes.ts`  | TypeScript types for gateway request/response shapes                    |
 
 ## Critical Rule: Usage Block
 
@@ -34,6 +34,7 @@ type GatewayUsage = {
 ```
 
 Your code must:
+
 1. Parse this from every chat response
 2. Pass it to `usageRepository.recordUsage()` (from token-management spec)
 3. If missing: log a warning, still return the message to the user
@@ -54,13 +55,13 @@ export async function callGateway<T>(
     body?: unknown;
     headers?: Record<string, string>;
     timeoutMs: number;
-  }
+  },
 ): Promise<GatewayResponse<T>> {
   validateGatewayUrl(gatewayUrl); // existing validation
-  
+
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), options.timeoutMs);
-  
+
   try {
     const response = await fetch(`${gatewayUrl}${path}`, {
       method: options.method,
@@ -85,7 +86,7 @@ export async function callGateway<T>(
 export async function triggerConfigReload(
   gatewayUrl: string,
   reason: string,
-  files: string[]
+  files: string[],
 ): Promise<void> {
   try {
     await callGateway(gatewayUrl, "/api/reload", {

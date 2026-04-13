@@ -6,17 +6,17 @@ The Settings page is the account management hub. Currently hardcoded with placeh
 
 ## Key Files to Modify
 
-| File | What to change |
-|---|---|
-| `packages/web/src/pages/Settings.tsx` | Full rewrite — fetch real data, wire all actions |
-| `microservices/core/src/application/users/userHandler.ts` | Add `PUT /users/me`, `DELETE /users/me` |
-| `microservices/core/src/application/subscriptions/subscriptionHandler.ts` | Add `POST /subscriptions/cancel` |
-| `microservices/core/src/application/stripe/stripeHandler.ts` | Add `POST /stripe/customer-portal` |
+| File                                                                      | What to change                                   |
+| ------------------------------------------------------------------------- | ------------------------------------------------ |
+| `packages/web/src/pages/Settings.tsx`                                     | Full rewrite — fetch real data, wire all actions |
+| `microservices/core/src/application/users/userHandler.ts`                 | Add `PUT /users/me`, `DELETE /users/me`          |
+| `microservices/core/src/application/subscriptions/subscriptionHandler.ts` | Add `POST /subscriptions/cancel`                 |
+| `microservices/core/src/application/stripe/stripeHandler.ts`              | Add `POST /stripe/customer-portal`               |
 
 ## Key Files to Create
 
-| File | Purpose |
-|---|---|
+| File                                             | Purpose           |
+| ------------------------------------------------ | ----------------- |
 | `packages/web/src/pages/settings/settingsApi.ts` | Eden client calls |
 
 ## Stripe Customer Portal

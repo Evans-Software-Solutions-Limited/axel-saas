@@ -6,18 +6,18 @@ Only the waitlist has rate limiting. Every authenticated endpoint is unprotected
 
 ## Key Files to Create
 
-| File | Purpose |
-|---|---|
+| File                                                           | Purpose                                |
+| -------------------------------------------------------------- | -------------------------------------- |
 | `microservices/core/src/application/middleware/rateLimiter.ts` | Sliding window rate limiter middleware |
 
 ## Key Files to Modify
 
-| File | What to change |
-|---|---|
-| `microservices/core/src/api.ts` | Add global IP rate limit as first middleware |
-| `microservices/core/src/application/chat/chatHandler.ts` | Add per-user rate limit |
-| `microservices/core/src/application/onboarding/onboardingHandler.ts` | Add per-user rate limit |
-| `microservices/core/src/application/subscriptions/subscriptionHandler.ts` | Add per-user rate limit on checkout |
+| File                                                                      | What to change                               |
+| ------------------------------------------------------------------------- | -------------------------------------------- |
+| `microservices/core/src/api.ts`                                           | Add global IP rate limit as first middleware |
+| `microservices/core/src/application/chat/chatHandler.ts`                  | Add per-user rate limit                      |
+| `microservices/core/src/application/onboarding/onboardingHandler.ts`      | Add per-user rate limit                      |
+| `microservices/core/src/application/subscriptions/subscriptionHandler.ts` | Add per-user rate limit on checkout          |
 
 ## Existing Rate Limiter
 
@@ -33,28 +33,32 @@ const windows = new Map<string, { count: number; resetAt: number }>();
 
 export function rateLimit(opts: {
   keyFn: (ctx: any) => string;
-  windowMs?: number;    // default 60_000
-  max?: number;         // default 60
+  windowMs?: number; // default 60_000
+  max?: number; // default 60
 }) {
   const { keyFn, windowMs = 60_000, max = 60 } = opts;
-  
+
   return function rateLimitMiddleware(ctx: any) {
     const key = keyFn(ctx);
     const now = Date.now();
     let win = windows.get(key);
-    
+
     if (!win || now > win.resetAt) {
       win = { count: 0, resetAt: now + windowMs };
       windows.set(key, win);
     }
-    
+
     win.count++;
-    
+
     // Set headers on every response
     ctx.set.headers["X-RateLimit-Limit"] = String(max);
-    ctx.set.headers["X-RateLimit-Remaining"] = String(Math.max(0, max - win.count));
-    ctx.set.headers["X-RateLimit-Reset"] = String(Math.ceil(win.resetAt / 1000));
-    
+    ctx.set.headers["X-RateLimit-Remaining"] = String(
+      Math.max(0, max - win.count),
+    );
+    ctx.set.headers["X-RateLimit-Reset"] = String(
+      Math.ceil(win.resetAt / 1000),
+    );
+
     if (win.count > max) {
       const retryAfter = Math.ceil((win.resetAt - now) / 1000);
       ctx.set.headers["Retry-After"] = String(retryAfter);

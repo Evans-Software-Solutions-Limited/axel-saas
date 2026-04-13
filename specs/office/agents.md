@@ -17,27 +17,52 @@ This keeps the backend simple and avoids duplicating data.
 
 ## Key Files to Modify
 
-| File | What to change |
-|---|---|
+| File                                | What to change                                  |
+| ----------------------------------- | ----------------------------------------------- |
 | `packages/web/src/pages/Office.tsx` | Replace hardcoded `agents` array with hook data |
-| `packages/web/src/pages/Tasks.tsx` | Share the same data hook |
+| `packages/web/src/pages/Tasks.tsx`  | Share the same data hook                        |
 
 ## Key Files to Create
 
-| File | Purpose |
-|---|---|
+| File                                      | Purpose                                                 |
+| ----------------------------------------- | ------------------------------------------------------- |
 | `packages/web/src/hooks/useAgentTasks.ts` | Shared hook: fetch tasks, group by agent, compute stats |
-| `packages/web/src/lib/agentMetadata.ts` | Static agent metadata (name, role, sprite, colour) |
+| `packages/web/src/lib/agentMetadata.ts`   | Static agent metadata (name, role, sprite, colour)      |
 
 ## Agent Metadata (Static)
 
 ```typescript
 export const AGENT_METADATA: Record<string, AgentMeta> = {
-  axel:   { name: "Axel",   role: "Chief Task Handler",  spriteImage: "/sprites/sprite-axel.png",   avatarColour: "bg-blue-600" },
-  scribe: { name: "Scribe", role: "Document Writer",     spriteImage: "/sprites/sprite-scribe.png", avatarColour: "bg-emerald-600" },
-  relay:  { name: "Relay",  role: "Comms Manager",       spriteImage: "/sprites/sprite-relay.png",  avatarColour: "bg-violet-600" },
-  keeper: { name: "Keeper", role: "Knowledge Manager",   spriteImage: "/sprites/sprite-keeper.png", avatarColour: "bg-amber-600" },
-  ops:    { name: "Ops",    role: "Automation Runner",    spriteImage: "/sprites/sprite-ops.png",    avatarColour: "bg-rose-600" },
+  axel: {
+    name: "Axel",
+    role: "Chief Task Handler",
+    spriteImage: "/sprites/sprite-axel.png",
+    avatarColour: "bg-blue-600",
+  },
+  scribe: {
+    name: "Scribe",
+    role: "Document Writer",
+    spriteImage: "/sprites/sprite-scribe.png",
+    avatarColour: "bg-emerald-600",
+  },
+  relay: {
+    name: "Relay",
+    role: "Comms Manager",
+    spriteImage: "/sprites/sprite-relay.png",
+    avatarColour: "bg-violet-600",
+  },
+  keeper: {
+    name: "Keeper",
+    role: "Knowledge Manager",
+    spriteImage: "/sprites/sprite-keeper.png",
+    avatarColour: "bg-amber-600",
+  },
+  ops: {
+    name: "Ops",
+    role: "Automation Runner",
+    spriteImage: "/sprites/sprite-ops.png",
+    avatarColour: "bg-rose-600",
+  },
 };
 ```
 
@@ -45,15 +70,15 @@ export const AGENT_METADATA: Record<string, AgentMeta> = {
 
 ```typescript
 function deriveStatus(tasks: Task[]): AgentStatus {
-  const inProgress = tasks.find(t => t.state === "running");
+  const inProgress = tasks.find((t) => t.state === "running");
   if (inProgress) return "busy";
-  
-  const recent = tasks.find(t => {
+
+  const recent = tasks.find((t) => {
     const age = Date.now() - new Date(t.updatedAt).getTime();
     return age < 5 * 60 * 1000; // 5 minutes
   });
   if (recent) return "working";
-  
+
   return "idle";
 }
 ```

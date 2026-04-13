@@ -30,6 +30,7 @@ These endpoints run inside the user's container. The backend calls them.
 ### POST /api/chat — Send a message to the agent
 
 **Request:**
+
 ```json
 {
   "message": "Summarise my emails from today",
@@ -39,6 +40,7 @@ These endpoints run inside the user's container. The backend calls them.
 ```
 
 **Headers:**
+
 ```
 Content-Type: application/json
 Authorization: Bearer <user-jwt> (forwarded from original request)
@@ -46,6 +48,7 @@ X-Request-Id: <uuid> (for tracing)
 ```
 
 **Response (200):**
+
 ```json
 {
   "response": "Here's a summary of your 5 emails today...",
@@ -61,6 +64,7 @@ X-Request-Id: <uuid> (for tracing)
 ```
 
 **Response (429 — agent-side rate limit):**
+
 ```json
 {
   "error": "rate_limited",
@@ -70,6 +74,7 @@ X-Request-Id: <uuid> (for tracing)
 ```
 
 **Response (500 — agent error):**
+
 ```json
 {
   "error": "agent_error",
@@ -79,6 +84,7 @@ X-Request-Id: <uuid> (for tracing)
 ```
 
 **Key contract points:**
+
 - `usage` block is **mandatory** in every successful response — the backend needs it for token tracking
 - `model` tells us which model was actually used (may differ from config if OpenClaw routes internally)
 - `sessionId` enables conversation continuity across messages
@@ -86,6 +92,7 @@ X-Request-Id: <uuid> (for tracing)
 ### GET /api/health — Container health check
 
 **Response (200):**
+
 ```json
 {
   "status": "healthy",
@@ -96,6 +103,7 @@ X-Request-Id: <uuid> (for tracing)
 ```
 
 **Response (503):**
+
 ```json
 {
   "status": "unhealthy",
@@ -111,6 +119,7 @@ X-Request-Id: <uuid> (for tracing)
 Called when integrations, BYOM keys, or schedules change. Tells the container to re-read workspace files.
 
 **Request:**
+
 ```json
 {
   "reason": "integration_added",
@@ -119,6 +128,7 @@ Called when integrations, BYOM keys, or schedules change. Tells the container to
 ```
 
 **Response (200):**
+
 ```json
 {
   "status": "reloaded",
@@ -127,6 +137,7 @@ Called when integrations, BYOM keys, or schedules change. Tells the container to
 ```
 
 **Response (409 — agent busy):**
+
 ```json
 {
   "status": "deferred",
@@ -135,6 +146,7 @@ Called when integrations, BYOM keys, or schedules change. Tells the container to
 ```
 
 **Key contract points:**
+
 - Reload is **best-effort**. If the container is busy, it queues the reload.
 - The `files` array tells the container which files changed (optimisation — it can skip re-reading unchanged files).
 - If the container doesn't support `/api/reload`, the fallback is that OpenClaw reads workspace files on each new session/heartbeat (slower but functional).
@@ -142,6 +154,7 @@ Called when integrations, BYOM keys, or schedules change. Tells the container to
 ### GET /api/usage — Query current token usage
 
 **Response (200):**
+
 ```json
 {
   "today": {
@@ -168,6 +181,7 @@ These endpoints run in the Axel SaaS backend. The container calls them.
 **Already exists.** Container calls this when ready to serve traffic.
 
 **Request:**
+
 ```json
 {
   "userId": "uuid",
@@ -176,12 +190,14 @@ These endpoints run in the Axel SaaS backend. The container calls them.
 ```
 
 **Headers:**
+
 ```
 Content-Type: application/json
 X-Provisioning-Secret: <shared-secret>
 ```
 
 **Response (200):**
+
 ```json
 {
   "status": "registered"
@@ -193,6 +209,7 @@ X-Provisioning-Secret: <shared-secret>
 If OpenClaw supports pushing usage data (rather than us pulling from each `/api/chat` response), the container can POST usage batches to us.
 
 **Request:**
+
 ```json
 {
   "userId": "uuid",
@@ -210,12 +227,14 @@ If OpenClaw supports pushing usage data (rather than us pulling from each `/api/
 ```
 
 **Headers:**
+
 ```
 Content-Type: application/json
 X-Provisioning-Secret: <shared-secret>
 ```
 
 **Response (200):**
+
 ```json
 {
   "status": "recorded",
@@ -227,36 +246,37 @@ X-Provisioning-Secret: <shared-secret>
 
 ## Authentication Between Services
 
-| Direction | Auth Mechanism |
-|---|---|
-| Backend → Container | Forward user's Bearer JWT + X-Request-Id for tracing |
-| Container → Backend (register) | X-Provisioning-Secret shared secret |
-| Container → Backend (usage report) | X-Provisioning-Secret shared secret |
+| Direction                          | Auth Mechanism                                       |
+| ---------------------------------- | ---------------------------------------------------- |
+| Backend → Container                | Forward user's Bearer JWT + X-Request-Id for tracing |
+| Container → Backend (register)     | X-Provisioning-Secret shared secret                  |
+| Container → Backend (usage report) | X-Provisioning-Secret shared secret                  |
 
 **Security rules:**
+
 - Gateway URLs validated: HTTPS-only in production, no private IPs
 - Shared secret rotatable via SST secret
 - User JWT forwarded but NOT verified by the container (the backend already verified it)
 
 ## Error Handling & Resilience
 
-| Scenario | Backend Behaviour |
-|---|---|
-| Container unreachable (network) | Return 503 to user, retry once after 1s |
-| Container returns 500 | Return 502 to user, log error, mark task as failed |
-| Container returns 429 | Return 429 to user with retry-after |
-| Container returns unexpected format | Return 502, log malformed response for debugging |
-| Usage block missing from chat response | Log warning, still return message to user, skip usage recording |
-| Reload fails | Log warning, no user-facing error (config catches up on next heartbeat) |
+| Scenario                               | Backend Behaviour                                                       |
+| -------------------------------------- | ----------------------------------------------------------------------- |
+| Container unreachable (network)        | Return 503 to user, retry once after 1s                                 |
+| Container returns 500                  | Return 502 to user, log error, mark task as failed                      |
+| Container returns 429                  | Return 429 to user with retry-after                                     |
+| Container returns unexpected format    | Return 502, log malformed response for debugging                        |
+| Usage block missing from chat response | Log warning, still return message to user, skip usage recording         |
+| Reload fails                           | Log warning, no user-facing error (config catches up on next heartbeat) |
 
 ## Timeout Policy
 
-| Endpoint | Timeout | Rationale |
-|---|---|---|
-| POST /api/chat | 60s | Agent may do multi-step reasoning |
-| GET /api/health | 5s | Should be instant |
-| POST /api/reload | 10s | File re-read, not heavy |
-| GET /api/usage | 5s | Simple aggregation |
+| Endpoint         | Timeout | Rationale                         |
+| ---------------- | ------- | --------------------------------- |
+| POST /api/chat   | 60s     | Agent may do multi-step reasoning |
+| GET /api/health  | 5s      | Should be instant                 |
+| POST /api/reload | 10s     | File re-read, not heavy           |
+| GET /api/usage   | 5s      | Simple aggregation                |
 
 ## Versioning
 

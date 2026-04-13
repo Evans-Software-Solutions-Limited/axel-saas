@@ -6,14 +6,14 @@ The Tasks page shows a filterable table of everything the user's agents have wor
 
 ## Key Files to Modify
 
-| File | What to change |
-|---|---|
+| File                               | What to change                                                            |
+| ---------------------------------- | ------------------------------------------------------------------------- |
 | `packages/web/src/pages/Tasks.tsx` | Replace SAMPLE_TASKS with API data, update columns, add expandable detail |
 
 ## Key Files to Create
 
-| File | Purpose |
-|---|---|
+| File                                       | Purpose                              |
+| ------------------------------------------ | ------------------------------------ |
 | `packages/web/src/pages/tasks/tasksApi.ts` | Eden client calls for task endpoints |
 
 ## Shared Dependencies
