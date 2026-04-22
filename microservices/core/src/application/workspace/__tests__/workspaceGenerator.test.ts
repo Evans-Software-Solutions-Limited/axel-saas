@@ -27,7 +27,7 @@ describe("workspaceGenerator", () => {
 
   describe("generateSoulContent", () => {
     it("should generate SOUL.md with user name and preferences", () => {
-      const soul = generateSoulContent(sampleAnswers, "starter");
+      const soul = generateSoulContent(sampleAnswers, "free");
 
       expect(soul).toContain("I'm Axel");
       expect(soul).toContain("Bradley");
@@ -36,42 +36,36 @@ describe("workspaceGenerator", () => {
       expect(soul).toContain("Watch Bradley's back on:");
     });
 
-    it("should include tier-specific rules for starter tier", () => {
-      const soul = generateSoulContent(sampleAnswers, "starter");
+    it("should include tier-specific rules for the free tier", () => {
+      const soul = generateSoulContent(sampleAnswers, "free");
 
-      expect(soul).toContain("Starter Tier Rules");
+      expect(soul).toContain("Free Tier Rules");
       expect(soul).toContain("Focus on text-based assistance");
     });
 
-    it("should include tier-specific rules for pro tier", () => {
-      const soul = generateSoulContent(sampleAnswers, "pro");
+    it("should include tier-specific rules for the premium tier", () => {
+      const soul = generateSoulContent(sampleAnswers, "premium");
 
-      expect(soul).toContain("Pro Tier Rules");
+      expect(soul).toContain("Premium Tier Rules");
       expect(soul).toContain("Full integration access");
     });
 
-    it("should include tier-specific rules for business tier", () => {
-      const soul = generateSoulContent(sampleAnswers, "business");
+    it("should include tier-specific rules for the enterprise tier", () => {
+      const soul = generateSoulContent(sampleAnswers, "enterprise");
 
-      expect(soul).toContain("Business Tier Rules");
-    });
-
-    it("should include tier-specific rules for developer tier", () => {
-      const soul = generateSoulContent(sampleAnswers, "developer");
-
-      expect(soul).toContain("Developer Tier Rules");
-      expect(soul).toContain("execute shell commands");
+      expect(soul).toContain("Enterprise Tier Rules");
+      expect(soul).toContain("SSO");
     });
 
     it("should handle missing answers gracefully", () => {
-      const soul = generateSoulContent({}, "starter");
+      const soul = generateSoulContent({}, "free");
 
       expect(soul).toContain("I'm Axel");
       expect(soul).toContain("the user");
     });
 
     it("should map formal tone preference correctly", () => {
-      const soul = generateSoulContent({ tonePreference: "formal" }, "starter");
+      const soul = generateSoulContent({ tonePreference: "formal" }, "free");
 
       expect(soul).toContain("professional, structured, concise");
     });
@@ -79,7 +73,7 @@ describe("workspaceGenerator", () => {
     it("should handle tone preference with 'direct' keyword", () => {
       const soul = generateSoulContent(
         { tonePreference: "very direct" },
-        "starter",
+        "free",
       );
 
       expect(soul).toContain("casual, direct");
@@ -137,32 +131,25 @@ describe("workspaceGenerator", () => {
   });
 
   describe("generateAgentsContent", () => {
-    it("should generate AGENTS.md for starter tier", () => {
-      const agents = generateAgentsContent("starter");
+    it("should generate AGENTS.md for the free tier", () => {
+      const agents = generateAgentsContent("free");
 
-      expect(agents).toContain("Tier: Starter");
-      expect(agents).toContain("Text-based assistance only");
+      expect(agents).toContain("Tier: Free");
+      expect(agents).toContain("daily usage caps");
     });
 
-    it("should generate AGENTS.md for pro tier", () => {
-      const agents = generateAgentsContent("pro");
+    it("should generate AGENTS.md for the premium tier", () => {
+      const agents = generateAgentsContent("premium");
 
-      expect(agents).toContain("Tier: Pro");
+      expect(agents).toContain("Tier: Premium");
       expect(agents).toContain("Full integration access");
     });
 
-    it("should generate AGENTS.md for developer tier", () => {
-      const agents = generateAgentsContent("developer");
+    it("should generate AGENTS.md for the enterprise tier", () => {
+      const agents = generateAgentsContent("enterprise");
 
-      expect(agents).toContain("Tier: Developer");
-      expect(agents).toContain("Developer mode enabled");
-    });
-
-    it("should generate AGENTS.md for business tier", () => {
-      const agents = generateAgentsContent("business");
-
-      expect(agents).toContain("Tier: Business");
-      expect(agents).toContain("Full business features");
+      expect(agents).toContain("Tier: Enterprise");
+      expect(agents).toContain("SSO");
     });
 
     it("should handle unknown tier gracefully", () => {
@@ -209,7 +196,7 @@ describe("workspaceGenerator", () => {
 
   describe("generateWorkspaceFiles", () => {
     it("should generate all workspace files", () => {
-      const files = generateWorkspaceFiles(sampleAnswers, "starter");
+      const files = generateWorkspaceFiles(sampleAnswers, "free");
 
       expect(files.soul).toBeTruthy();
       expect(files.user).toBeTruthy();
@@ -220,10 +207,10 @@ describe("workspaceGenerator", () => {
     });
 
     it("should include tier in generated files", () => {
-      const files = generateWorkspaceFiles(sampleAnswers, "pro");
+      const files = generateWorkspaceFiles(sampleAnswers, "premium");
 
-      expect(files.soul).toContain("Pro Tier Rules");
-      expect(files.agents).toContain("Tier: Pro");
+      expect(files.soul).toContain("Premium Tier Rules");
+      expect(files.agents).toContain("Tier: Premium");
     });
   });
 });
@@ -232,7 +219,7 @@ describe("writeWorkspaceFiles", () => {
   it("should write all required files to disk", async () => {
     const tmpDir = await fs.mkdtemp(path.join(tmpdir(), "axel-ws-test-"));
     try {
-      const files = generateWorkspaceFiles(sampleAnswers, "starter");
+      const files = generateWorkspaceFiles(sampleAnswers, "free");
       await writeWorkspaceFiles(tmpDir, files);
 
       const [soul, user, memory, agents, tools] = await Promise.all([
@@ -246,7 +233,7 @@ describe("writeWorkspaceFiles", () => {
       expect(soul).toContain("I'm Axel");
       expect(user).toContain("Bradley");
       expect(memory).toContain("Facts Learned from Onboarding");
-      expect(agents).toContain("Tier: Starter");
+      expect(agents).toContain("Tier: Free");
       expect(tools).toContain("No integrations configured yet");
     } finally {
       await fs.rm(tmpDir, { recursive: true });
@@ -256,7 +243,7 @@ describe("writeWorkspaceFiles", () => {
   it("should write HEARTBEAT.md when briefing is requested", async () => {
     const tmpDir = await fs.mkdtemp(path.join(tmpdir(), "axel-ws-test-"));
     try {
-      const files = generateWorkspaceFiles(sampleAnswers, "starter");
+      const files = generateWorkspaceFiles(sampleAnswers, "free");
       expect(files.heartbeat).not.toBeNull();
       await writeWorkspaceFiles(tmpDir, files);
 
@@ -273,7 +260,7 @@ describe("writeWorkspaceFiles", () => {
   it("should not create HEARTBEAT.md when briefing was not requested", async () => {
     const tmpDir = await fs.mkdtemp(path.join(tmpdir(), "axel-ws-test-"));
     try {
-      const files = generateWorkspaceFiles({ name: "Jane" }, "starter");
+      const files = generateWorkspaceFiles({ name: "Jane" }, "free");
       expect(files.heartbeat).toBeNull();
       await writeWorkspaceFiles(tmpDir, files);
 
@@ -291,7 +278,7 @@ describe("writeWorkspaceFiles", () => {
     const tmpDir = await fs.mkdtemp(path.join(tmpdir(), "axel-ws-test-"));
     const nestedPath = path.join(tmpDir, "user-abc", "workspace");
     try {
-      const files = generateWorkspaceFiles({}, "starter");
+      const files = generateWorkspaceFiles({}, "free");
       await writeWorkspaceFiles(nestedPath, files);
 
       const soul = await fs.readFile(path.join(nestedPath, "SOUL.md"), "utf-8");

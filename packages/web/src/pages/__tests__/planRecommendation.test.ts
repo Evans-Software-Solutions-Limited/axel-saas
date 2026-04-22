@@ -30,139 +30,79 @@ describe("getRecommendedPlan", () => {
     ).toBeNull();
   });
 
-  it("returns null when user messages contain no recognisable keywords", () => {
+  it("returns null when user messages contain no Premium keywords", () => {
     const result = getRecommendedPlan({
       messages: [{ role: "user", content: "Hi, my name is Alex" }],
     });
     expect(result).toBeNull();
   });
 
-  it("does not recommend developer when user mentions executive (exec false positive)", () => {
-    const result = getRecommendedPlan({
-      messages: [
-        {
-          role: "user",
-          content: "I am an executive at a large company",
-        },
-      ],
-    });
-    // "executive" contains "exec" as a substring — must not trigger developer tier
-    expect(result?.tierId).not.toBe("developer");
-  });
-
-  it("still recommends developer when user explicitly says exec", () => {
-    const result = getRecommendedPlan({
-      messages: [{ role: "user", content: "I want exec access to scripts" }],
-    });
-    expect(result?.tierId).toBe("developer");
-  });
-
-  it("recommends developer when user mentions api", () => {
+  it("recommends Premium when the user mentions api", () => {
     const result = getRecommendedPlan({
       messages: [{ role: "user", content: "I need api access and scripting" }],
     });
-    expect(result?.tierId).toBe("developer");
+    expect(result?.tierId).toBe("premium");
   });
 
-  it("recommends developer when user mentions code or programming", () => {
+  it("recommends Premium when the user mentions code or programming", () => {
     const result = getRecommendedPlan({
       messages: [
         { role: "user", content: "I do a lot of coding and programming" },
       ],
     });
-    expect(result?.tierId).toBe("developer");
+    expect(result?.tierId).toBe("premium");
   });
 
-  it("recommends business when user mentions team", () => {
-    const result = getRecommendedPlan({
-      messages: [{ role: "user", content: "I manage a team of 10 people" }],
-    });
-    expect(result?.tierId).toBe("business");
-  });
-
-  it("recommends business when user mentions company or organisation", () => {
-    const result = getRecommendedPlan({
-      messages: [{ role: "user", content: "I run a small organisation" }],
-    });
-    expect(result?.tierId).toBe("business");
-  });
-
-  it("recommends pro when user mentions calendar", () => {
+  it("recommends Premium when the user mentions calendar", () => {
     const result = getRecommendedPlan({
       messages: [
         { role: "user", content: "I need help with calendar management" },
       ],
     });
-    expect(result?.tierId).toBe("pro");
+    expect(result?.tierId).toBe("premium");
   });
 
-  it("recommends pro when user mentions email", () => {
+  it("recommends Premium when the user mentions email", () => {
     const result = getRecommendedPlan({
       messages: [{ role: "user", content: "I want to automate my email" }],
     });
-    expect(result?.tierId).toBe("pro");
+    expect(result?.tierId).toBe("premium");
   });
 
-  it("recommends starter when user mentions telegram", () => {
+  it("recommends Premium when the user mentions integrations", () => {
     const result = getRecommendedPlan({
-      messages: [{ role: "user", content: "I use telegram mainly" }],
+      messages: [{ role: "user", content: "I need integrations with Slack" }],
     });
-    expect(result?.tierId).toBe("starter");
+    expect(result?.tierId).toBe("premium");
   });
 
-  it("recommends starter when user mentions daily brief", () => {
+  it("recommends Premium when the user mentions a team", () => {
     const result = getRecommendedPlan({
-      messages: [{ role: "user", content: "I just want a daily brief" }],
+      messages: [{ role: "user", content: "I manage a team of 10 people" }],
     });
-    expect(result?.tierId).toBe("starter");
+    expect(result?.tierId).toBe("premium");
   });
 
-  it("does not recommend developer for 'build a team' — build is too generic", () => {
-    const result = getRecommendedPlan({
-      messages: [{ role: "user", content: "I want to build a team" }],
-    });
-    expect(result?.tierId).not.toBe("developer");
-    expect(result?.tierId).toBe("business");
-  });
-
-  it("does not recommend developer for 'build my email workflow'", () => {
-    const result = getRecommendedPlan({
-      messages: [
-        { role: "user", content: "I want to build my email workflow" },
-      ],
-    });
-    expect(result?.tierId).not.toBe("developer");
-    expect(result?.tierId).toBe("pro");
-  });
-
-  it("recommends business when user mentions teams (plural)", () => {
-    const result = getRecommendedPlan({
-      messages: [{ role: "user", content: "I manage multiple teams" }],
-    });
-    expect(result?.tierId).toBe("business");
-  });
-
-  it("recommends pro when user mentions emails (plural)", () => {
+  it("recommends Premium when the user mentions emails (plural)", () => {
     const result = getRecommendedPlan({
       messages: [{ role: "user", content: "automate my emails" }],
     });
-    expect(result?.tierId).toBe("pro");
+    expect(result?.tierId).toBe("premium");
   });
 
-  it("recommends pro when user mentions meetings (plural)", () => {
+  it("recommends Premium when the user mentions meetings (plural)", () => {
     const result = getRecommendedPlan({
       messages: [{ role: "user", content: "I have a lot of meetings" }],
     });
-    expect(result?.tierId).toBe("pro");
+    expect(result?.tierId).toBe("premium");
   });
 
-  it("developer takes priority over pro when both keywords are present", () => {
+  it("does not match 'developer' inside another word (boundary check)", () => {
+    // "redeveloper" contains "developer" as a substring but must not match
     const result = getRecommendedPlan({
-      messages: [
-        { role: "user", content: "I need api access and email automation" },
-      ],
+      messages: [{ role: "user", content: "I am a redeveloperish" }],
     });
-    expect(result?.tierId).toBe("developer");
+    expect(result).toBeNull();
   });
 
   it("returned recommendation has a non-empty reason", () => {
@@ -179,7 +119,7 @@ describe("getRecommendedPlan", () => {
     expect(result?.shortReason.length).toBeGreaterThan(0);
   });
 
-  it("returned tierId matches a known paid plan", () => {
+  it("returned tierId matches a known plan", () => {
     const result = getRecommendedPlan({
       messages: [{ role: "user", content: "I need calendar and email" }],
     });
@@ -200,9 +140,28 @@ describe("getRecommendedPlan", () => {
 });
 
 describe("PLANS", () => {
-  it("contains at least 4 paid tiers", () => {
-    const paid = PLANS.filter((p) => p.tierId !== null);
-    expect(paid.length).toBeGreaterThanOrEqual(4);
+  it("contains exactly Free, Premium and Enterprise", () => {
+    const names = PLANS.map((p) => p.name);
+    expect(names).toEqual(["Free", "Premium", "Enterprise"]);
+  });
+
+  it("Free plan has tierId 'free'", () => {
+    const free = PLANS.find((p) => p.name === "Free");
+    expect(free?.tierId).toBe("free");
+    expect(free?.price).toBe("£0");
+  });
+
+  it("Premium plan has tierId 'premium' at £49", () => {
+    const premium = PLANS.find((p) => p.name === "Premium");
+    expect(premium?.tierId).toBe("premium");
+    expect(premium?.price).toBe("£49");
+    expect(premium?.period).toBe("/month");
+  });
+
+  it("Enterprise plan has null tierId (not self-serve)", () => {
+    const enterprise = PLANS.find((p) => p.name === "Enterprise");
+    expect(enterprise?.tierId).toBeNull();
+    expect(enterprise?.price).toBe("Contact us");
   });
 
   it("each plan has a non-empty description and tagline", () => {

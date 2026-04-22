@@ -9,54 +9,53 @@ import { getDb } from "@axel-saas/db";
 import { SubscriptionRepository } from "../repositories/subscriptionRepository";
 import { UserRepository } from "../repositories/userRepository";
 
-const tiers = [
+export const TIERS = [
   {
-    id: "starter",
-    name: "Starter",
-    priceGbpMonthly: 19,
-    features: ["Daily brief", "Telegram", "Basic tasks", "Email triage"],
+    id: "free",
+    name: "Free",
+    priceGbpMonthly: 0,
+    selfServe: true,
+    features: [
+      "Core Axel experience",
+      "Daily usage caps",
+      "7-day Premium trial",
+    ],
   },
   {
-    id: "pro",
-    name: "Pro",
+    id: "premium",
+    name: "Premium",
     priceGbpMonthly: 49,
+    selfServe: true,
     features: [
-      "Everything in Starter",
-      "Calendar",
-      "Email send/receive",
-      "Integrations",
-      "Sub-agents",
+      "Everything in Free, without the caps",
+      "Bring your own model (BYOM)",
+      "Deeper integrations",
+      "Higher volume",
+      "Cancel any time",
     ],
   },
   {
-    id: "business",
-    name: "Business",
-    priceGbpMonthly: 99,
+    id: "enterprise",
+    name: "Enterprise",
+    priceGbpMonthly: null,
+    selfServe: false,
     features: [
-      "Everything in Pro",
-      "Custom channels",
-      "Multiple agents",
-      "Priority support",
+      "SSO and audit logs",
+      "SLA options",
+      "Custom retention",
+      "Dedicated support",
     ],
   },
-  {
-    id: "developer",
-    name: "Developer",
-    priceGbpMonthly: 149,
-    features: [
-      "Everything in Business",
-      "Full exec access",
-      "Code generation",
-      "API access",
-      "Heavy sub-agent use",
-    ],
-  },
-];
+] as const;
+
+/** Tier IDs that can be checked out via self-serve Stripe checkout. */
+const CHECKOUT_TIERS = ["premium"] as const;
+type CheckoutTier = (typeof CHECKOUT_TIERS)[number];
 
 // Public — no auth required
 export const subscriptionPublicHandler = new Elysia({
   name: "SubscriptionPublicHandler",
-}).get("/subscriptions/tiers", () => tiers, {
+}).get("/subscriptions/tiers", () => TIERS, {
   detail: {
     description: "Get subscription tier definitions",
     tags: ["Subscriptions"],
@@ -115,7 +114,7 @@ export const subscriptionHandler = new Elysia({
       const { sub: supabaseUserId } = getUser(ctx);
 
       const { tierId } = body;
-      if (!["starter", "pro", "business", "developer"].includes(tierId)) {
+      if (!(CHECKOUT_TIERS as readonly string[]).includes(tierId)) {
         set.status = 400;
         return { success: false, error: "Invalid tier" };
       }
@@ -126,14 +125,11 @@ export const subscriptionHandler = new Elysia({
         return { success: false, error: "Stripe not configured" };
       }
 
-      const priceMap: Record<string, string> = {
-        starter: process.env.STRIPE_PRICE_STARTER || "",
-        pro: process.env.STRIPE_PRICE_PRO || "",
-        business: process.env.STRIPE_PRICE_BUSINESS || "",
-        developer: process.env.STRIPE_PRICE_DEVELOPER || "",
+      const priceMap: Record<CheckoutTier, string> = {
+        premium: process.env.STRIPE_PRICE_PREMIUM || "",
       };
 
-      const priceId = priceMap[tierId];
+      const priceId = priceMap[tierId as CheckoutTier];
       if (!priceId) {
         set.status = 500;
         return { success: false, error: "Price not configured for tier" };

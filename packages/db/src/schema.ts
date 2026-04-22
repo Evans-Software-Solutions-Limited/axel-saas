@@ -14,10 +14,9 @@ import {
 // ─── Enums ────────────────────────────────────────────────────────────────────
 
 export const subscriptionTierEnum = pgEnum("subscription_tier", [
-  "starter",
-  "pro",
-  "business",
-  "developer",
+  "free",
+  "premium",
+  "enterprise",
 ]);
 
 export const subscriptionStatusEnum = pgEnum("subscription_status", [

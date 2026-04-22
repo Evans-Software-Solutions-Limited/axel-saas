@@ -35,7 +35,7 @@ const PROV = {
 
 const PARAMS = {
   userId: "user-id-1",
-  tier: "pro",
+  tier: "premium",
   workspacePath: "/tmp/workspace/user-id-1/workspace",
 };
 

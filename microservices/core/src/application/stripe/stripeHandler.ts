@@ -61,19 +61,12 @@ export const stripeHandler = new Elysia({ name: "StripeHandler" })
     }
 
     const { tier } = body as { tier: string };
-    if (!["starter", "pro", "business", "developer"].includes(tier)) {
+    if (tier !== "premium") {
       set.status = 400;
       return { error: "Invalid tier" };
     }
 
-    const priceMap: Record<string, string> = {
-      starter: process.env.STRIPE_PRICE_STARTER || "",
-      pro: process.env.STRIPE_PRICE_PRO || "",
-      business: process.env.STRIPE_PRICE_BUSINESS || "",
-      developer: process.env.STRIPE_PRICE_DEVELOPER || "",
-    };
-
-    const priceId = priceMap[tier];
+    const priceId = process.env.STRIPE_PRICE_PREMIUM || "";
     if (!priceId) {
       set.status = 500;
       return { error: "Price not configured for tier" };
@@ -161,7 +154,7 @@ export const stripeHandler = new Elysia({ name: "StripeHandler" })
           userId: metadata.userId,
           stripeCustomerId: session.customer as string,
           stripeSubscriptionId: session.subscription as string,
-          tier: metadata.tier as "starter" | "pro" | "business" | "developer",
+          tier: metadata.tier as "free" | "premium" | "enterprise",
           status: "active",
           currentPeriodEnd: session.expires_at
             ? new Date(session.expires_at * 1000)
@@ -206,11 +199,7 @@ export const stripeHandler = new Elysia({ name: "StripeHandler" })
           if (itemPrice?.metadata?.tier) {
             await subRepo.updateTier(
               sub.id,
-              itemPrice.metadata.tier as
-                | "starter"
-                | "pro"
-                | "business"
-                | "developer",
+              itemPrice.metadata.tier as "free" | "premium" | "enterprise",
             );
           }
 

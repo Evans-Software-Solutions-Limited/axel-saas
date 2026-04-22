@@ -46,7 +46,7 @@ const mockSubscriptionRow = {
   userId: "user-uuid-1",
   stripeCustomerId: "cus_123",
   stripeSubscriptionId: "sub_stripe_123",
-  tier: "pro" as const,
+  tier: "premium" as const,
   status: "active" as const,
   currentPeriodEnd: new Date("2025-06-01"),
   createdAt: NOW,
@@ -107,7 +107,7 @@ describe("SubscriptionRepository", () => {
       await repo.upsertByStripeCustomerId({
         userId: "user-uuid-1",
         stripeCustomerId: "cus_123",
-        tier: "pro",
+        tier: "premium",
         status: "active",
       });
 
@@ -118,7 +118,7 @@ describe("SubscriptionRepository", () => {
       await repo.upsertByStripeCustomerId({
         userId: "user-uuid-1",
         stripeCustomerId: "cus_123",
-        tier: "business",
+        tier: "free",
         status: "active",
       });
 
@@ -135,7 +135,7 @@ describe("SubscriptionRepository", () => {
 
   describe("updateTier", () => {
     it("updates subscription tier", async () => {
-      await repo.updateTier("sub-uuid-1", "business");
+      await repo.updateTier("sub-uuid-1", "enterprise");
       expect(mockDb.update).toHaveBeenCalledOnce();
     });
   });

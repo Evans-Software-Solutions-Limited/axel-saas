@@ -61,7 +61,7 @@ const mockActiveSubscription = {
   userId: "db-user-123",
   stripeCustomerId: "cus_test",
   stripeSubscriptionId: "sub_test",
-  tier: "pro" as const,
+  tier: "premium" as const,
   status: "active" as const,
   currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
   createdAt: new Date(),

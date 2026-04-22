@@ -4,9 +4,9 @@ import { DiscoveryPanel } from "../chat/DiscoveryPanel";
 import type { Recommendation } from "../planRecommendation";
 
 const recommendation: Recommendation = {
-  tierId: "pro",
+  tierId: "premium",
   reason:
-    "Covers calendar, email, and task automation — the features most users need from day one.",
+    "Covers calendar, email, and integrations — the features most users need from day one.",
   shortReason: "Best starting point",
 };
 
@@ -25,7 +25,7 @@ describe("DiscoveryPanel", () => {
     ).toBeDefined();
   });
 
-  it("renders all plan tiers", () => {
+  it("renders all three plan tiers", () => {
     render(
       <DiscoveryPanel
         recommendation={recommendation}
@@ -34,10 +34,8 @@ describe("DiscoveryPanel", () => {
         error={null}
       />,
     );
-    expect(screen.getByText("Starter")).toBeDefined();
-    expect(screen.getByText("Pro")).toBeDefined();
-    expect(screen.getByText("Business")).toBeDefined();
-    expect(screen.getByText("Developer")).toBeDefined();
+    expect(screen.getByText("Free")).toBeDefined();
+    expect(screen.getByText("Premium")).toBeDefined();
     expect(screen.getByText("Enterprise")).toBeDefined();
   });
 
@@ -63,11 +61,11 @@ describe("DiscoveryPanel", () => {
       />,
     );
     expect(
-      screen.getByText(/covers calendar, email, and task automation/i),
+      screen.getByText(/covers calendar, email, and integrations/i),
     ).toBeDefined();
   });
 
-  it("calls onSelectPlan with the tierId when Get started is clicked", async () => {
+  it("calls onSelectPlan with 'free' when the Free plan's Get started is clicked", async () => {
     const onSelectPlan = vi.fn();
     render(
       <DiscoveryPanel
@@ -78,10 +76,28 @@ describe("DiscoveryPanel", () => {
       />,
     );
     const buttons = screen.getAllByRole("button", { name: "Get started" });
-    // First button is Starter (index 0)
+    // Free is the first self-serve plan (index 0)
     fireEvent.click(buttons[0]);
     await waitFor(() => {
-      expect(onSelectPlan).toHaveBeenCalledWith("starter");
+      expect(onSelectPlan).toHaveBeenCalledWith("free");
+    });
+  });
+
+  it("calls onSelectPlan with 'premium' when the Premium plan's Get started is clicked", async () => {
+    const onSelectPlan = vi.fn();
+    render(
+      <DiscoveryPanel
+        recommendation={recommendation}
+        onSelectPlan={onSelectPlan}
+        loadingTier={null}
+        error={null}
+      />,
+    );
+    const buttons = screen.getAllByRole("button", { name: "Get started" });
+    // Premium is the second self-serve plan (index 1)
+    fireEvent.click(buttons[1]);
+    await waitFor(() => {
+      expect(onSelectPlan).toHaveBeenCalledWith("premium");
     });
   });
 
@@ -90,7 +106,7 @@ describe("DiscoveryPanel", () => {
       <DiscoveryPanel
         recommendation={recommendation}
         onSelectPlan={vi.fn()}
-        loadingTier="pro"
+        loadingTier="premium"
         error={null}
       />,
     );
@@ -102,7 +118,7 @@ describe("DiscoveryPanel", () => {
       <DiscoveryPanel
         recommendation={recommendation}
         onSelectPlan={vi.fn()}
-        loadingTier="starter"
+        loadingTier="free"
         error={null}
       />,
     );
@@ -133,7 +149,6 @@ describe("DiscoveryPanel", () => {
         error={null}
       />,
     );
-    // Enterprise has tierId: null — its button must never say "Redirecting..."
     expect(screen.queryByText("Redirecting...")).toBeNull();
     expect(screen.getByRole("button", { name: "Contact sales" })).toBeDefined();
   });
@@ -149,8 +164,7 @@ describe("DiscoveryPanel", () => {
     );
     expect(screen.queryByText("Best starting point")).toBeNull();
     expect(screen.queryByText(/based on your needs/i)).toBeNull();
-    // Plans are still rendered
-    expect(screen.getByText("Pro")).toBeDefined();
+    expect(screen.getByText("Premium")).toBeDefined();
   });
 
   it("does not claim a suggestion in the intro when recommendation is null", () => {
@@ -163,7 +177,6 @@ describe("DiscoveryPanel", () => {
       />,
     );
     expect(screen.queryByText(/i've suggested one below/i)).toBeNull();
-    // Generic intro copy is still shown
     expect(
       screen.getByText(/pick a plan that fits how you work/i),
     ).toBeDefined();

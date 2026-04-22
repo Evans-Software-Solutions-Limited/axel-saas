@@ -94,34 +94,23 @@ export type RoutingPolicy = {
 /**
  * Canonical routing policy per subscription tier.
  *
- * Derived from the tier enforcement table in docs/nemoclaw-architecture-implications.md:
- *
- * | Tier      | Policy                                                              |
- * |-----------|---------------------------------------------------------------------|
- * | Starter   | Pre-approved tools only, no external HTTP, refuse PII               |
- * | Pro       | Extended tools, external HTTP with logging, log-only PII handling   |
- * | Business  | Custom tool allowlist, full audit log, PII anonymisation            |
- * | Developer | Policy-as-code: same caps as Business plus full API access          |
+ * | Tier       | Policy                                                              |
+ * |------------|---------------------------------------------------------------------|
+ * | Free       | Pre-approved tools only, no external HTTP, refuse PII               |
+ * | Premium    | External HTTP with logging, PII anonymisation, full audit           |
+ * | Enterprise | Same as Premium plus custom retention and dedicated controls       |
  */
 export const TIER_ROUTING_MATRIX: Record<SubscriptionTier, RoutingPolicy> = {
-  starter: {
-    tier: "starter",
+  free: {
+    tier: "free",
     externalCallsPermitted: false,
     piiHandling: "refuse",
     allowedDataClassifications: ["clean", "anonymized"],
     cloudModelFallback: false,
     auditLogging: false,
   },
-  pro: {
-    tier: "pro",
-    externalCallsPermitted: true,
-    piiHandling: "log-only",
-    allowedDataClassifications: ["clean", "pii-suspected", "anonymized"],
-    cloudModelFallback: true,
-    auditLogging: true,
-  },
-  business: {
-    tier: "business",
+  premium: {
+    tier: "premium",
     externalCallsPermitted: true,
     piiHandling: "anonymize",
     allowedDataClassifications: [
@@ -133,8 +122,8 @@ export const TIER_ROUTING_MATRIX: Record<SubscriptionTier, RoutingPolicy> = {
     cloudModelFallback: true,
     auditLogging: true,
   },
-  developer: {
-    tier: "developer",
+  enterprise: {
+    tier: "enterprise",
     externalCallsPermitted: true,
     piiHandling: "anonymize",
     allowedDataClassifications: [
