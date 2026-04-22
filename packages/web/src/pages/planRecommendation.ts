@@ -101,19 +101,18 @@ const PREMIUM_KEYWORDS = [
   "custom channel",
 ];
 
-const TIER_REASONS: Record<
-  "free" | "premium",
-  { reason: string; shortReason: string }
-> = {
-  premium: {
-    reason: "Based on your needs around deeper integrations and higher volume.",
-    shortReason: "Based on your needs",
-  },
-  free: {
-    reason: "A great starting point based on what you described.",
-    shortReason: "Based on your needs",
-  },
-};
+// Only Premium gets a recommendation — Free is the default entry point and
+// `getRecommendedPlan` returns `null` when no Premium keywords match, so the
+// Discovery panel simply shows no badge. Keep the record keyed on a single
+// literal so the dead Free entry can't drift back in.
+const TIER_REASONS: Record<"premium", { reason: string; shortReason: string }> =
+  {
+    premium: {
+      reason:
+        "Based on your needs around deeper integrations and higher volume.",
+      shortReason: "Based on your needs",
+    },
+  };
 
 /**
  * Returns true when `keyword` appears in `text` at a word boundary, preventing

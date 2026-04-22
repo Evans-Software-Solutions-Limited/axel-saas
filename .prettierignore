@@ -9,3 +9,5 @@ coverage
 CHANGELOG.md
 sst-env.d.ts
 **/sst-env.d.ts
+.claude/worktrees
+.claude/worktrees/**

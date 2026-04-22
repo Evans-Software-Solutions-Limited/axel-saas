@@ -13,6 +13,7 @@ import {
   triggerContainerLaunch,
   resolveWorkspacePath,
 } from "../provisioning/provisioningService";
+import { normaliseTier } from "./tierNormaliser";
 
 function getStripeInstance() {
   const secretKey = process.env.STRIPE_SECRET_KEY;
@@ -150,11 +151,18 @@ export const stripeHandler = new Elysia({ name: "StripeHandler" })
           throw new Error("Missing required metadata in checkout session");
         }
 
+        const checkoutTier = normaliseTier(metadata.tier);
+        if (!checkoutTier) {
+          throw new Error(
+            `Unrecognised tier '${metadata.tier}' in checkout session metadata`,
+          );
+        }
+
         await subRepo.upsertByStripeCustomerId({
           userId: metadata.userId,
           stripeCustomerId: session.customer as string,
           stripeSubscriptionId: session.subscription as string,
-          tier: metadata.tier as "free" | "premium" | "enterprise",
+          tier: checkoutTier,
           status: "active",
           currentPeriodEnd: session.expires_at
             ? new Date(session.expires_at * 1000)
@@ -178,7 +186,7 @@ export const stripeHandler = new Elysia({ name: "StripeHandler" })
         try {
           await triggerContainerLaunch(provRepo, {
             userId: metadata.userId,
-            tier: metadata.tier,
+            tier: checkoutTier,
             workspacePath,
           });
         } catch (err: unknown) {
@@ -194,13 +202,22 @@ export const stripeHandler = new Elysia({ name: "StripeHandler" })
         );
 
         if (sub) {
-          // Extract tier from metadata or price ID
+          // Extract tier from price metadata. Legacy prices may still carry
+          // old 4-tier values (starter/pro/business/developer) — map them
+          // via `normaliseTier` rather than casting blindly. An unrecognised
+          // tier is logged and skipped; the current DB value is left alone
+          // so the webhook still succeeds and Stripe doesn't retry-loop.
           const itemPrice = subscription.items.data[0]?.price;
-          if (itemPrice?.metadata?.tier) {
-            await subRepo.updateTier(
-              sub.id,
-              itemPrice.metadata.tier as "free" | "premium" | "enterprise",
-            );
+          const rawTier = itemPrice?.metadata?.tier;
+          if (rawTier) {
+            const nextTier = normaliseTier(rawTier);
+            if (nextTier) {
+              await subRepo.updateTier(sub.id, nextTier);
+            } else {
+              console.warn(
+                `[stripe] subscription.updated: ignoring unrecognised tier '${rawTier}' on price ${itemPrice?.id ?? "unknown"} for subscription ${sub.id}`,
+              );
+            }
           }
 
           if (subscription.current_period_end) {
