@@ -14,6 +14,7 @@ import {
   resolveWorkspacePath,
 } from "../provisioning/provisioningService";
 import { normaliseTier } from "./tierNormaliser";
+import { sendEmail } from "../email/emailService";
 
 function getStripeInstance() {
   const secretKey = process.env.STRIPE_SECRET_KEY;
@@ -195,6 +196,20 @@ export const stripeHandler = new Elysia({ name: "StripeHandler" })
             err,
           );
         }
+
+        // Confirmation email — fire-and-forget. Never breaks the webhook.
+        try {
+          const user = await userRepository.findById(metadata.userId);
+          if (user?.email) {
+            void sendEmail({
+              template: "subscription-confirmed",
+              to: user.email,
+              data: { tier: metadata.tier },
+            });
+          }
+        } catch (err: unknown) {
+          console.error("[email] subscription-confirmed lookup failed:", err);
+        }
       } else if (event.type === "customer.subscription.updated") {
         const subscription = event.data.object as Stripe.Subscription;
         const sub = await subRepo.findByStripeCustomerId(
@@ -251,6 +266,20 @@ export const stripeHandler = new Elysia({ name: "StripeHandler" })
 
         if (sub) {
           await subRepo.updateStatus(sub.id, "cancelled");
+
+          // Cancellation email — fire-and-forget.
+          try {
+            const user = await userRepository.findById(sub.userId);
+            if (user?.email) {
+              void sendEmail({
+                template: "subscription-cancelled",
+                to: user.email,
+                data: { tier: sub.tier },
+              });
+            }
+          } catch (err: unknown) {
+            console.error("[email] subscription-cancelled lookup failed:", err);
+          }
         }
       } else if (event.type === "invoice.payment_failed") {
         const invoice = event.data.object as Stripe.Invoice;
@@ -260,6 +289,20 @@ export const stripeHandler = new Elysia({ name: "StripeHandler" })
 
         if (sub) {
           await subRepo.updateStatus(sub.id, "past_due");
+
+          // Payment failure email — fire-and-forget.
+          try {
+            const user = await userRepository.findById(sub.userId);
+            if (user?.email) {
+              void sendEmail({
+                template: "payment-failed",
+                to: user.email,
+                data: { tier: sub.tier },
+              });
+            }
+          } catch (err: unknown) {
+            console.error("[email] payment-failed lookup failed:", err);
+          }
         }
       }
 

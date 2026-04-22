@@ -1,11 +1,14 @@
 /**
- * Waitlist email notifications.
+ * Waitlist email notifications. Thin wrappers over the shared emailService so
+ * the waitlist handler can stay focused on validation + persistence.
  *
- * Currently a logging stub. Wire to a real provider (Resend, SES, etc.) by
- * setting EMAIL_PROVIDER and implementing the send function below.
+ * Fire-and-forget: failures never throw. The handler should still `void` these
+ * calls to make intent explicit.
  */
 
-const APP_URL = process.env.APP_URL ?? "https://app.axel.so";
+import { sendEmail } from "../email/emailService";
+
+const APP_URL = process.env.APP_URL ?? "https://app.meetaxel.ai";
 
 function unsubscribeLink(token: string): string {
   return `${APP_URL}/waitlist/unsubscribe?token=${token}`;
@@ -16,9 +19,14 @@ export async function sendJoinConfirmation(
   interestedIn: string,
   token: string,
 ): Promise<void> {
-  const link = unsubscribeLink(token);
-  // TODO: replace with real email provider call
-  console.info("[waitlist] join confirmation", { email, interestedIn, link });
+  await sendEmail({
+    template: "waitlist-joined",
+    to: email,
+    data: {
+      interestedIn,
+      unsubscribeLink: unsubscribeLink(token),
+    },
+  });
 }
 
 export async function sendUpdateConfirmation(
@@ -26,7 +34,12 @@ export async function sendUpdateConfirmation(
   interestedIn: string,
   token: string,
 ): Promise<void> {
-  const link = unsubscribeLink(token);
-  // TODO: replace with real email provider call
-  console.info("[waitlist] update confirmation", { email, interestedIn, link });
+  await sendEmail({
+    template: "waitlist-updated",
+    to: email,
+    data: {
+      interestedIn,
+      unsubscribeLink: unsubscribeLink(token),
+    },
+  });
 }
