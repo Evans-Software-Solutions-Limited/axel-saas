@@ -24,11 +24,11 @@ The module exposes:
 
 ### Tier Feature Rules
 
-- Starter: Daily brief, Telegram, basic tasks, email triage
-- Pro: Starter + calendar, email send/receive, integrations, sub-agents
-- Business: Pro + custom channels, multiple agents, priority support
-- Developer: Business + full exec access, code generation, API, heavy sub-agent use
+- Free: Core Axel experience with daily usage caps. 7-day Premium trial available from inside the app. No Stripe checkout — self-provisioned.
+- Premium (£49/month): Full capability — BYOM (bring your own model), deeper integrations, higher volume, cancel any time. Only paid self-serve tier. Single Stripe Price ID (`STRIPE_PRICE_PREMIUM`).
+- Enterprise: SSO, audit logs, SLA options, custom retention, dedicated support. Not self-serve — contact sales, provisioned manually.
 - Feature access controlled by current tier; never trust client-side tier claim
+- Legacy tiers (`starter`, `pro`, `business`, `developer`) no longer exist; `stripe/tierNormaliser.ts` maps any lingering values from old Stripe prices when webhooks fire
 
 ### Checkout Idempotency
 
@@ -46,9 +46,10 @@ The module exposes:
 
 ### Type Safety
 
-- Tier IDs are string literals: `"starter" | "pro" | "business" | "developer"`
+- Tier IDs are string literals: `"free" | "premium" | "enterprise"`
 - Subscription state: `"pending" | "active" | "cancelled" | "paused"`
 - Never accept tier/state as untyped strings from routes
+- For any tier value coming from Stripe metadata, route it through `stripe/tierNormaliser.ts` to safely map legacy values and reject unknown inputs
 
 ### Error Handling
 

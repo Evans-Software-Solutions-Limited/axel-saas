@@ -138,7 +138,9 @@ export function Subscribe() {
               Is there a free trial?
             </h3>
             <p className="text-muted text-sm">
-              Yes, all plans include a 14-day free trial with full access.
+              Free users can activate a 7-day Premium trial from inside the app
+              — no card required until the trial ends. Free itself has no time
+              limit; use it for as long as you like.
             </p>
           </div>
           <div>
