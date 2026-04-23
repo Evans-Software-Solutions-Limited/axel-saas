@@ -1992,9 +1992,9 @@ describe("Chat onboarding integration", () => {
       expect(screen.queryByText("Best starting point")).toBeNull();
       expect(screen.queryByText(/based on your needs/i)).toBeNull();
       // All plan tiers are still visible
-      expect(screen.getByText("Starter")).toBeDefined();
-      expect(screen.getByText("Pro")).toBeDefined();
-      expect(screen.getByText("Business")).toBeDefined();
+      expect(screen.getByText("Free")).toBeDefined();
+      expect(screen.getByText("Premium")).toBeDefined();
+      expect(screen.getByText("Enterprise")).toBeDefined();
     });
 
     it("navigates to /subscribe when postChatMessage returns 402", async () => {

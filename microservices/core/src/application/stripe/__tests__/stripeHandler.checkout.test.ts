@@ -65,10 +65,7 @@ vi.mock("../../repositories/userRepository", () => ({
 
 vi.stubEnv("STRIPE_SECRET_KEY", "sk_test_123");
 vi.stubEnv("STRIPE_WEBHOOK_SECRET", "whsec_test_123");
-vi.stubEnv("STRIPE_PRICE_STARTER", "price_starter");
-vi.stubEnv("STRIPE_PRICE_PRO", "price_pro");
-vi.stubEnv("STRIPE_PRICE_BUSINESS", "price_business");
-vi.stubEnv("STRIPE_PRICE_DEVELOPER", "price_developer");
+vi.stubEnv("STRIPE_PRICE_PREMIUM", "price_premium_test");
 vi.stubEnv("VITE_WEB_URL", "http://localhost:5173");
 
 import { stripeHandler } from "../stripeHandler";
@@ -76,7 +73,6 @@ import { stripeHandler } from "../stripeHandler";
 describe("StripeHandler Checkout Route", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    // Re-apply default mocks after clearAllMocks
     mockSessionCreate.mockResolvedValue({
       url: "https://checkout.stripe.com/pay/cs_test_123",
     });
@@ -85,7 +81,7 @@ describe("StripeHandler Checkout Route", () => {
   });
 
   describe("POST /stripe/create-checkout-session", () => {
-    it("should create a checkout session and return URL for valid tier with auth", async () => {
+    it("creates a checkout session and returns URL for tier 'premium' with auth", async () => {
       const response = await stripeHandler.handle(
         new Request("http://localhost/stripe/create-checkout-session", {
           method: "POST",
@@ -93,7 +89,7 @@ describe("StripeHandler Checkout Route", () => {
             "Content-Type": "application/json",
             Authorization: "Bearer valid_token",
           },
-          body: JSON.stringify({ tier: "pro" }),
+          body: JSON.stringify({ tier: "premium" }),
         }),
       );
 
@@ -102,7 +98,7 @@ describe("StripeHandler Checkout Route", () => {
       expect(json.url).toBe("https://checkout.stripe.com/pay/cs_test_123");
     });
 
-    it("should create a new Stripe customer when none exists", async () => {
+    it("creates a new Stripe customer when none exists", async () => {
       mockFindByUserId.mockResolvedValue(null);
 
       await stripeHandler.handle(
@@ -112,14 +108,14 @@ describe("StripeHandler Checkout Route", () => {
             "Content-Type": "application/json",
             Authorization: "Bearer valid_token",
           },
-          body: JSON.stringify({ tier: "starter" }),
+          body: JSON.stringify({ tier: "premium" }),
         }),
       );
 
       expect(mockCustomerCreate).toHaveBeenCalledOnce();
     });
 
-    it("should reuse existing Stripe customer when subscription exists", async () => {
+    it("reuses existing Stripe customer when subscription exists", async () => {
       mockFindByUserId.mockResolvedValue({
         id: "sub-id",
         stripeCustomerId: "cus_existing_123",
@@ -132,7 +128,7 @@ describe("StripeHandler Checkout Route", () => {
             "Content-Type": "application/json",
             Authorization: "Bearer valid_token",
           },
-          body: JSON.stringify({ tier: "business" }),
+          body: JSON.stringify({ tier: "premium" }),
         }),
       );
 
@@ -143,7 +139,7 @@ describe("StripeHandler Checkout Route", () => {
       );
     });
 
-    it("should pass correct metadata to Stripe checkout session", async () => {
+    it("passes correct metadata to Stripe checkout session", async () => {
       await stripeHandler.handle(
         new Request("http://localhost/stripe/create-checkout-session", {
           method: "POST",
@@ -151,21 +147,21 @@ describe("StripeHandler Checkout Route", () => {
             "Content-Type": "application/json",
             Authorization: "Bearer valid_token",
           },
-          body: JSON.stringify({ tier: "developer" }),
+          body: JSON.stringify({ tier: "premium" }),
         }),
       );
 
       expect(mockSessionCreate).toHaveBeenCalledWith(
         expect.objectContaining({
           mode: "subscription",
-          metadata: { userId: "db-user-id", tier: "developer" },
+          metadata: { userId: "db-user-id", tier: "premium" },
           success_url: "http://localhost:5173/dashboard?checkout=success",
           cancel_url: "http://localhost:5173/subscribe?checkout=cancelled",
         }),
       );
     });
 
-    it("should reject request without Bearer token", async () => {
+    it("rejects request without Bearer token", async () => {
       const response = await stripeHandler.handle(
         new Request("http://localhost/stripe/create-checkout-session", {
           method: "POST",
@@ -173,26 +169,44 @@ describe("StripeHandler Checkout Route", () => {
             "Content-Type": "application/json",
             Authorization: "Basic token",
           },
-          body: JSON.stringify({ tier: "pro" }),
+          body: JSON.stringify({ tier: "premium" }),
         }),
       );
 
       expect(response.status).toBe(401);
     });
 
-    it("should reject request without authorization header", async () => {
+    it("rejects request without authorization header", async () => {
       const response = await stripeHandler.handle(
         new Request("http://localhost/stripe/create-checkout-session", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ tier: "pro" }),
+          body: JSON.stringify({ tier: "premium" }),
         }),
       );
 
       expect(response.status).toBe(401);
     });
 
-    it("should reject invalid tier", async () => {
+    it.each([["starter"], ["pro"], ["business"], ["developer"]])(
+      "rejects legacy tier %s with 400",
+      async (tier) => {
+        const response = await stripeHandler.handle(
+          new Request("http://localhost/stripe/create-checkout-session", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: "Bearer valid_token",
+            },
+            body: JSON.stringify({ tier }),
+          }),
+        );
+
+        expect(response.status).toBe(400);
+      },
+    );
+
+    it("rejects invalid tier", async () => {
       const response = await stripeHandler.handle(
         new Request("http://localhost/stripe/create-checkout-session", {
           method: "POST",
@@ -207,7 +221,37 @@ describe("StripeHandler Checkout Route", () => {
       expect(response.status).toBe(400);
     });
 
-    it("should reject empty tier", async () => {
+    it("rejects free tier — it is not self-serve via Stripe", async () => {
+      const response = await stripeHandler.handle(
+        new Request("http://localhost/stripe/create-checkout-session", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: "Bearer valid_token",
+          },
+          body: JSON.stringify({ tier: "free" }),
+        }),
+      );
+
+      expect(response.status).toBe(400);
+    });
+
+    it("rejects enterprise tier — it requires manual sales contact", async () => {
+      const response = await stripeHandler.handle(
+        new Request("http://localhost/stripe/create-checkout-session", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: "Bearer valid_token",
+          },
+          body: JSON.stringify({ tier: "enterprise" }),
+        }),
+      );
+
+      expect(response.status).toBe(400);
+    });
+
+    it("rejects empty tier", async () => {
       const response = await stripeHandler.handle(
         new Request("http://localhost/stripe/create-checkout-session", {
           method: "POST",
@@ -222,22 +266,7 @@ describe("StripeHandler Checkout Route", () => {
       expect(response.status).toBe(400);
     });
 
-    it("should reject missing tier in body", async () => {
-      const response = await stripeHandler.handle(
-        new Request("http://localhost/stripe/create-checkout-session", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: "Bearer valid_token",
-          },
-          body: JSON.stringify({}),
-        }),
-      );
-
-      expect(response.status).toBe(400);
-    });
-
-    it("should validate Bearer token format strictly", async () => {
+    it("validates Bearer token format strictly", async () => {
       const response = await stripeHandler.handle(
         new Request("http://localhost/stripe/create-checkout-session", {
           method: "POST",
@@ -245,15 +274,14 @@ describe("StripeHandler Checkout Route", () => {
             "Content-Type": "application/json",
             Authorization: "Bearertoken",
           },
-          body: JSON.stringify({ tier: "pro" }),
+          body: JSON.stringify({ tier: "premium" }),
         }),
       );
 
       expect(response.status).toBe(401);
     });
 
-    it("should return 401 when JWT verification fails", async () => {
-      // Token doesn't start with "Bearer valid_" so getAuthUser returns null
+    it("returns 401 when JWT verification fails", async () => {
       const response = await stripeHandler.handle(
         new Request("http://localhost/stripe/create-checkout-session", {
           method: "POST",
@@ -261,14 +289,14 @@ describe("StripeHandler Checkout Route", () => {
             "Content-Type": "application/json",
             Authorization: "Bearer bad_jwt",
           },
-          body: JSON.stringify({ tier: "pro" }),
+          body: JSON.stringify({ tier: "premium" }),
         }),
       );
 
       expect(response.status).toBe(401);
     });
 
-    it("should return 500 when Stripe returns a null session URL", async () => {
+    it("returns 500 when Stripe returns a null session URL", async () => {
       mockSessionCreate.mockResolvedValueOnce({ url: null });
 
       const response = await stripeHandler.handle(
@@ -278,7 +306,7 @@ describe("StripeHandler Checkout Route", () => {
             "Content-Type": "application/json",
             Authorization: "Bearer valid_token",
           },
-          body: JSON.stringify({ tier: "pro" }),
+          body: JSON.stringify({ tier: "premium" }),
         }),
       );
 
@@ -287,25 +315,30 @@ describe("StripeHandler Checkout Route", () => {
       expect(json.error).toBe("Checkout session URL unavailable");
     });
 
-    it("should accept all valid tiers", async () => {
-      for (const tier of ["starter", "pro", "business", "developer"]) {
-        const response = await stripeHandler.handle(
-          new Request("http://localhost/stripe/create-checkout-session", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: "Bearer valid_token",
-            },
-            body: JSON.stringify({ tier }),
-          }),
-        );
-        expect(response.status).toBe(200);
-      }
+    it("returns 500 when STRIPE_PRICE_PREMIUM env var is missing", async () => {
+      vi.stubEnv("STRIPE_PRICE_PREMIUM", "");
+
+      const response = await stripeHandler.handle(
+        new Request("http://localhost/stripe/create-checkout-session", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: "Bearer valid_token",
+          },
+          body: JSON.stringify({ tier: "premium" }),
+        }),
+      );
+
+      expect(response.status).toBe(500);
+      const json = (await response.json()) as { error: string };
+      expect(json.error).toBe("Price not configured for tier");
+
+      vi.stubEnv("STRIPE_PRICE_PREMIUM", "price_premium_test");
     });
   });
 
   describe("POST /stripe/webhook", () => {
-    it("should require stripe-signature header", async () => {
+    it("requires the stripe-signature header", async () => {
       const response = await stripeHandler.handle(
         new Request("http://localhost/stripe/webhook", {
           method: "POST",
@@ -317,23 +350,7 @@ describe("StripeHandler Checkout Route", () => {
       expect(response.status).toBe(400);
     });
 
-    it("should process webhook with valid signature header", async () => {
-      const response = await stripeHandler.handle(
-        new Request("http://localhost/stripe/webhook", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "stripe-signature": "sig_test_1234567890",
-          },
-          body: "event_data",
-        }),
-      );
-
-      // Signature validation will fail with test data, but route accepts the header
-      expect([400, 500]).toContain(response.status);
-    });
-
-    it("should handle webhook with empty signature", async () => {
+    it("rejects webhook with empty signature", async () => {
       const response = await stripeHandler.handle(
         new Request("http://localhost/stripe/webhook", {
           method: "POST",
@@ -347,10 +364,33 @@ describe("StripeHandler Checkout Route", () => {
 
       expect(response.status).toBe(400);
     });
+
+    it("rejects webhook when signature verification throws", async () => {
+      mockConstructEvent.mockImplementationOnce(() => {
+        throw new Error("signature mismatch");
+      });
+
+      // Body must be valid JSON for Elysia's parser; constructEvent is mocked
+      // so the raw payload is never actually inspected.
+      const response = await stripeHandler.handle(
+        new Request("http://localhost/stripe/webhook", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "stripe-signature": "sig_test_1234567890",
+          },
+          body: "{}",
+        }),
+      );
+
+      expect(response.status).toBe(400);
+      const json = (await response.json()) as { received: boolean };
+      expect(json.received).toBe(false);
+    });
   });
 
   describe("Route definitions", () => {
-    it("should have POST /stripe/create-checkout-session route", () => {
+    it("exposes POST /stripe/create-checkout-session", () => {
       const route = stripeHandler.routes.find(
         (r) =>
           r.method === "POST" && r.path === "/stripe/create-checkout-session",
@@ -358,23 +398,25 @@ describe("StripeHandler Checkout Route", () => {
       expect(route).toBeDefined();
     });
 
-    it("should have POST /stripe/webhook route", () => {
+    it("exposes POST /stripe/webhook", () => {
       const route = stripeHandler.routes.find(
         (r) => r.method === "POST" && r.path === "/stripe/webhook",
       );
       expect(route).toBeDefined();
     });
 
-    it("should have exactly 2 POST routes", () => {
-      const postRoutes = stripeHandler.routes.filter(
-        (r) => r.method === "POST",
+    it("exposes GET /stripe/invoices", () => {
+      const route = stripeHandler.routes.find(
+        (r) => r.method === "GET" && r.path === "/stripe/invoices",
       );
-      expect(postRoutes.length).toBe(2);
+      expect(route).toBeDefined();
     });
 
-    it("should be an Elysia instance", () => {
-      expect(stripeHandler).toBeDefined();
-      expect(typeof stripeHandler).toBe("object");
+    it("exposes GET /stripe/invoices/:id", () => {
+      const route = stripeHandler.routes.find(
+        (r) => r.method === "GET" && r.path === "/stripe/invoices/:id",
+      );
+      expect(route).toBeDefined();
     });
   });
 });

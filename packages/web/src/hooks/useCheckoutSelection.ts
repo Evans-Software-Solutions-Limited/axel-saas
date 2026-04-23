@@ -11,6 +11,11 @@ export function useCheckoutSelection() {
       window.location.assign("mailto:admin@evans-software-solutions.com");
       return;
     }
+    if (tierId === "free") {
+      // Free tier — no checkout required; user signs up and is provisioned directly.
+      window.location.assign("/signup");
+      return;
+    }
     setError(null);
     setLoadingTier(tierId);
     try {

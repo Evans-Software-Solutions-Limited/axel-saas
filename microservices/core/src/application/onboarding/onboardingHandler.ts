@@ -351,7 +351,7 @@ export const onboardingHandler = new Elysia({ name: "OnboardingHandler" })
         // Generate workspace files from collected answers
         const collectedAnswers = onboardingState.collectedAnswers;
         const subscription = await subscriptionRepo.findByUserId(dbUser.id);
-        const tier = subscription?.tier ?? "starter";
+        const tier = subscription?.tier ?? "free";
 
         const workspaceFiles = generateWorkspaceFiles(collectedAnswers, tier);
 

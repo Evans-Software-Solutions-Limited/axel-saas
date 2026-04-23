@@ -114,7 +114,6 @@ describe("classifyMessage", () => {
     });
 
     it("prioritises financial-data over pii-suspected when both present", () => {
-      // Contains both a sort code (PII) and a currency amount (financial)
       expect(classifyMessage("Account 20-00-00 owes £300")).toBe(
         "financial-data",
       );
@@ -127,35 +126,33 @@ describe("classifyMessage", () => {
 // ---------------------------------------------------------------------------
 
 describe("getRoutingPolicy", () => {
-  it("returns the starter policy", () => {
-    const policy = getRoutingPolicy("starter");
-    expect(policy).toEqual(TIER_ROUTING_MATRIX.starter);
-    expect(policy.tier).toBe("starter");
+  it("returns the free policy", () => {
+    const policy = getRoutingPolicy("free");
+    expect(policy).toEqual(TIER_ROUTING_MATRIX.free);
+    expect(policy.tier).toBe("free");
+    expect(policy.externalCallsPermitted).toBe(false);
   });
 
-  it("returns the pro policy", () => {
-    const policy = getRoutingPolicy("pro");
-    expect(policy).toEqual(TIER_ROUTING_MATRIX.pro);
+  it("returns the premium policy", () => {
+    const policy = getRoutingPolicy("premium");
+    expect(policy).toEqual(TIER_ROUTING_MATRIX.premium);
     expect(policy.auditLogging).toBe(true);
-  });
-
-  it("returns the business policy", () => {
-    const policy = getRoutingPolicy("business");
     expect(policy.piiHandling).toBe("anonymize");
     expect(policy.allowedDataClassifications).toContain("financial-data");
   });
 
-  it("returns the developer policy", () => {
-    const policy = getRoutingPolicy("developer");
+  it("returns the enterprise policy", () => {
+    const policy = getRoutingPolicy("enterprise");
     expect(policy.externalCallsPermitted).toBe(true);
     expect(policy.cloudModelFallback).toBe(true);
+    expect(policy.piiHandling).toBe("anonymize");
   });
 
   it("throws for an unknown tier", () => {
     expect(() =>
       // @ts-expect-error intentional invalid tier for runtime test
-      getRoutingPolicy("enterprise"),
-    ).toThrow("Unknown subscription tier: enterprise");
+      getRoutingPolicy("unknown"),
+    ).toThrow("Unknown subscription tier: unknown");
   });
 });
 
@@ -164,82 +161,88 @@ describe("getRoutingPolicy", () => {
 // ---------------------------------------------------------------------------
 
 describe("resolveRoutingCategory", () => {
-  const starterPolicy: RoutingPolicy = TIER_ROUTING_MATRIX.starter;
-  const proPolicy: RoutingPolicy = TIER_ROUTING_MATRIX.pro;
-  const businessPolicy: RoutingPolicy = TIER_ROUTING_MATRIX.business;
+  const freePolicy: RoutingPolicy = TIER_ROUTING_MATRIX.free;
+  const premiumPolicy: RoutingPolicy = TIER_ROUTING_MATRIX.premium;
+  const enterprisePolicy: RoutingPolicy = TIER_ROUTING_MATRIX.enterprise;
 
-  describe("clean messages", () => {
+  describe("clean and anonymized messages", () => {
     it("always returns cloud-direct for clean data on any tier", () => {
-      expect(resolveRoutingCategory("clean", starterPolicy)).toBe(
+      expect(resolveRoutingCategory("clean", freePolicy)).toBe("cloud-direct");
+      expect(resolveRoutingCategory("clean", premiumPolicy)).toBe(
         "cloud-direct",
       );
-      expect(resolveRoutingCategory("clean", proPolicy)).toBe("cloud-direct");
-      expect(resolveRoutingCategory("clean", businessPolicy)).toBe(
+      expect(resolveRoutingCategory("clean", enterprisePolicy)).toBe(
         "cloud-direct",
       );
     });
 
-    it("returns cloud-direct for anonymized data", () => {
-      expect(resolveRoutingCategory("anonymized", starterPolicy)).toBe(
+    it("returns cloud-direct for anonymized data on any tier", () => {
+      expect(resolveRoutingCategory("anonymized", freePolicy)).toBe(
+        "cloud-direct",
+      );
+      expect(resolveRoutingCategory("anonymized", premiumPolicy)).toBe(
         "cloud-direct",
       );
     });
   });
 
   describe("pii-suspected messages", () => {
-    it("starter refuses pii-suspected (not in allowedDataClassifications)", () => {
-      expect(resolveRoutingCategory("pii-suspected", starterPolicy)).toBe(
+    it("free refuses pii-suspected (not in allowedDataClassifications)", () => {
+      expect(resolveRoutingCategory("pii-suspected", freePolicy)).toBe(
         "refused",
       );
     });
 
-    it("pro logs-and-forwards pii-suspected", () => {
-      expect(resolveRoutingCategory("pii-suspected", proPolicy)).toBe(
-        "log-and-forward",
+    it("premium anonymizes pii-suspected", () => {
+      expect(resolveRoutingCategory("pii-suspected", premiumPolicy)).toBe(
+        "cloud-post-anonymize",
       );
     });
 
-    it("business anonymizes pii-suspected", () => {
-      expect(resolveRoutingCategory("pii-suspected", businessPolicy)).toBe(
+    it("enterprise anonymizes pii-suspected", () => {
+      expect(resolveRoutingCategory("pii-suspected", enterprisePolicy)).toBe(
         "cloud-post-anonymize",
       );
     });
   });
 
   describe("financial-data messages", () => {
-    it("starter refuses financial-data (not in allowedDataClassifications)", () => {
-      expect(resolveRoutingCategory("financial-data", starterPolicy)).toBe(
+    it("free refuses financial-data", () => {
+      expect(resolveRoutingCategory("financial-data", freePolicy)).toBe(
         "refused",
       );
     });
 
-    it("pro refuses financial-data (not in allowedDataClassifications)", () => {
-      // Pro allows pii-suspected but not financial-data
-      expect(resolveRoutingCategory("financial-data", proPolicy)).toBe(
-        "refused",
-      );
-    });
-
-    it("business anonymizes financial-data", () => {
-      expect(resolveRoutingCategory("financial-data", businessPolicy)).toBe(
+    it("premium anonymizes financial-data", () => {
+      expect(resolveRoutingCategory("financial-data", premiumPolicy)).toBe(
         "cloud-post-anonymize",
       );
     });
 
-    it("developer anonymizes financial-data", () => {
-      expect(
-        resolveRoutingCategory("financial-data", TIER_ROUTING_MATRIX.developer),
-      ).toBe("cloud-post-anonymize");
+    it("enterprise anonymizes financial-data", () => {
+      expect(resolveRoutingCategory("financial-data", enterprisePolicy)).toBe(
+        "cloud-post-anonymize",
+      );
     });
   });
 
-  describe("edge: custom policy with refuse handling", () => {
-    it("returns refused when piiHandling is refuse regardless of allowedClassifications", () => {
-      const refuseAllPolicy: RoutingPolicy = {
-        ...businessPolicy,
+  describe("synthetic policies (exercising the full decision table)", () => {
+    it("returns log-and-forward when a policy uses log-only piiHandling", () => {
+      const logOnlyPolicy: RoutingPolicy = {
+        ...premiumPolicy,
+        piiHandling: "log-only",
+      };
+      expect(resolveRoutingCategory("pii-suspected", logOnlyPolicy)).toBe(
+        "log-and-forward",
+      );
+    });
+
+    it("returns refused when piiHandling is refuse even if classification is allowed", () => {
+      const refusePolicy: RoutingPolicy = {
+        ...premiumPolicy,
         piiHandling: "refuse",
       };
-      expect(resolveRoutingCategory("pii-suspected", refuseAllPolicy)).toBe(
+      expect(resolveRoutingCategory("pii-suspected", refusePolicy)).toBe(
         "refused",
       );
     });
@@ -251,49 +254,49 @@ describe("resolveRoutingCategory", () => {
 // ---------------------------------------------------------------------------
 
 describe("buildTaskEnvelope", () => {
-  it("builds a complete envelope for a clean message on starter tier", () => {
+  it("builds a complete envelope for a clean message on the free tier", () => {
     const envelope = buildTaskEnvelope({
       userId: "user-123",
-      tier: "starter",
+      tier: "free",
       rawMessage: "What's on my schedule?",
     });
 
     expect(envelope.userId).toBe("user-123");
-    expect(envelope.tier).toBe("starter");
+    expect(envelope.tier).toBe("free");
     expect(envelope.rawMessage).toBe("What's on my schedule?");
     expect(envelope.dataClassification).toBe("clean");
     expect(envelope.routingCategory).toBe("cloud-direct");
-    expect(envelope.policy).toEqual(TIER_ROUTING_MATRIX.starter);
+    expect(envelope.policy).toEqual(TIER_ROUTING_MATRIX.free);
     expect(envelope.createdAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
   });
 
-  it("classifies PII and produces refused for starter", () => {
+  it("classifies PII and produces refused for the free tier", () => {
     const envelope = buildTaskEnvelope({
       userId: "user-456",
-      tier: "starter",
-      rawMessage: "Tenant at SW1A 1AA owes money",
+      tier: "free",
+      rawMessage: "Tenant at SW1A 1AA needs a reply",
     });
 
-    // SW1A 1AA is a postcode → pii-suspected; starter refuses pii
+    // SW1A 1AA is a postcode → pii-suspected; free refuses PII
     expect(envelope.dataClassification).toBe("pii-suspected");
     expect(envelope.routingCategory).toBe("refused");
   });
 
-  it("classifies PII and produces log-and-forward for pro", () => {
+  it("classifies PII and anonymizes for the premium tier", () => {
     const envelope = buildTaskEnvelope({
       userId: "user-789",
-      tier: "pro",
+      tier: "premium",
       rawMessage: "Email jane@example.com about the meeting",
     });
 
     expect(envelope.dataClassification).toBe("pii-suspected");
-    expect(envelope.routingCategory).toBe("log-and-forward");
+    expect(envelope.routingCategory).toBe("cloud-post-anonymize");
   });
 
-  it("classifies financial data and anonymizes for business", () => {
+  it("classifies financial data and anonymizes for the premium tier", () => {
     const envelope = buildTaskEnvelope({
       userId: "user-000",
-      tier: "business",
+      tier: "premium",
       rawMessage: "Tenant owes £1,200 in arrears",
     });
 
@@ -304,9 +307,8 @@ describe("buildTaskEnvelope", () => {
   it("respects an explicit dataClassification override", () => {
     const envelope = buildTaskEnvelope({
       userId: "user-111",
-      tier: "starter",
+      tier: "free",
       rawMessage: "jane@example.com has a query",
-      // Upstream anonymiser already scrubbed the message
       dataClassification: "anonymized",
     });
 
@@ -318,7 +320,7 @@ describe("buildTaskEnvelope", () => {
     const before = Date.now();
     const envelope = buildTaskEnvelope({
       userId: "u",
-      tier: "pro",
+      tier: "premium",
       rawMessage: "hello",
     });
     const after = Date.now();
@@ -333,7 +335,7 @@ describe("buildTaskEnvelope", () => {
 // ---------------------------------------------------------------------------
 
 describe("TIER_ROUTING_MATRIX structural invariants", () => {
-  const tiers = ["starter", "pro", "business", "developer"] as const;
+  const tiers = ["free", "premium", "enterprise"] as const;
 
   it("defines a policy for every tier", () => {
     for (const tier of tiers) {
@@ -342,13 +344,13 @@ describe("TIER_ROUTING_MATRIX structural invariants", () => {
     }
   });
 
-  it("starter does not permit external calls or cloud fallback", () => {
-    expect(TIER_ROUTING_MATRIX.starter.externalCallsPermitted).toBe(false);
-    expect(TIER_ROUTING_MATRIX.starter.cloudModelFallback).toBe(false);
+  it("free does not permit external calls or cloud fallback", () => {
+    expect(TIER_ROUTING_MATRIX.free.externalCallsPermitted).toBe(false);
+    expect(TIER_ROUTING_MATRIX.free.cloudModelFallback).toBe(false);
   });
 
-  it("business and developer permit cloud fallback and audit logging", () => {
-    for (const tier of ["business", "developer"] as const) {
+  it("premium and enterprise permit cloud fallback and audit logging", () => {
+    for (const tier of ["premium", "enterprise"] as const) {
       expect(TIER_ROUTING_MATRIX[tier].cloudModelFallback).toBe(true);
       expect(TIER_ROUTING_MATRIX[tier].auditLogging).toBe(true);
     }

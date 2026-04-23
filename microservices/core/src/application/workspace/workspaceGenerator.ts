@@ -49,33 +49,26 @@ export function generateSoulContent(
   // Tier-specific rules
   let tierRules = "";
   switch (tier) {
-    case "starter":
+    case "free":
       tierRules = `
-## Starter Tier Rules
-- Focus on text-based assistance
-- No external integrations enabled yet
-- ${name} can add integrations later via the dashboard`;
+## Free Tier Rules
+- Focus on text-based assistance with daily usage caps
+- External integrations limited; upgrade to Premium for full access
+- ${name} can activate a 7-day Premium trial from inside the app`;
       break;
-    case "pro":
+    case "premium":
       tierRules = `
-## Pro Tier Rules
-- Full integration access enabled
-- Can connect to calendars, email, and messaging platforms
-- Proactive monitoring enabled for tracked areas`;
+## Premium Tier Rules
+- Full integration access (calendar, email, messaging, custom tools)
+- Bring your own model (BYOM) supported
+- Proactive monitoring enabled for tracked areas
+- Higher usage limits`;
       break;
-    case "business":
+    case "enterprise":
       tierRules = `
-## Business Tier Rules
-- Full access to all features
-- Priority response handling
-- Team collaboration features available`;
-      break;
-    case "developer":
-      tierRules = `
-## Developer Tier Rules
-- Full API access
-- Can execute shell commands in sandboxed environment
-- Code assistance and automation capabilities`;
+## Enterprise Tier Rules
+- Full Premium capability plus SSO, audit logs, and custom retention
+- SLA-backed support and dedicated account controls`;
       break;
     default:
       tierRules = "";
@@ -258,27 +251,22 @@ export function generateAgentsContent(tier: string): string {
 ## Tier: ${tierUpper}
 
 ${
-  tier === "starter"
-    ? `- Text-based assistance only
-- No external integrations enabled`
+  tier === "free"
+    ? `- Text-based assistance with daily usage caps
+- Limited external integrations`
     : ""
 }
 ${
-  tier === "pro"
+  tier === "premium"
     ? `- Full integration access
-- Calendar, email, messaging connections available`
+- Calendar, email, messaging, BYOM supported
+- Higher usage limits`
     : ""
 }
 ${
-  tier === "business"
-    ? `- Full business features
-- Team collaboration enabled`
-    : ""
-}
-${
-  tier === "developer"
-    ? `- Developer mode enabled
-- Shell commands and API access available`
+  tier === "enterprise"
+    ? `- Everything in Premium
+- SSO, audit logs, custom retention, dedicated support`
     : ""
 }
 
@@ -358,7 +346,7 @@ export interface WorkspaceFiles {
  */
 export function generateWorkspaceFiles(
   answers: OnboardingAnswers,
-  tier: string = "starter",
+  tier: string = "free",
 ): WorkspaceFiles {
   return {
     soul: generateSoulContent(answers, tier),

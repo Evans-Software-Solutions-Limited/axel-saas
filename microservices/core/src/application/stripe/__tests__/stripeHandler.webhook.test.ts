@@ -1,259 +1,302 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-// Mock dependencies BEFORE importing handler
-vi.mock("stripe");
-vi.mock("@axel-saas/db", () => ({
-  getDb: vi.fn(() => ({
-    insert: vi.fn(),
-    select: vi.fn(),
-    update: vi.fn(),
+const mockConstructEvent = vi.fn();
+
+vi.mock("stripe", () => ({
+  default: vi.fn().mockImplementation(() => ({
+    checkout: { sessions: { create: vi.fn() } },
+    customers: { create: vi.fn() },
+    webhooks: { constructEvent: mockConstructEvent },
+    invoices: { list: vi.fn(), retrieve: vi.fn() },
   })),
+}));
+
+vi.mock("@axel-saas/db", () => ({
+  getDb: vi.fn(() => ({})),
   subscriptionStatusEnum: {
     enumValues: ["active", "trialing", "past_due", "cancelled", "incomplete"],
   },
 }));
 
-const mockSubscriptionRepo = {
-  upsertByStripeCustomerId: vi.fn(),
-  findByStripeCustomerId: vi.fn(),
-  updateTier: vi.fn(),
-  updatePeriodEnd: vi.fn(),
-  updateStatus: vi.fn(),
-};
+const mockUpsert = vi.fn();
+const mockFindByStripeCustomer = vi.fn();
+const mockUpdateTier = vi.fn();
+const mockUpdatePeriodEnd = vi.fn();
+const mockUpdateStatus = vi.fn();
 
-const mockProvisioningRepo = {
-  findByUserId: vi.fn(),
-  create: vi.fn(),
-};
-
-vi.mock("../repositories/subscriptionRepository", () => ({
-  SubscriptionRepository: vi.fn(() => mockSubscriptionRepo),
+vi.mock("../../repositories/subscriptionRepository", () => ({
+  SubscriptionRepository: vi.fn().mockImplementation(() => ({
+    upsertByStripeCustomerId: mockUpsert,
+    findByStripeCustomerId: mockFindByStripeCustomer,
+    updateTier: mockUpdateTier,
+    updatePeriodEnd: mockUpdatePeriodEnd,
+    updateStatus: mockUpdateStatus,
+  })),
 }));
 
-vi.mock("../repositories/provisioningRepository", () => ({
-  ProvisioningRepository: vi.fn(() => mockProvisioningRepo),
+const mockProvFindByUserId = vi.fn();
+const mockProvCreate = vi.fn();
+vi.mock("../../repositories/provisioningRepository", () => ({
+  ProvisioningRepository: vi.fn().mockImplementation(() => ({
+    findByUserId: mockProvFindByUserId,
+    create: mockProvCreate,
+  })),
 }));
 
-vi.stubEnv("STRIPE_SECRET_KEY", "test_secret_key");
-vi.stubEnv("STRIPE_WEBHOOK_SECRET", "test_webhook_secret");
-vi.stubEnv("STRIPE_PRICE_STARTER", "price_starter_123");
-vi.stubEnv("STRIPE_PRICE_PRO", "price_pro_123");
-vi.stubEnv("STRIPE_PRICE_BUSINESS", "price_business_123");
-vi.stubEnv("STRIPE_PRICE_DEVELOPER", "price_developer_123");
+vi.mock("../../repositories/userRepository", () => ({
+  userRepository: { getUserBySupabaseId: vi.fn() },
+}));
 
-import { stripeHandler as _stripeHandler } from "../stripeHandler";
+const mockTriggerContainerLaunch = vi.fn().mockResolvedValue(undefined);
+vi.mock("../../provisioning/provisioningService", () => ({
+  triggerContainerLaunch: (...args: unknown[]) =>
+    mockTriggerContainerLaunch(...args),
+  resolveWorkspacePath: (userId: string) => `/workspaces/${userId}`,
+}));
 
-void _stripeHandler;
+vi.stubEnv("STRIPE_SECRET_KEY", "sk_test_123");
+vi.stubEnv("STRIPE_WEBHOOK_SECRET", "whsec_test_123");
+vi.stubEnv("STRIPE_PRICE_PREMIUM", "price_premium_test");
+vi.stubEnv("VITE_WEB_URL", "http://localhost:5173");
 
-describe("StripeHandler Webhook Tests", () => {
+import { stripeHandler } from "../stripeHandler";
+
+// Elysia parses request body as JSON by default, so the body must be valid JSON
+// even though the handler treats it as an opaque string for Stripe signature
+// verification. The mocked constructEvent returns canned event data regardless.
+function postWebhook(body: string = "{}") {
+  return stripeHandler.handle(
+    new Request("http://localhost/stripe/webhook", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "stripe-signature": "sig_test_1234567890",
+      },
+      body,
+    }),
+  );
+}
+
+describe("StripeHandler webhook behaviour", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockTriggerContainerLaunch.mockResolvedValue(undefined);
   });
 
-  describe("Webhook signature validation", () => {
-    it("should reject webhook without signature", async () => {
-      // Test missing stripe-signature header
-      const missingSignature = "should reject missing sig";
-      expect(missingSignature).toBeDefined();
-    });
-
-    it("should process checkout.session.completed event", async () => {
-      // Simulate checkout.session.completed event
-      const session = {
-        id: "cs_test_123",
-        customer: "cus_test_123",
-        subscription: "sub_test_123",
-        expires_at: Math.floor(Date.now() / 1000) + 3600,
-        metadata: {
-          userId: "user_123",
-          tier: "pro",
+  describe("checkout.session.completed", () => {
+    it("upserts the subscription as premium/active and creates provisioning when missing", async () => {
+      mockConstructEvent.mockReturnValueOnce({
+        type: "checkout.session.completed",
+        data: {
+          object: {
+            customer: "cus_123",
+            subscription: "sub_abc",
+            expires_at: 1_800_000_000,
+            metadata: { userId: "user-1", tier: "premium" },
+          },
         },
-      };
+      });
+      mockProvFindByUserId.mockResolvedValueOnce(null);
 
-      expect(session.customer).toBe("cus_test_123");
-      expect(session.metadata?.userId).toBe("user_123");
-      expect(session.metadata?.tier).toBe("pro");
+      const response = await postWebhook();
+
+      expect(response.status).toBe(200);
+      expect(mockUpsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: "user-1",
+          stripeCustomerId: "cus_123",
+          stripeSubscriptionId: "sub_abc",
+          tier: "premium",
+          status: "active",
+        }),
+      );
+      expect(mockProvCreate).toHaveBeenCalledWith({
+        userId: "user-1",
+        status: "pending",
+      });
+      expect(mockTriggerContainerLaunch).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          userId: "user-1",
+          tier: "premium",
+          workspacePath: "/workspaces/user-1",
+        }),
+      );
     });
 
-    it("should validate metadata in checkout session", async () => {
-      const metadata = {
-        userId: "user_123",
-        tier: "pro",
-      };
+    it("does not re-create provisioning state when one already exists", async () => {
+      mockConstructEvent.mockReturnValueOnce({
+        type: "checkout.session.completed",
+        data: {
+          object: {
+            customer: "cus_123",
+            subscription: "sub_abc",
+            metadata: { userId: "user-1", tier: "premium" },
+          },
+        },
+      });
+      mockProvFindByUserId.mockResolvedValueOnce({ id: "prov-existing" });
 
-      const isValid = metadata.userId && metadata.tier;
-      expect(isValid).toBeTruthy();
+      await postWebhook();
+
+      expect(mockProvCreate).not.toHaveBeenCalled();
+      expect(mockTriggerContainerLaunch).toHaveBeenCalled();
     });
 
-    it("should handle missing metadata in checkout session", async () => {
-      const session = {
-        customer: "cus_123",
-        metadata: null,
-      };
+    it("returns 500 when checkout session metadata is missing required fields", async () => {
+      mockConstructEvent.mockReturnValueOnce({
+        type: "checkout.session.completed",
+        data: {
+          object: {
+            customer: "cus_123",
+            subscription: "sub_abc",
+            metadata: null,
+          },
+        },
+      });
 
-      const isValid = !!(session.customer && session.metadata);
-      expect(isValid).toBeFalsy();
+      const response = await postWebhook();
+      expect(response.status).toBe(500);
+      expect(mockUpsert).not.toHaveBeenCalled();
+    });
+
+    it("swallows provisioning errors so Stripe receives a 200 (no retry)", async () => {
+      mockConstructEvent.mockReturnValueOnce({
+        type: "checkout.session.completed",
+        data: {
+          object: {
+            customer: "cus_123",
+            subscription: "sub_abc",
+            metadata: { userId: "user-1", tier: "premium" },
+          },
+        },
+      });
+      mockProvFindByUserId.mockResolvedValueOnce(null);
+      mockTriggerContainerLaunch.mockRejectedValueOnce(new Error("ECS down"));
+      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+      const response = await postWebhook();
+      expect(response.status).toBe(200);
+      expect(errorSpy).toHaveBeenCalled();
+      errorSpy.mockRestore();
     });
   });
 
-  describe("Webhook event processing", () => {
-    it("should handle subscription tier extraction from price", async () => {
-      const subscription = {
-        items: {
-          data: [
-            {
-              price: {
-                metadata: {
-                  tier: "business",
+  describe("customer.subscription.updated", () => {
+    it("updates tier and period end when both are present in the event", async () => {
+      mockConstructEvent.mockReturnValueOnce({
+        type: "customer.subscription.updated",
+        data: {
+          object: {
+            customer: "cus_999",
+            current_period_end: 1_900_000_000,
+            status: "active",
+            items: {
+              data: [
+                {
+                  price: { metadata: { tier: "premium" } },
                 },
-              },
+              ],
             },
-          ],
+          },
         },
-      };
+      });
+      mockFindByStripeCustomer.mockResolvedValueOnce({
+        id: "sub-row-1",
+        status: "trialing",
+      });
 
-      const itemPrice = subscription.items.data[0]?.price;
-      expect(itemPrice?.metadata?.tier).toBe("business");
+      const response = await postWebhook();
+
+      expect(response.status).toBe(200);
+      expect(mockUpdateTier).toHaveBeenCalledWith("sub-row-1", "premium");
+      expect(mockUpdatePeriodEnd).toHaveBeenCalledWith(
+        "sub-row-1",
+        new Date(1_900_000_000 * 1000),
+      );
+      expect(mockUpdateStatus).toHaveBeenCalledWith("sub-row-1", "active");
     });
 
-    it("should map Stripe subscription status to db status", async () => {
-      const statusMap: Record<string, string> = {
-        active: "active",
-        trialing: "trialing",
-        past_due: "past_due",
-        canceled: "cancelled",
-        incomplete: "incomplete",
-      };
-
-      // Test that canceled maps to cancelled
-      expect(statusMap["canceled"]).toBe("cancelled");
-      expect(statusMap["active"]).toBe("active");
-    });
-
-    it("should extract subscription from checkout session", async () => {
-      const session = {
-        subscription: "sub_test_456",
-      };
-
-      expect(session.subscription).toBe("sub_test_456");
-    });
-
-    it("should handle multiple items in subscription", async () => {
-      const subscription = {
-        items: {
-          data: [
-            { price: { metadata: { tier: "pro" } } },
-            { price: { metadata: { tier: "business" } } },
-          ],
+    it("maps the Stripe 'canceled' status to the DB 'cancelled' value", async () => {
+      mockConstructEvent.mockReturnValueOnce({
+        type: "customer.subscription.updated",
+        data: {
+          object: {
+            customer: "cus_999",
+            status: "canceled",
+            items: { data: [] },
+          },
         },
-      };
+      });
+      mockFindByStripeCustomer.mockResolvedValueOnce({
+        id: "sub-row-1",
+        status: "active",
+      });
 
-      // Should use first item
-      const tier = subscription.items.data[0]?.price?.metadata?.tier;
-      expect(tier).toBe("pro");
+      await postWebhook();
+      expect(mockUpdateStatus).toHaveBeenCalledWith("sub-row-1", "cancelled");
     });
 
-    it("should validate customer subscription association", async () => {
-      const subscription = {
-        customer: "cus_123",
-      };
+    it("is a no-op when no matching subscription row is found", async () => {
+      mockConstructEvent.mockReturnValueOnce({
+        type: "customer.subscription.updated",
+        data: {
+          object: {
+            customer: "cus_unknown",
+            status: "active",
+            items: { data: [] },
+          },
+        },
+      });
+      mockFindByStripeCustomer.mockResolvedValueOnce(null);
 
-      const isValid = !!subscription.customer;
-      expect(isValid).toBeTruthy();
-    });
-  });
-
-  describe("Event type handling", () => {
-    it("should identify checkout.session.completed event type", async () => {
-      const eventType = "checkout.session.completed";
-      const isCheckoutCompleted = eventType === "checkout.session.completed";
-      expect(isCheckoutCompleted).toBeTruthy();
-    });
-
-    it("should identify customer.subscription.updated event type", async () => {
-      const eventType = "customer.subscription.updated";
-      const isSubscriptionUpdated =
-        eventType === "customer.subscription.updated";
-      expect(isSubscriptionUpdated).toBeTruthy();
-    });
-
-    it("should identify customer.subscription.deleted event type", async () => {
-      const eventType = "customer.subscription.deleted";
-      const isSubscriptionDeleted =
-        eventType === "customer.subscription.deleted";
-      expect(isSubscriptionDeleted).toBeTruthy();
-    });
-
-    it("should identify invoice.payment_failed event type", async () => {
-      const eventType = "invoice.payment_failed";
-      const isPaymentFailed = eventType === "invoice.payment_failed";
-      expect(isPaymentFailed).toBeTruthy();
-    });
-
-    it("should ignore unknown event types", async () => {
-      const eventType = "unknown.event";
-      const knownTypes = [
-        "checkout.session.completed",
-        "customer.subscription.updated",
-        "customer.subscription.deleted",
-        "invoice.payment_failed",
-      ];
-      expect(knownTypes).not.toContain(eventType);
+      const response = await postWebhook();
+      expect(response.status).toBe(200);
+      expect(mockUpdateStatus).not.toHaveBeenCalled();
+      expect(mockUpdateTier).not.toHaveBeenCalled();
     });
   });
 
-  describe("Period end handling", () => {
-    it("should convert unix timestamp to Date", async () => {
-      const unixTimestamp = 1704067200;
-      const date = new Date(unixTimestamp * 1000);
-      expect(date.getTime()).toBe(unixTimestamp * 1000);
-    });
+  describe("customer.subscription.deleted", () => {
+    it("marks the matching subscription row as cancelled", async () => {
+      mockConstructEvent.mockReturnValueOnce({
+        type: "customer.subscription.deleted",
+        data: { object: { customer: "cus_del" } },
+      });
+      mockFindByStripeCustomer.mockResolvedValueOnce({ id: "sub-del" });
 
-    it("should handle missing period end", async () => {
-      const currentPeriodEnd = null;
-      const date = currentPeriodEnd
-        ? new Date(currentPeriodEnd * 1000)
-        : undefined;
-      expect(date).toBeUndefined();
-    });
-
-    it("should handle expires_at timestamp", async () => {
-      const expiresAt = 1704067200;
-      const date = new Date(expiresAt * 1000);
-      expect(date).toBeInstanceOf(Date);
-      expect(date.getTime()).toBeGreaterThan(0);
+      const response = await postWebhook();
+      expect(response.status).toBe(200);
+      expect(mockUpdateStatus).toHaveBeenCalledWith("sub-del", "cancelled");
     });
   });
 
-  describe("Customer association", () => {
-    it("should extract customer ID from checkout session", async () => {
-      const session = {
-        customer: "cus_test_123",
-      };
+  describe("invoice.payment_failed", () => {
+    it("marks the matching subscription as past_due", async () => {
+      mockConstructEvent.mockReturnValueOnce({
+        type: "invoice.payment_failed",
+        data: { object: { customer: "cus_pd" } },
+      });
+      mockFindByStripeCustomer.mockResolvedValueOnce({ id: "sub-pd" });
 
-      expect(session.customer).toBe("cus_test_123");
+      const response = await postWebhook();
+      expect(response.status).toBe(200);
+      expect(mockUpdateStatus).toHaveBeenCalledWith("sub-pd", "past_due");
     });
+  });
 
-    it("should extract customer ID from subscription", async () => {
-      const subscription = {
-        customer: "cus_test_456",
-      };
+  describe("unknown event types", () => {
+    it("returns 200 without touching any repository", async () => {
+      mockConstructEvent.mockReturnValueOnce({
+        type: "unknown.event.type",
+        data: { object: {} },
+      });
 
-      expect(subscription.customer).toBe("cus_test_456");
-    });
-
-    it("should extract customer ID from invoice", async () => {
-      const invoice = {
-        customer: "cus_test_789",
-      };
-
-      expect(invoice.customer).toBe("cus_test_789");
-    });
-
-    it("should validate customer is string type", async () => {
-      const customer = "cus_test_123";
-      const isValid = typeof customer === "string";
-      expect(isValid).toBeTruthy();
+      const response = await postWebhook();
+      expect(response.status).toBe(200);
+      expect(mockUpsert).not.toHaveBeenCalled();
+      expect(mockUpdateStatus).not.toHaveBeenCalled();
+      expect(mockUpdateTier).not.toHaveBeenCalled();
     });
   });
 });

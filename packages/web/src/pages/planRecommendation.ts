@@ -1,6 +1,12 @@
 export type Plan = {
   name: string;
-  tierId: string | null;
+  /**
+   * Internal tier ID used for Stripe checkout.
+   * `null` for tiers that are not self-serve (Enterprise — contact us).
+   * Consumers (`Subscribe.tsx`, `DiscoveryPanel.tsx`) branch on this:
+   * `null` → "Contact sales" CTA, otherwise → "Get started" → checkout.
+   */
+  tierId: "free" | "premium" | null;
   price: string;
   period: string;
   tagline: string;
@@ -9,7 +15,7 @@ export type Plan = {
 };
 
 export type Recommendation = {
-  tierId: string;
+  tierId: "free" | "premium";
   /** Full sentence shown inline below the highlighted card. */
   reason: string;
   /** Short label used in the badge (≤ 4 words). */
@@ -23,155 +29,85 @@ export type UserSignals = {
 
 export const PLANS: Plan[] = [
   {
-    name: "Starter",
-    tierId: "starter",
-    price: "£19",
-    period: "/month",
-    tagline: "Get organised",
+    name: "Free",
+    tierId: "free",
+    price: "£0",
+    period: "",
+    tagline: "Get started",
     description:
-      "For individuals who want a daily brief and simple task tracking over Telegram.",
+      "Core Axel experience with daily usage caps. 7-day Premium trial available from inside the app.",
     features: [
-      "Daily brief",
-      "Telegram integration",
-      "Basic task automation",
-      "Email triage",
+      "Core Axel experience",
+      "Daily usage caps",
+      "7-day Premium trial",
     ],
   },
   {
-    name: "Pro",
-    tierId: "pro",
+    name: "Premium",
+    tierId: "premium",
     price: "£49",
     period: "/month",
     tagline: "Most popular",
     description:
-      "For busy professionals who need calendar, email, and task automation in one place.",
+      "Full capability — bring your own model, deeper integrations, higher volume.",
     features: [
-      "Everything in Starter",
-      "Calendar management",
-      "Email send/receive",
-      "Integrations",
-      "Sub-agents",
-    ],
-  },
-  {
-    name: "Business",
-    tierId: "business",
-    price: "£99",
-    period: "/month",
-    tagline: "Scale your team",
-    description:
-      "For teams running multiple workflows or needing custom channel support.",
-    features: [
-      "Everything in Pro",
-      "Custom channels",
-      "Multiple agents",
-      "Priority support",
-    ],
-  },
-  {
-    name: "Developer",
-    tierId: "developer",
-    price: "£149",
-    period: "/month",
-    tagline: "For builders",
-    description:
-      "For technical users who need API access, automation scripts, and deep integrations.",
-    features: [
-      "Everything in Business",
-      "Full exec access",
-      "Code generation",
-      "API access",
-      "Heavy sub-agent use",
+      "Everything in Free, without the caps",
+      "Bring your own model (BYOM)",
+      "Deeper integrations",
+      "Higher volume",
+      "Cancel any time",
     ],
   },
   {
     name: "Enterprise",
     tierId: null,
-    price: "Custom",
+    price: "Contact us",
     period: "",
     tagline: "Large organisations",
     description:
-      "For organisations needing custom SLAs, deployment, and compliance controls.",
+      "Security, control, and hands-on support for organisations with real requirements.",
     features: [
-      "Everything in Developer",
-      "Full deployment",
-      "Custom integrations",
-      "MCP knowledge integrations",
-      "SLA guarantee",
-      "Custom contracts",
+      "SSO and audit logs",
+      "SLA options",
+      "Custom retention",
+      "Dedicated support",
     ],
   },
 ];
 
-// Tiers checked in priority order (most specific / highest-value first).
-const TIER_KEYWORDS: Array<{ tierId: string; keywords: string[] }> = [
-  {
-    tierId: "developer",
-    keywords: [
-      "api",
-      "code",
-      "coding",
-      "developer",
-      "script",
-      "technical",
-      "programming",
-      "exec",
-    ],
-  },
-  {
-    tierId: "business",
-    keywords: [
-      "team",
-      "company",
-      "organisation",
-      "organization",
-      "employees",
-      "custom channel",
-      "multiple agent",
-    ],
-  },
-  {
-    tierId: "pro",
-    keywords: [
-      "calendar",
-      "email",
-      "integration",
-      "meeting",
-      "schedule",
-      "sub-agent",
-    ],
-  },
-  {
-    tierId: "starter",
-    keywords: [
-      "simple",
-      "basic",
-      "telegram",
-      "daily brief",
-      "organised",
-      "organized",
-    ],
-  },
+/**
+ * Keywords that indicate a user needs Premium rather than Free.
+ * Matched at word boundaries to avoid substring false positives.
+ */
+const PREMIUM_KEYWORDS = [
+  "api",
+  "byom",
+  "bring your own model",
+  "calendar",
+  "code",
+  "coding",
+  "developer",
+  "email",
+  "integration",
+  "meeting",
+  "schedule",
+  "sub-agent",
+  "team",
+  "custom channel",
 ];
 
-const TIER_REASONS: Record<string, { reason: string; shortReason: string }> = {
-  developer: {
-    reason: "Based on your interest in API access and code automation.",
-    shortReason: "Based on your needs",
-  },
-  business: {
-    reason: "Based on your team-scale needs.",
-    shortReason: "Based on your needs",
-  },
-  pro: {
-    reason: "Based on your calendar, email, and task automation needs.",
-    shortReason: "Based on your needs",
-  },
-  starter: {
-    reason: "A great starting point based on what you described.",
-    shortReason: "Based on your needs",
-  },
-};
+// Only Premium gets a recommendation — Free is the default entry point and
+// `getRecommendedPlan` returns `null` when no Premium keywords match, so the
+// Discovery panel simply shows no badge. Keep the record keyed on a single
+// literal so the dead Free entry can't drift back in.
+const TIER_REASONS: Record<"premium", { reason: string; shortReason: string }> =
+  {
+    premium: {
+      reason:
+        "Based on your needs around deeper integrations and higher volume.",
+      shortReason: "Based on your needs",
+    },
+  };
 
 /**
  * Returns true when `keyword` appears in `text` at a word boundary, preventing
@@ -189,10 +125,9 @@ function matchesKeyword(text: string, keyword: string): boolean {
  * Returns a plan recommendation derived from user signals, or null when no
  * meaningful signals are available.
  *
- * Accepts optional onboarding/chat messages and matches tier keywords against
- * user message content to produce a signal-driven recommendation without AI
- * inference. Returns null when there are no user messages to draw from — the
- * recommendation badge is only shown when it has real context behind it.
+ * Heuristic: match Premium keywords against user messages. If any match,
+ * recommend Premium; otherwise no recommendation is shown (Free is the default
+ * entry point and doesn't need a badge).
  */
 export function getRecommendedPlan(
   signals?: UserSignals,
@@ -204,10 +139,8 @@ export function getRecommendedPlan(
   const userText = userMessages.map((m) => m.content.toLowerCase()).join(" ");
   if (!userText.trim()) return null;
 
-  for (const { tierId, keywords } of TIER_KEYWORDS) {
-    if (keywords.some((k) => matchesKeyword(userText, k))) {
-      return { tierId, ...TIER_REASONS[tierId] };
-    }
+  if (PREMIUM_KEYWORDS.some((k) => matchesKeyword(userText, k))) {
+    return { tierId: "premium", ...TIER_REASONS.premium };
   }
 
   return null;

@@ -12,15 +12,14 @@ vi.mock("../subscribeApi", () => ({
 }));
 
 describe("Subscribe", () => {
-  it("renders pricing plans", () => {
+  it("renders the three pricing plans", () => {
     render(
       <MemoryRouter>
         <Subscribe />
       </MemoryRouter>,
     );
-    expect(screen.getByText("Starter")).toBeDefined();
-    expect(screen.getByText("Pro")).toBeDefined();
-    expect(screen.getByText("Business")).toBeDefined();
+    expect(screen.getByText("Free")).toBeDefined();
+    expect(screen.getByText("Premium")).toBeDefined();
     expect(screen.getByText("Enterprise")).toBeDefined();
   });
 
@@ -30,10 +29,9 @@ describe("Subscribe", () => {
         <Subscribe />
       </MemoryRouter>,
     );
-    expect(screen.getByText(/£19/)).toBeDefined();
+    expect(screen.getByText(/£0/)).toBeDefined();
     expect(screen.getByText(/£49/)).toBeDefined();
-    expect(screen.getByText(/£99/)).toBeDefined();
-    expect(screen.getByText(/£149/)).toBeDefined();
+    expect(screen.getByText("Contact us")).toBeDefined();
   });
 
   it("does not show a recommendation badge when no signals are available", () => {
@@ -42,13 +40,11 @@ describe("Subscribe", () => {
         <Subscribe />
       </MemoryRouter>,
     );
-    // No onboarding signals on the generic pricing page — no badge should render
     expect(screen.queryByText("Best starting point")).toBeNull();
     expect(screen.queryByText(/based on your needs/i)).toBeNull();
-    expect(screen.queryByText(/covers calendar, email/i)).toBeNull();
   });
 
-  it("renders Get started for non-Enterprise plans", () => {
+  it("renders Get started for self-serve plans", () => {
     render(
       <MemoryRouter>
         <Subscribe />
@@ -57,7 +53,8 @@ describe("Subscribe", () => {
     const getStartedButtons = screen.getAllByRole("button", {
       name: "Get started",
     });
-    expect(getStartedButtons.length).toBeGreaterThan(0);
+    // Free + Premium = 2 self-serve plans
+    expect(getStartedButtons.length).toBe(2);
   });
 
   it("Enterprise plan shows Contact sales button", () => {
@@ -75,25 +72,25 @@ describe("Subscribe", () => {
         <Subscribe />
       </MemoryRouter>,
     );
-    // Clicking Contact sales should not throw; jsdom doesn't support window.location.assign spying
     expect(() =>
       fireEvent.click(screen.getByRole("button", { name: "Contact sales" })),
     ).not.toThrow();
   });
 
-  it("clicking Get started calls createCheckoutSession with the plan tier", async () => {
+  it("clicking Get started on the Premium plan calls createCheckoutSession with 'premium'", async () => {
     render(
       <MemoryRouter>
         <Subscribe />
       </MemoryRouter>,
     );
-    fireEvent.click(screen.getAllByRole("button", { name: "Get started" })[0]);
+    // Free is index 0, Premium is index 1 — Premium triggers checkout
+    fireEvent.click(screen.getAllByRole("button", { name: "Get started" })[1]);
     await waitFor(() => {
-      expect(createCheckoutSession).toHaveBeenCalledWith("starter");
+      expect(createCheckoutSession).toHaveBeenCalledWith("premium");
     });
   });
 
-  it("shows error message when createCheckoutSession rejects", async () => {
+  it("shows error message when createCheckoutSession rejects on Premium", async () => {
     vi.mocked(createCheckoutSession).mockRejectedValueOnce(
       new Error("Stripe unavailable"),
     );
@@ -102,7 +99,8 @@ describe("Subscribe", () => {
         <Subscribe />
       </MemoryRouter>,
     );
-    fireEvent.click(screen.getAllByRole("button", { name: "Get started" })[0]);
+    // Premium is the second Get started button
+    fireEvent.click(screen.getAllByRole("button", { name: "Get started" })[1]);
     await waitFor(() => {
       expect(screen.getByText("Stripe unavailable")).toBeDefined();
     });
@@ -111,8 +109,8 @@ describe("Subscribe", () => {
   describe("when a signal-driven recommendation is available", () => {
     it("shows the recommendation badge and reason on the recommended plan", () => {
       vi.spyOn(planRecommendation, "getRecommendedPlan").mockReturnValue({
-        tierId: "pro",
-        reason: "Based on your calendar, email, and task automation needs.",
+        tierId: "premium",
+        reason: "Based on your needs around deeper integrations.",
         shortReason: "Based on your needs",
       });
 
@@ -124,18 +122,16 @@ describe("Subscribe", () => {
 
       expect(screen.getByText("Based on your needs")).toBeDefined();
       expect(
-        screen.getByText(
-          /based on your calendar, email, and task automation needs/i,
-        ),
+        screen.getByText(/based on your needs around deeper integrations/i),
       ).toBeDefined();
 
       vi.restoreAllMocks();
     });
 
-    it("highlights the recommended plan card with accent border", () => {
+    it("renders all three plan buttons when a recommendation is set", () => {
       vi.spyOn(planRecommendation, "getRecommendedPlan").mockReturnValue({
-        tierId: "pro",
-        reason: "Based on your calendar, email, and task automation needs.",
+        tierId: "premium",
+        reason: "Based on your needs around deeper integrations.",
         shortReason: "Based on your needs",
       });
 
@@ -145,10 +141,13 @@ describe("Subscribe", () => {
         </MemoryRouter>,
       );
 
-      // Recommended plan button uses accent background
-      const buttons = screen.getAllByRole("button", { name: "Get started" });
-      // Pro is the second plan (index 1); its button should exist
-      expect(buttons.length).toBeGreaterThanOrEqual(2);
+      const getStartedButtons = screen.getAllByRole("button", {
+        name: "Get started",
+      });
+      expect(getStartedButtons.length).toBe(2);
+      expect(
+        screen.getByRole("button", { name: "Contact sales" }),
+      ).toBeDefined();
 
       vi.restoreAllMocks();
     });

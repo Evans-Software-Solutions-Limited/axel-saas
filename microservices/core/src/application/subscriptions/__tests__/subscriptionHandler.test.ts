@@ -73,15 +73,13 @@ vi.mock("../../repositories/userRepository", () => ({
 }));
 
 vi.stubEnv("STRIPE_SECRET_KEY", "sk_test_sub_123");
-vi.stubEnv("STRIPE_PRICE_STARTER", "price_starter_sub");
-vi.stubEnv("STRIPE_PRICE_PRO", "price_pro_sub");
-vi.stubEnv("STRIPE_PRICE_BUSINESS", "price_business_sub");
-vi.stubEnv("STRIPE_PRICE_DEVELOPER", "price_developer_sub");
+vi.stubEnv("STRIPE_PRICE_PREMIUM", "price_premium_sub");
 vi.stubEnv("VITE_WEB_URL", "http://localhost:5173");
 
 import {
   subscriptionHandler,
   subscriptionPublicHandler,
+  TIERS,
 } from "../subscriptionHandler";
 
 describe("SubscriptionHandler", () => {
@@ -100,193 +98,63 @@ describe("SubscriptionHandler", () => {
     });
   });
 
-  describe("subscriptionPublicHandler instance", () => {
-    it("should be defined", () => {
-      expect(subscriptionPublicHandler).toBeDefined();
+  describe("TIERS constant", () => {
+    it("exposes exactly Free, Premium, Enterprise", () => {
+      const ids = TIERS.map((t) => t.id);
+      expect(ids).toEqual(["free", "premium", "enterprise"]);
     });
 
-    it("should have expected routes", () => {
-      expect(subscriptionPublicHandler.routes).toBeDefined();
-      expect(Array.isArray(subscriptionPublicHandler.routes)).toBe(true);
-      expect(subscriptionPublicHandler.routes.length).toBeGreaterThan(0);
+    it("prices Free at 0 and Premium at 49 GBP", () => {
+      const free = TIERS.find((t) => t.id === "free");
+      const premium = TIERS.find((t) => t.id === "premium");
+      expect(free?.priceGbpMonthly).toBe(0);
+      expect(premium?.priceGbpMonthly).toBe(49);
     });
 
-    it("should have GET /subscriptions/tiers route", () => {
-      const getRoutes = subscriptionPublicHandler.routes.filter(
-        (r) => r.method === "GET",
-      );
-      const tiersRoute = getRoutes.find(
-        (r) => r.path === "/subscriptions/tiers",
-      );
-      expect(tiersRoute).toBeDefined();
-    });
-  });
-
-  describe("subscriptionHandler instance", () => {
-    it("should be defined", () => {
-      expect(subscriptionHandler).toBeDefined();
-    });
-
-    it("should have expected routes", () => {
-      expect(subscriptionHandler.routes).toBeDefined();
-      expect(Array.isArray(subscriptionHandler.routes)).toBe(true);
-      expect(subscriptionHandler.routes.length).toBeGreaterThan(0);
-    });
-
-    it("should have POST /subscriptions/checkout route", () => {
-      const postRoutes = subscriptionHandler.routes.filter(
-        (r) => r.method === "POST",
-      );
-      const checkoutRoute = postRoutes.find(
-        (r) => r.path === "/subscriptions/checkout",
-      );
-      expect(checkoutRoute).toBeDefined();
+    it("marks Enterprise as not self-serve", () => {
+      const enterprise = TIERS.find((t) => t.id === "enterprise");
+      expect(enterprise?.selfServe).toBe(false);
+      expect(enterprise?.priceGbpMonthly).toBeNull();
     });
   });
 
   describe("GET /subscriptions/tiers (public)", () => {
-    it("should return all tiers without authentication", async () => {
+    it("returns the three tiers without authentication", async () => {
       const result = await subscriptionPublicHandler.handle(
-        new Request("http://localhost/subscriptions/tiers", {
-          method: "GET",
-        }),
+        new Request("http://localhost/subscriptions/tiers", { method: "GET" }),
       );
 
       expect(result.status).toBe(200);
-      const tiers = (await result.json()) as Array<{
-        id: string;
-        name: string;
-        priceGbpMonthly: number;
-        features: string[];
-      }>;
-      expect(Array.isArray(tiers)).toBe(true);
-      expect(tiers.length).toBeGreaterThan(0);
-    });
-
-    it("should return tiers with correct structure", async () => {
-      const result = await subscriptionPublicHandler.handle(
-        new Request("http://localhost/subscriptions/tiers", {
-          method: "GET",
-        }),
-      );
-
-      const tiers = (await result.json()) as Array<{
-        id: string;
-        name: string;
-        priceGbpMonthly: number;
-        features: string[];
-      }>;
-      for (const tier of tiers) {
-        expect(tier.id).toBeDefined();
-        expect(tier.name).toBeDefined();
-        expect(tier.priceGbpMonthly).toBeDefined();
-        expect(tier.features).toBeDefined();
-        expect(Array.isArray(tier.features)).toBe(true);
-      }
-    });
-
-    it("should include all four tier options", async () => {
-      const result = await subscriptionPublicHandler.handle(
-        new Request("http://localhost/subscriptions/tiers", {
-          method: "GET",
-        }),
-      );
-
       const tiers = (await result.json()) as Array<{ id: string }>;
-      const tierIds = tiers.map((t) => t.id);
-      expect(tierIds).toContain("starter");
-      expect(tierIds).toContain("pro");
-      expect(tierIds).toContain("business");
-      expect(tierIds).toContain("developer");
+      expect(tiers.map((t) => t.id)).toEqual(["free", "premium", "enterprise"]);
     });
 
-    it("should have starter tier with correct price", async () => {
+    it("each tier has a non-empty feature list", async () => {
       const result = await subscriptionPublicHandler.handle(
-        new Request("http://localhost/subscriptions/tiers", {
-          method: "GET",
-        }),
+        new Request("http://localhost/subscriptions/tiers", { method: "GET" }),
       );
-
-      const tiers = (await result.json()) as Array<{
-        id: string;
-        priceGbpMonthly: number;
-        features: string[];
-      }>;
-      const starter = tiers.find((t) => t.id === "starter");
-      expect(starter).toBeDefined();
-      expect(starter?.priceGbpMonthly).toBe(19);
-      expect(starter?.features).toContain("Daily brief");
-    });
-
-    it("should have pro tier with correct price", async () => {
-      const result = await subscriptionPublicHandler.handle(
-        new Request("http://localhost/subscriptions/tiers", {
-          method: "GET",
-        }),
-      );
-
-      const tiers = (await result.json()) as Array<{
-        id: string;
-        priceGbpMonthly: number;
-        features: string[];
-      }>;
-      const pro = tiers.find((t) => t.id === "pro");
-      expect(pro).toBeDefined();
-      expect(pro?.priceGbpMonthly).toBe(49);
-      expect(pro?.features).toContain("Calendar");
-    });
-
-    it("should have business tier with correct price", async () => {
-      const result = await subscriptionPublicHandler.handle(
-        new Request("http://localhost/subscriptions/tiers", {
-          method: "GET",
-        }),
-      );
-
-      const tiers = (await result.json()) as Array<{
-        id: string;
-        priceGbpMonthly: number;
-        features: string[];
-      }>;
-      const business = tiers.find((t) => t.id === "business");
-      expect(business).toBeDefined();
-      expect(business?.priceGbpMonthly).toBe(99);
-      expect(business?.features).toContain("Priority support");
-    });
-
-    it("should have developer tier with correct price", async () => {
-      const result = await subscriptionPublicHandler.handle(
-        new Request("http://localhost/subscriptions/tiers", {
-          method: "GET",
-        }),
-      );
-
-      const tiers = (await result.json()) as Array<{
-        id: string;
-        priceGbpMonthly: number;
-        features: string[];
-      }>;
-      const developer = tiers.find((t) => t.id === "developer");
-      expect(developer).toBeDefined();
-      expect(developer?.priceGbpMonthly).toBe(149);
-      expect(developer?.features).toContain("API access");
+      const tiers = (await result.json()) as Array<{ features: string[] }>;
+      for (const tier of tiers) {
+        expect(Array.isArray(tier.features)).toBe(true);
+        expect(tier.features.length).toBeGreaterThan(0);
+      }
     });
   });
 
   describe("POST /subscriptions/checkout (protected)", () => {
-    it("should return 401 without authorization", async () => {
+    it("returns 401 without authorization", async () => {
       const result = await subscriptionHandler.handle(
         new Request("http://localhost/subscriptions/checkout", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ tierId: "starter" }),
+          body: JSON.stringify({ tierId: "premium" }),
         }),
       );
 
       expect(result.status).toBe(401);
     });
 
-    it("should create a Stripe checkout session and return URL for starter tier", async () => {
+    it("creates a Stripe checkout session for 'premium'", async () => {
       const result = await subscriptionHandler.handle(
         new Request("http://localhost/subscriptions/checkout", {
           method: "POST",
@@ -294,7 +162,7 @@ describe("SubscriptionHandler", () => {
             authorization: "Bearer test_token",
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ tierId: "starter" }),
+          body: JSON.stringify({ tierId: "premium" }),
         }),
       );
 
@@ -304,61 +172,25 @@ describe("SubscriptionHandler", () => {
       expect(json.url).toBe("https://checkout.stripe.com/pay/cs_test_sub");
     });
 
-    it("should create a Stripe checkout session and return URL for pro tier", async () => {
-      const result = await subscriptionHandler.handle(
-        new Request("http://localhost/subscriptions/checkout", {
-          method: "POST",
-          headers: {
-            authorization: "Bearer test_token",
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ tierId: "pro" }),
-        }),
-      );
+    it.each([["free"], ["enterprise"], ["starter"], ["pro"], ["business"]])(
+      "rejects non-checkout tier %s with 400",
+      async (tier) => {
+        const result = await subscriptionHandler.handle(
+          new Request("http://localhost/subscriptions/checkout", {
+            method: "POST",
+            headers: {
+              authorization: "Bearer test_token",
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ tierId: tier }),
+          }),
+        );
 
-      expect(result.status).toBe(200);
-      const json = (await result.json()) as { success: boolean; url: string };
-      expect(json.success).toBe(true);
-      expect(typeof json.url).toBe("string");
-    });
+        expect(result.status).toBe(400);
+      },
+    );
 
-    it("should create a Stripe checkout session and return URL for business tier", async () => {
-      const result = await subscriptionHandler.handle(
-        new Request("http://localhost/subscriptions/checkout", {
-          method: "POST",
-          headers: {
-            authorization: "Bearer test_token",
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ tierId: "business" }),
-        }),
-      );
-
-      expect(result.status).toBe(200);
-      const json = (await result.json()) as { success: boolean; url: string };
-      expect(json.success).toBe(true);
-      expect(typeof json.url).toBe("string");
-    });
-
-    it("should create a Stripe checkout session and return URL for developer tier", async () => {
-      const result = await subscriptionHandler.handle(
-        new Request("http://localhost/subscriptions/checkout", {
-          method: "POST",
-          headers: {
-            authorization: "Bearer test_token",
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ tierId: "developer" }),
-        }),
-      );
-
-      expect(result.status).toBe(200);
-      const json = (await result.json()) as { success: boolean; url: string };
-      expect(json.success).toBe(true);
-      expect(typeof json.url).toBe("string");
-    });
-
-    it("should return 400 for an invalid tier", async () => {
+    it("returns 400 for an unknown tier", async () => {
       const result = await subscriptionHandler.handle(
         new Request("http://localhost/subscriptions/checkout", {
           method: "POST",
@@ -373,7 +205,7 @@ describe("SubscriptionHandler", () => {
       expect(result.status).toBe(400);
     });
 
-    it("should reuse existing Stripe customer when subscription exists", async () => {
+    it("reuses an existing Stripe customer when a subscription row exists", async () => {
       mockFindByUserId.mockResolvedValue({
         id: "sub-id",
         stripeCustomerId: "cus_existing_456",
@@ -386,7 +218,7 @@ describe("SubscriptionHandler", () => {
             authorization: "Bearer test_token",
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ tierId: "starter" }),
+          body: JSON.stringify({ tierId: "premium" }),
         }),
       );
 
@@ -396,54 +228,72 @@ describe("SubscriptionHandler", () => {
         expect.objectContaining({ customer: "cus_existing_456" }),
       );
     });
-  });
 
-  describe("subscription tiers structure", () => {
-    it("should define expected tier structure", () => {
-      expect(
-        subscriptionPublicHandler.routes.some(
-          (r) => r.path === "/subscriptions/tiers",
-        ),
-      ).toBe(true);
-    });
+    it("returns 500 when STRIPE_PRICE_PREMIUM is missing", async () => {
+      vi.stubEnv("STRIPE_PRICE_PREMIUM", "");
 
-    it("should have proper route configuration", () => {
-      const publicGetRoute = subscriptionPublicHandler.routes.find(
-        (r) => r.method === "GET" && r.path === "/subscriptions/tiers",
-      );
-      const protectedPostRoute = subscriptionHandler.routes.find(
-        (r) => r.method === "POST" && r.path === "/subscriptions/checkout",
+      const result = await subscriptionHandler.handle(
+        new Request("http://localhost/subscriptions/checkout", {
+          method: "POST",
+          headers: {
+            authorization: "Bearer test_token",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ tierId: "premium" }),
+        }),
       );
 
-      expect(publicGetRoute).toBeDefined();
-      expect(protectedPostRoute).toBeDefined();
+      expect(result.status).toBe(500);
+      vi.stubEnv("STRIPE_PRICE_PREMIUM", "price_premium_sub");
     });
 
-    it("should separate public and protected handlers", () => {
-      expect(subscriptionPublicHandler).toBeDefined();
-      expect(subscriptionHandler).toBeDefined();
-      expect(subscriptionPublicHandler).not.toEqual(subscriptionHandler);
-    });
+    it("returns 404 when the user is missing", async () => {
+      mockFindBySupabaseId.mockResolvedValue(null);
 
-    it("should have GET /subscriptions/status route", () => {
-      const statusRoute = subscriptionHandler.routes.find(
-        (r) => r.method === "GET" && r.path === "/subscriptions/status",
+      const result = await subscriptionHandler.handle(
+        new Request("http://localhost/subscriptions/checkout", {
+          method: "POST",
+          headers: {
+            authorization: "Bearer test_token",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ tierId: "premium" }),
+        }),
       );
-      expect(statusRoute).toBeDefined();
+
+      expect(result.status).toBe(404);
+    });
+
+    it("returns 500 when Stripe returns a null session URL", async () => {
+      mockSessionCreate.mockResolvedValue({ url: null });
+
+      const result = await subscriptionHandler.handle(
+        new Request("http://localhost/subscriptions/checkout", {
+          method: "POST",
+          headers: {
+            authorization: "Bearer test_token",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ tierId: "premium" }),
+        }),
+      );
+
+      expect(result.status).toBe(500);
+      const json = (await result.json()) as { success: boolean; error: string };
+      expect(json.success).toBe(false);
+      expect(json.error).toMatch(/checkout URL/i);
     });
   });
 
   describe("GET /subscriptions/status (protected)", () => {
-    it("should return 401 without authorization", async () => {
+    it("returns 401 without authorization", async () => {
       const result = await subscriptionHandler.handle(
-        new Request("http://localhost/subscriptions/status", {
-          method: "GET",
-        }),
+        new Request("http://localhost/subscriptions/status", { method: "GET" }),
       );
       expect(result.status).toBe(401);
     });
 
-    it("should return null subscription when user has no subscription", async () => {
+    it("returns null subscription when the user has none", async () => {
       mockFindByUserId.mockResolvedValue(null);
 
       const result = await subscriptionHandler.handle(
@@ -462,19 +312,18 @@ describe("SubscriptionHandler", () => {
       expect(json.subscription).toBeNull();
     });
 
-    it("should return subscription data when subscription exists", async () => {
-      const mockSub = {
+    it("returns subscription data (tier, status, period end) when one exists", async () => {
+      mockFindByUserId.mockResolvedValue({
         id: "sub-123",
         userId: "db-user-id",
         stripeCustomerId: "cus_test",
         stripeSubscriptionId: "sub_test",
-        tier: "pro" as const,
-        status: "active" as const,
+        tier: "premium",
+        status: "active",
         currentPeriodEnd: new Date("2026-04-01"),
         createdAt: new Date(),
         updatedAt: new Date(),
-      };
-      mockFindByUserId.mockResolvedValue(mockSub);
+      });
 
       const result = await subscriptionHandler.handle(
         new Request("http://localhost/subscriptions/status", {
@@ -489,11 +338,11 @@ describe("SubscriptionHandler", () => {
         subscription: { tier: string; status: string };
       };
       expect(json.success).toBe(true);
-      expect(json.subscription?.tier).toBe("pro");
+      expect(json.subscription?.tier).toBe("premium");
       expect(json.subscription?.status).toBe("active");
     });
 
-    it("should return 404 when user not found", async () => {
+    it("returns 404 when the user is not found", async () => {
       mockFindBySupabaseId.mockResolvedValue(null);
 
       const result = await subscriptionHandler.handle(
@@ -507,61 +356,23 @@ describe("SubscriptionHandler", () => {
     });
   });
 
-  describe("POST /subscriptions/checkout error branches", () => {
-    it("should return 500 when price is not configured for tier", async () => {
-      // Simulate missing price env var
-      vi.stubEnv("STRIPE_PRICE_PRO", "");
-
-      const result = await subscriptionHandler.handle(
-        new Request("http://localhost/subscriptions/checkout", {
-          method: "POST",
-          headers: {
-            authorization: "Bearer test_token",
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ tierId: "pro" }),
-        }),
+  describe("route definitions", () => {
+    it("public handler exposes GET /subscriptions/tiers", () => {
+      const route = subscriptionPublicHandler.routes.find(
+        (r) => r.method === "GET" && r.path === "/subscriptions/tiers",
       );
-
-      expect(result.status).toBe(500);
-      vi.stubEnv("STRIPE_PRICE_PRO", "price_pro_sub");
+      expect(route).toBeDefined();
     });
 
-    it("should return 404 when user not found in checkout", async () => {
-      mockFindBySupabaseId.mockResolvedValue(null);
-
-      const result = await subscriptionHandler.handle(
-        new Request("http://localhost/subscriptions/checkout", {
-          method: "POST",
-          headers: {
-            authorization: "Bearer test_token",
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ tierId: "pro" }),
-        }),
+    it("protected handler exposes POST /subscriptions/checkout and GET /subscriptions/status", () => {
+      const checkout = subscriptionHandler.routes.find(
+        (r) => r.method === "POST" && r.path === "/subscriptions/checkout",
       );
-
-      expect(result.status).toBe(404);
-    });
-
-    it("should return 500 when Stripe returns null session URL", async () => {
-      mockSessionCreate.mockResolvedValue({ url: null });
-
-      const result = await subscriptionHandler.handle(
-        new Request("http://localhost/subscriptions/checkout", {
-          method: "POST",
-          headers: {
-            authorization: "Bearer test_token",
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ tierId: "starter" }),
-        }),
+      const status = subscriptionHandler.routes.find(
+        (r) => r.method === "GET" && r.path === "/subscriptions/status",
       );
-
-      expect(result.status).toBe(500);
-      const json = (await result.json()) as { success: boolean; error: string };
-      expect(json.success).toBe(false);
-      expect(json.error).toMatch(/checkout URL/i);
+      expect(checkout).toBeDefined();
+      expect(status).toBeDefined();
     });
   });
 });

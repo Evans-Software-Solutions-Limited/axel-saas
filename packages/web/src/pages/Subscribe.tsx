@@ -33,7 +33,7 @@ export function Subscribe() {
       </div>
 
       {/* Pricing Cards */}
-      <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+      <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-6">
         {PLANS.map((plan) => {
           const isRecommended =
             recommendation !== null && plan.tierId === recommendation.tierId;
@@ -138,7 +138,9 @@ export function Subscribe() {
               Is there a free trial?
             </h3>
             <p className="text-muted text-sm">
-              Yes, all plans include a 14-day free trial with full access.
+              Free users can activate a 7-day Premium trial from inside the app
+              — no card required until the trial ends. Free itself has no time
+              limit; use it for as long as you like.
             </p>
           </div>
           <div>

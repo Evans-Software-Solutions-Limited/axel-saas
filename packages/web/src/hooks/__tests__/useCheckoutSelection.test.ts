@@ -37,12 +37,21 @@ describe("useCheckoutSelection", () => {
     expect(createCheckoutSession).not.toHaveBeenCalled();
   });
 
-  it("calls createCheckoutSession and redirects on success", async () => {
+  it("redirects to /signup for the free tier (no Stripe checkout)", async () => {
     const { result } = renderHook(() => useCheckoutSelection());
     await act(async () => {
-      await result.current.handleSelectPlan("pro");
+      await result.current.handleSelectPlan("free");
     });
-    expect(createCheckoutSession).toHaveBeenCalledWith("pro");
+    expect(assignMock).toHaveBeenCalledWith("/signup");
+    expect(createCheckoutSession).not.toHaveBeenCalled();
+  });
+
+  it("calls createCheckoutSession and redirects on premium success", async () => {
+    const { result } = renderHook(() => useCheckoutSelection());
+    await act(async () => {
+      await result.current.handleSelectPlan("premium");
+    });
+    expect(createCheckoutSession).toHaveBeenCalledWith("premium");
     expect(assignMock).toHaveBeenCalledWith(
       "https://checkout.stripe.com/pay/cs_test",
     );
@@ -54,7 +63,7 @@ describe("useCheckoutSelection", () => {
     );
     const { result } = renderHook(() => useCheckoutSelection());
     await act(async () => {
-      await result.current.handleSelectPlan("starter");
+      await result.current.handleSelectPlan("premium");
     });
     expect(result.current.loadingTier).toBeNull();
     expect(result.current.error).toBe("Stripe unavailable");
@@ -64,12 +73,12 @@ describe("useCheckoutSelection", () => {
     vi.mocked(createCheckoutSession).mockRejectedValueOnce("unexpected");
     const { result } = renderHook(() => useCheckoutSelection());
     await act(async () => {
-      await result.current.handleSelectPlan("starter");
+      await result.current.handleSelectPlan("premium");
     });
     expect(result.current.error).toBe("Failed to start checkout");
   });
 
-  it("clears previous error before a new attempt", async () => {
+  it("clears previous error before a new Premium attempt", async () => {
     vi.mocked(createCheckoutSession)
       .mockRejectedValueOnce(new Error("first error"))
       .mockResolvedValueOnce({ url: "https://checkout.stripe.com/pay/cs_ok" });
@@ -77,12 +86,12 @@ describe("useCheckoutSelection", () => {
     const { result } = renderHook(() => useCheckoutSelection());
 
     await act(async () => {
-      await result.current.handleSelectPlan("starter");
+      await result.current.handleSelectPlan("premium");
     });
     expect(result.current.error).toBe("first error");
 
     await act(async () => {
-      await result.current.handleSelectPlan("pro");
+      await result.current.handleSelectPlan("premium");
     });
     expect(result.current.error).toBeNull();
   });

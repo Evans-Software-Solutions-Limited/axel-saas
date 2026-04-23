@@ -28,7 +28,7 @@ describe("subscribeApi", () => {
         data: { url: "https://checkout.stripe.com/pay/cs_test_123" },
       } as never);
 
-      const result = await createCheckoutSession("pro");
+      const result = await createCheckoutSession("premium");
 
       expect(result).toEqual({
         url: "https://checkout.stripe.com/pay/cs_test_123",
@@ -37,14 +37,14 @@ describe("subscribeApi", () => {
 
     it("passes tier to the API", async () => {
       mockApi.core.stripe["create-checkout-session"].post.mockResolvedValue({
-        data: { url: "https://checkout.stripe.com/pay/cs_starter" },
+        data: { url: "https://checkout.stripe.com/pay/cs_premium" },
       } as never);
 
-      await createCheckoutSession("starter");
+      await createCheckoutSession("premium");
 
       expect(
         mockApi.core.stripe["create-checkout-session"].post,
-      ).toHaveBeenCalledWith({ tier: "starter" });
+      ).toHaveBeenCalledWith({ tier: "premium" });
     });
 
     it("throws when API returns an error object", async () => {
@@ -60,7 +60,7 @@ describe("subscribeApi", () => {
         data: {},
       } as never);
 
-      await expect(createCheckoutSession("pro")).rejects.toThrow(
+      await expect(createCheckoutSession("premium")).rejects.toThrow(
         "Failed to create checkout session",
       );
     });

@@ -158,7 +158,7 @@ describe("POST /users/onboarding/complete", () => {
       messages: [],
     });
     mockIsComplete.mockReturnValue(true);
-    mockSubFindByUserId.mockResolvedValue(null); // no subscription → "starter"
+    mockSubFindByUserId.mockResolvedValue(null); // no subscription → "free"
     mockProvFindByUserId.mockResolvedValue(MOCK_PROVISIONING);
     mockResolveWorkspacePath.mockReturnValue(
       "/tmp/workspace/db-user-123/workspace",
@@ -203,20 +203,23 @@ describe("POST /users/onboarding/complete", () => {
     });
 
     it("uses subscription tier when generating files", async () => {
-      mockSubFindByUserId.mockResolvedValue({ tier: "pro", status: "active" });
+      mockSubFindByUserId.mockResolvedValue({
+        tier: "premium",
+        status: "active",
+      });
       await onboardingHandler.handle(makeRequest());
       expect(mockGenerateWorkspaceFiles).toHaveBeenCalledWith(
         MOCK_STATE.collectedAnswers,
-        "pro",
+        "premium",
       );
     });
 
-    it("defaults to starter tier when subscription is absent", async () => {
+    it("defaults to the free tier when subscription is absent", async () => {
       mockSubFindByUserId.mockResolvedValue(null);
       await onboardingHandler.handle(makeRequest());
       expect(mockGenerateWorkspaceFiles).toHaveBeenCalledWith(
         MOCK_STATE.collectedAnswers,
-        "starter",
+        "free",
       );
     });
 

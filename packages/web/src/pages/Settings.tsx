@@ -96,12 +96,12 @@ export function Settings() {
             <div className="flex items-center justify-between p-4 bg-surface-elevated/50 rounded-xl border border-border-subtle">
               <div>
                 <div className="flex items-center gap-2">
-                  <p className="text-text font-medium">Professional</p>
+                  <p className="text-text font-medium">Free</p>
                   <Badge className="bg-accent-muted text-accent border-0">
                     Active
                   </Badge>
                 </div>
-                <p className="text-sm text-text-secondary mt-0.5">£79/month</p>
+                <p className="text-sm text-text-secondary mt-0.5">£0/month</p>
               </div>
               <Button variant="outline" className="text-xs">
                 Change plan
