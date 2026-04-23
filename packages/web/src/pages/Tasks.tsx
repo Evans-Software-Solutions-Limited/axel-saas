@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router";
 import { Card } from "@axel-saas/ui/card";
 import { Input } from "@axel-saas/ui/input";
 import {
@@ -17,77 +18,143 @@ import {
   TableHeader,
   TableRow,
 } from "@axel-saas/ui/table";
-import { IconSearch } from "@tabler/icons-react";
+import {
+  IconSearch,
+  IconChevronDown,
+  IconChevronRight,
+} from "@tabler/icons-react";
+import type { TaskState } from "@/pages/tasks/tasksApi";
+import { useAgentTasks } from "@/hooks/useAgentTasks";
+import {
+  getAgentMetadata,
+  AGENT_METADATA,
+  type AgentId,
+} from "@/lib/agentMetadata";
+import {
+  getTaskDetail,
+  type TaskDetail,
+  type TaskListItem,
+} from "./tasks/tasksApi";
 
-interface Task {
-  id: string;
-  name: string;
-  agent: string;
-  status: "pending" | "in-progress" | "completed" | "failed";
-  dueDate: string;
-}
-
-const SAMPLE_TASKS: Task[] = [
-  {
-    id: "1",
-    name: "Process email inbox",
-    agent: "Axel",
-    status: "in-progress",
-    dueDate: "Today",
-  },
-  {
-    id: "2",
-    name: "Generate weekly report",
-    agent: "Automata",
-    status: "completed",
-    dueDate: "Yesterday",
-  },
-  {
-    id: "3",
-    name: "Index new documents",
-    agent: "Keeper",
-    status: "pending",
-    dueDate: "Tomorrow",
-  },
-  {
-    id: "4",
-    name: "Update client files",
-    agent: "Axel",
-    status: "failed",
-    dueDate: "3 days ago",
-  },
-];
-
-const statusColors = {
-  pending: "bg-muted/15 text-text-secondary",
-  "in-progress": "bg-accent-muted text-accent",
+const statusColors: Record<TaskState, string> = {
+  running: "bg-warning/15 text-warning",
   completed: "bg-success/15 text-success",
   failed: "bg-destructive/15 text-destructive",
+  review_ready: "bg-accent-muted text-accent",
+  no_changes: "bg-muted/15 text-text-secondary",
+  unknown: "bg-muted/15 text-text-secondary",
 };
 
-const statusLabels = {
-  pending: "Pending",
-  "in-progress": "In Progress",
+const statusLabels: Record<TaskState, string> = {
+  running: "In Progress",
   completed: "Completed",
   failed: "Failed",
+  review_ready: "Review Ready",
+  no_changes: "No Changes",
+  unknown: "Pending",
 };
 
+import { filterTasks, type DateRange } from "./tasks/tasksFilter";
+
+function formatRelative(iso: string): string {
+  const diffMs = Date.now() - new Date(iso).getTime();
+  if (diffMs < 60_000) return "Just now";
+  const minutes = Math.floor(diffMs / 60_000);
+  if (minutes < 60) return `${minutes} min ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} hr ago`;
+  const days = Math.floor(hours / 24);
+  return `${days} day${days === 1 ? "" : "s"} ago`;
+}
+
+function formatDurationMs(ms: number): string {
+  if (!Number.isFinite(ms) || ms <= 0) return "—";
+  const totalSeconds = Math.round(ms / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  if (minutes === 0) return `${seconds}s`;
+  return `${minutes}m ${seconds.toString().padStart(2, "0")}s`;
+}
+
 export function Tasks() {
+  const navigate = useNavigate();
+  const { tasks, loading, error } = useAgentTasks();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [agentFilter, setAgentFilter] = useState<string>("all");
+  const [dateRange, setDateRange] = useState<DateRange>("all");
+  const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
+  const [detail, setDetail] = useState<TaskDetail | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState<string | null>(null);
 
-  const filtered = SAMPLE_TASKS.filter((task) => {
-    const matchesSearch = task.name
-      .toLowerCase()
-      .includes(searchTerm.toLowerCase());
-    const matchesStatus =
-      statusFilter === "all" || task.status === statusFilter;
-    return matchesSearch && matchesStatus;
-  });
+  const filtered = useMemo(
+    () =>
+      filterTasks(tasks, {
+        searchTerm,
+        statusFilter,
+        agentFilter,
+        dateRange,
+      }),
+    [tasks, searchTerm, statusFilter, agentFilter, dateRange],
+  );
+
+  const uniqueAgents = useMemo(() => {
+    const seen = new Set<string>();
+    for (const t of tasks) seen.add(t.source);
+    return Array.from(seen).sort();
+  }, [tasks]);
+
+  useEffect(() => {
+    if (!expandedTaskId) return;
+    let cancelled = false;
+    // Standard async-fetch pattern: the setState calls happen asynchronously
+    // inside `.then`/`.catch`/`.finally`, not synchronously in the effect
+    // body. The `react-hooks/set-state-in-effect` rule flags any setState in
+    // an effect including inside promise callbacks; we suppress here because
+    // the alternative (pulling in react-query just for one detail fetch) is
+    // disproportionate.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setDetailLoading(true);
+
+    setDetailError(null);
+    getTaskDetail(expandedTaskId)
+      .then((d) => {
+        if (!cancelled) setDetail(d);
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) {
+          setDetailError(
+            err instanceof Error ? err.message : "Failed to load task detail",
+          );
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setDetailLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [expandedTaskId]);
+
+  function toggleExpand(taskId: string) {
+    setExpandedTaskId((current) => {
+      const next = current === taskId ? null : taskId;
+      // Clear stale detail state here rather than in an effect body, so we
+      // avoid the cascading-render pattern the lint rule warns about.
+      if (next === null) {
+        setDetail(null);
+        setDetailError(null);
+      }
+      return next;
+    });
+  }
+
+  const hasTasks = tasks.length > 0;
+  const hasResults = filtered.length > 0;
 
   return (
     <div className="p-6 space-y-6">
-      {/* Page header */}
       <div>
         <h1 className="text-2xl font-display font-bold text-text">Tasks</h1>
         <p className="text-sm text-text-secondary mt-1">
@@ -95,9 +162,8 @@ export function Tasks() {
         </p>
       </div>
 
-      {/* Filters */}
-      <div className="flex gap-4">
-        <div className="flex-1 relative">
+      <div className="flex gap-4 flex-wrap">
+        <div className="flex-1 min-w-60 relative">
           <IconSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
           <Input
             value={searchTerm}
@@ -107,63 +173,281 @@ export function Tasks() {
           />
         </div>
         <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-40 bg-surface-raised border-border text-text">
+          <SelectTrigger
+            aria-label="Filter by status"
+            className="w-40 bg-surface-raised border-border text-text"
+          >
             <SelectValue placeholder="Filter by status" />
           </SelectTrigger>
           <SelectContent className="bg-surface-raised border-border">
             <SelectItem value="all">All statuses</SelectItem>
-            <SelectItem value="pending">Pending</SelectItem>
-            <SelectItem value="in-progress">In Progress</SelectItem>
+            <SelectItem value="running">In Progress</SelectItem>
             <SelectItem value="completed">Completed</SelectItem>
             <SelectItem value="failed">Failed</SelectItem>
+            <SelectItem value="review_ready">Review Ready</SelectItem>
+            <SelectItem value="no_changes">No Changes</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={agentFilter} onValueChange={setAgentFilter}>
+          <SelectTrigger
+            aria-label="Filter by agent"
+            className="w-40 bg-surface-raised border-border text-text"
+          >
+            <SelectValue placeholder="Filter by agent" />
+          </SelectTrigger>
+          <SelectContent className="bg-surface-raised border-border">
+            <SelectItem value="all">All agents</SelectItem>
+            {uniqueAgents.map((source) => (
+              <SelectItem key={source} value={source}>
+                {source in AGENT_METADATA
+                  ? AGENT_METADATA[source as AgentId].name
+                  : source}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select
+          value={dateRange}
+          onValueChange={(v) => setDateRange(v as DateRange)}
+        >
+          <SelectTrigger
+            aria-label="Filter by date range"
+            className="w-40 bg-surface-raised border-border text-text"
+          >
+            <SelectValue placeholder="Date range" />
+          </SelectTrigger>
+          <SelectContent className="bg-surface-raised border-border">
+            <SelectItem value="all">All time</SelectItem>
+            <SelectItem value="today">Today</SelectItem>
+            <SelectItem value="7d">Last 7 days</SelectItem>
+            <SelectItem value="30d">Last 30 days</SelectItem>
           </SelectContent>
         </Select>
       </div>
 
-      {/* Tasks Table */}
-      <Card>
-        <Table>
-          <TableHeader>
-            <TableRow className="border-border-subtle hover:bg-transparent">
-              <TableHead className="text-text-secondary text-xs uppercase tracking-wider font-medium">
-                Task
-              </TableHead>
-              <TableHead className="text-text-secondary text-xs uppercase tracking-wider font-medium">
-                Agent
-              </TableHead>
-              <TableHead className="text-text-secondary text-xs uppercase tracking-wider font-medium">
-                Status
-              </TableHead>
-              <TableHead className="text-text-secondary text-xs uppercase tracking-wider font-medium">
-                Due Date
-              </TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filtered.map((task) => (
-              <TableRow
-                key={task.id}
-                className="border-border-subtle hover:bg-white/[0.02] transition-colors duration-150"
-              >
-                <TableCell className="text-text font-medium">
-                  {task.name}
-                </TableCell>
-                <TableCell className="text-text-secondary">
-                  {task.agent}
-                </TableCell>
-                <TableCell>
-                  <Badge className={`${statusColors[task.status]} border-0`}>
-                    {statusLabels[task.status]}
-                  </Badge>
-                </TableCell>
-                <TableCell className="text-text-secondary">
-                  {task.dueDate}
-                </TableCell>
-              </TableRow>
+      {error && (
+        <div
+          role="alert"
+          className="text-sm text-destructive bg-destructive/10 border border-destructive/30 rounded-lg px-3 py-2"
+        >
+          {error}
+        </div>
+      )}
+
+      {loading && !hasTasks ? (
+        <Card>
+          <div
+            role="status"
+            aria-label="Loading tasks"
+            className="p-6 space-y-3"
+          >
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div
+                key={i}
+                className="h-10 bg-surface-raised/60 animate-pulse rounded-lg"
+              />
             ))}
-          </TableBody>
-        </Table>
-      </Card>
+          </div>
+        </Card>
+      ) : !hasTasks ? (
+        <Card>
+          <div className="p-10 flex flex-col items-center text-center gap-3">
+            <div className="font-display font-semibold text-text text-lg">
+              No tasks yet
+            </div>
+            <p className="text-sm text-text-secondary max-w-sm">
+              When you give Axel something to do, it&rsquo;ll show up here.
+            </p>
+            <button
+              type="button"
+              onClick={() => navigate("/dashboard/chat")}
+              className="mt-2 text-sm text-accent font-medium hover:underline"
+            >
+              Go to Chat →
+            </button>
+          </div>
+        </Card>
+      ) : (
+        <Card>
+          <Table>
+            <TableHeader>
+              <TableRow className="border-border-subtle hover:bg-transparent">
+                <TableHead className="w-10" />
+                <TableHead className="text-text-secondary text-xs uppercase tracking-wider font-medium">
+                  Task
+                </TableHead>
+                <TableHead className="text-text-secondary text-xs uppercase tracking-wider font-medium">
+                  Agent
+                </TableHead>
+                <TableHead className="text-text-secondary text-xs uppercase tracking-wider font-medium">
+                  Status
+                </TableHead>
+                <TableHead className="text-text-secondary text-xs uppercase tracking-wider font-medium">
+                  Time
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {!hasResults && (
+                <TableRow className="border-border-subtle hover:bg-transparent">
+                  <TableCell
+                    colSpan={5}
+                    className="text-center text-sm text-text-secondary py-8"
+                  >
+                    No results match your filters.
+                  </TableCell>
+                </TableRow>
+              )}
+              {filtered.map((task) => {
+                const agent = getAgentMetadata(task.source);
+                const isExpanded = expandedTaskId === task.id;
+                return (
+                  <Fragment key={task.id}>
+                    <TableRow
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => toggleExpand(task.id)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          toggleExpand(task.id);
+                        }
+                      }}
+                      className="border-border-subtle hover:bg-white/[0.02] transition-colors duration-150 cursor-pointer"
+                    >
+                      <TableCell className="text-text-secondary">
+                        {isExpanded ? (
+                          <IconChevronDown
+                            aria-label="Collapse"
+                            className="w-4 h-4"
+                          />
+                        ) : (
+                          <IconChevronRight
+                            aria-label="Expand"
+                            className="w-4 h-4"
+                          />
+                        )}
+                      </TableCell>
+                      <TableCell className="text-text font-medium">
+                        {task.taskSummary ?? "(no summary)"}
+                      </TableCell>
+                      <TableCell className="text-text-secondary">
+                        {agent.name}
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          className={`${statusColors[task.state]} border-0`}
+                        >
+                          {statusLabels[task.state]}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-text-secondary">
+                        {formatRelative(task.createdAt)}
+                      </TableCell>
+                    </TableRow>
+                    {isExpanded && (
+                      <TableRow className="border-border-subtle bg-surface-raised/40 hover:bg-surface-raised/40">
+                        <TableCell colSpan={5} className="p-4">
+                          <TaskDetailPanel
+                            task={task}
+                            detail={detail}
+                            loading={detailLoading}
+                            error={detailError}
+                          />
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </Fragment>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </Card>
+      )}
+    </div>
+  );
+}
+
+interface TaskDetailPanelProps {
+  readonly task: TaskListItem;
+  readonly detail: TaskDetail | null;
+  readonly loading: boolean;
+  readonly error: string | null;
+}
+
+function TaskDetailPanel({
+  task,
+  detail,
+  loading,
+  error,
+}: TaskDetailPanelProps) {
+  const duration =
+    detail && detail.events.length > 0
+      ? new Date(detail.updatedAt).getTime() -
+        new Date(detail.events[0].createdAt).getTime()
+      : 0;
+
+  return (
+    <div className="space-y-3">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+        <DetailField label="Summary" value={task.taskSummary ?? "(none)"} />
+        <DetailField label="Agent" value={getAgentMetadata(task.source).name} />
+        <DetailField label="Repo" value={task.repo ?? "—"} />
+        <DetailField label="Branch" value={task.branch ?? "—"} />
+      </div>
+      <div>
+        <div className="text-xs uppercase tracking-wider text-text-secondary mb-2">
+          Event timeline
+        </div>
+        {loading && (
+          <div role="status" className="text-sm text-text-secondary">
+            Loading detail…
+          </div>
+        )}
+        {error && (
+          <div role="alert" className="text-sm text-destructive">
+            {error}
+          </div>
+        )}
+        {!loading && !error && detail && detail.events.length === 0 && (
+          <div className="text-sm text-text-secondary">
+            No events recorded yet.
+          </div>
+        )}
+        {!loading && !error && detail && detail.events.length > 0 && (
+          <ol className="space-y-1 text-sm">
+            {detail.events.map((ev) => (
+              <li
+                key={ev.id}
+                className="flex gap-2 border-b border-border-subtle py-1 last:border-0"
+              >
+                <span className="font-mono text-xs text-text-secondary shrink-0">
+                  {new Date(ev.createdAt).toLocaleString()}
+                </span>
+                <span className="text-text">{ev.eventType}</span>
+              </li>
+            ))}
+          </ol>
+        )}
+        {detail && (
+          <div className="mt-2 text-xs text-text-secondary">
+            Duration: {formatDurationMs(duration)}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function DetailField({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <div className="text-xs uppercase tracking-wider text-text-secondary">
+        {label}
+      </div>
+      <div className="text-sm text-text truncate" title={value}>
+        {value}
+      </div>
     </div>
   );
 }

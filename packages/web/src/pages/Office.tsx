@@ -1,4 +1,5 @@
 import * as React from "react";
+import { useNavigate } from "react-router";
 import { Badge } from "@axel-saas/ui/badge";
 import {
   Accordion,
@@ -7,316 +8,64 @@ import {
   AccordionTrigger,
 } from "@axel-saas/ui/accordion";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@axel-saas/ui/tabs";
+import { useAgentTasks, type AgentDerivedStatus } from "@/hooks/useAgentTasks";
+import type { TaskListItem } from "@/pages/tasks/tasksApi";
+import type { TaskState } from "@/pages/tasks/tasksApi";
 
-type AgentStatus = "idle" | "busy" | "working" | "special";
-
-interface RecentJob {
-  type: string;
-  description: string;
-  time: string;
-  status: "Completed" | "In Progress" | "Failed";
-}
-
-interface Agent {
-  id: string;
-  name: string;
-  role: string;
-  status: AgentStatus;
-  currentTask: string;
-  lastActive: string;
-  /** Position in the office scene as percentage of the container */
-  scenePosition: { top: string; left: string };
-  /** Path to the individual character sprite image (transparent PNG). */
-  spriteImage: string;
-  avatarColour: string;
-  stats: {
-    totalTasks: number;
-    todayTasks: number;
-    avgDuration: string;
-  };
-  recentJobs: RecentJob[];
-}
-
-const statusColours: Record<AgentStatus, string> = {
+const statusColours: Record<AgentDerivedStatus, string> = {
   idle: "bg-success",
   busy: "bg-warning",
   working: "bg-destructive",
-  special: "bg-secondary-accent",
 };
 
-const statusGlow: Record<AgentStatus, string> = {
+const statusGlow: Record<AgentDerivedStatus, string> = {
   idle: "",
   busy: "drop-shadow(0 0 6px rgba(251,191,36,0.9))",
   working: "drop-shadow(0 0 6px rgba(248,113,113,0.9))",
-  special: "drop-shadow(0 0 6px rgba(192,132,252,0.9))",
 };
 
-/** Sprite height as fraction of the scene container height (0.15 = 15%). */
+/** Sprite height as fraction of the scene container height (0.12 = 12%). */
 const SPRITE_HEIGHT_RATIO = 0.12;
 
-const jobStatusColours: Record<RecentJob["status"], string> = {
-  Completed: "bg-success/15 text-success",
-  "In Progress": "bg-warning/15 text-warning",
-  Failed: "bg-destructive/15 text-destructive",
+const DeskPositions = [
+  { top: "36%", left: "20.5%" },
+  { top: "36%", left: "39%" },
+  { top: "36%", left: "56.5%" },
+  { top: "36%", left: "76.5%" },
+  { top: "90%", left: "24%" },
+  { top: "90%", left: "57%" },
+  { top: "90%", left: "85%" },
+];
+
+const taskStatusColours: Record<TaskState, string> = {
+  running: "bg-warning/15 text-warning",
+  completed: "bg-success/15 text-success",
+  failed: "bg-destructive/15 text-destructive",
+  review_ready: "bg-accent-muted text-accent",
+  no_changes: "bg-muted/15 text-text-secondary",
+  unknown: "bg-muted/15 text-text-secondary",
 };
 
-const DeskPositions = [
-  {
-    top: "36%",
-    left: "20.5%",
-  },
-  {
-    top: "36%",
-    left: "39%",
-  },
-  {
-    top: "36%",
-    left: "56.5%",
-  },
-  {
-    top: "36%",
-    left: "76.5%",
-  },
-  {
-    top: "90%",
-    left: "24%",
-  },
-  {
-    top: "90%",
-    left: "57%",
-  },
-  {
-    top: "90%",
-    left: "85%",
-  },
-];
+const taskStatusLabels: Record<TaskState, string> = {
+  running: "In Progress",
+  completed: "Completed",
+  failed: "Failed",
+  review_ready: "Review Ready",
+  no_changes: "No Changes",
+  unknown: "Pending",
+};
 
-const agents: Agent[] = [
-  {
-    id: "axel",
-    name: "Axel",
-    role: "Chief Task Handler",
-    status: "idle",
-    currentTask: "Ready and waiting",
-    lastActive: "Just now",
-    scenePosition: DeskPositions[0],
-    spriteImage: "/sprites/sprite-axel.png",
-    avatarColour: "bg-blue-600",
-    stats: { totalTasks: 142, todayTasks: 7, avgDuration: "2m 14s" },
-    recentJobs: [
-      {
-        type: "Email",
-        description: "Replied to viewing enquiry from sarah@gmail.com",
-        time: "Today, 14:23",
-        status: "Completed",
-      },
-      {
-        type: "Task",
-        description: "Summarised weekly leads report",
-        time: "Today, 11:05",
-        status: "Completed",
-      },
-      {
-        type: "Doc",
-        description: "Drafted tenancy agreement for 12 Oak Street",
-        time: "Yesterday",
-        status: "Completed",
-      },
-      {
-        type: "Email",
-        description: "Processed maintenance request from tenant",
-        time: "Yesterday",
-        status: "Completed",
-      },
-      {
-        type: "Task",
-        description: "Qualified new lead: James Whitfield",
-        time: "2 days ago",
-        status: "Completed",
-      },
-    ],
-  },
-  {
-    id: "scribe",
-    name: "Scribe",
-    role: "Document Writer",
-    status: "working",
-    currentTask: "Drafting tenancy agreement",
-    lastActive: "1 min ago",
-    // Top row, 4th cubicle from left
-    scenePosition: DeskPositions[1],
-    spriteImage: "/sprites/sprite-scribe.png",
-    avatarColour: "bg-emerald-600",
-    stats: { totalTasks: 38, todayTasks: 3, avgDuration: "5m 40s" },
-    recentJobs: [
-      {
-        type: "Doc",
-        description: "Tenancy agreement — 12 Oak Street",
-        time: "Now",
-        status: "In Progress",
-      },
-      {
-        type: "Doc",
-        description: "Reference letter for Tom Brady",
-        time: "Today, 10:00",
-        status: "Completed",
-      },
-      {
-        type: "Doc",
-        description: "Inventory report — Flat 4B",
-        time: "Yesterday",
-        status: "Completed",
-      },
-      {
-        type: "Doc",
-        description: "Viewing confirmation email template",
-        time: "3 days ago",
-        status: "Completed",
-      },
-      {
-        type: "Doc",
-        description: "Monthly newsletter draft",
-        time: "4 days ago",
-        status: "Completed",
-      },
-    ],
-  },
-  {
-    id: "relay",
-    name: "Relay",
-    role: "Comms Manager",
-    status: "busy",
-    currentTask: "Processing 3 emails",
-    lastActive: "30s ago",
-    // Bottom row, left L-desk
-    scenePosition: DeskPositions[2],
-    spriteImage: "/sprites/sprite-relay.png",
-    avatarColour: "bg-violet-600",
-    stats: { totalTasks: 291, todayTasks: 12, avgDuration: "45s" },
-    recentJobs: [
-      {
-        type: "Email",
-        description: "Auto-replied to 3 viewing enquiries",
-        time: "Just now",
-        status: "In Progress",
-      },
-      {
-        type: "Email",
-        description: "Sent qualification follow-up to Mark Chen",
-        time: "Today, 13:55",
-        status: "Completed",
-      },
-      {
-        type: "Call",
-        description: "Handled inbound call — 07712 345678",
-        time: "Today, 12:30",
-        status: "Completed",
-      },
-      {
-        type: "Email",
-        description: "Forwarded maintenance request to contractor",
-        time: "Today, 09:15",
-        status: "Completed",
-      },
-      {
-        type: "Email",
-        description: "Sent viewing confirmation to Lisa Park",
-        time: "Yesterday",
-        status: "Completed",
-      },
-    ],
-  },
-  {
-    id: "keeper",
-    name: "Keeper",
-    role: "Knowledge Manager",
-    status: "idle",
-    currentTask: "Ready and waiting",
-    lastActive: "1 hour ago",
-    // Bottom row, center L-desk
-    scenePosition: DeskPositions[3],
-    spriteImage: "/sprites/sprite-keeper.png",
-    avatarColour: "bg-amber-600",
-    stats: { totalTasks: 19, todayTasks: 1, avgDuration: "8m 20s" },
-    recentJobs: [
-      {
-        type: "Task",
-        description: "Indexed updated tenancy policy document",
-        time: "Today, 08:00",
-        status: "Completed",
-      },
-      {
-        type: "Task",
-        description: "Updated compliance knowledge base",
-        time: "Yesterday",
-        status: "Completed",
-      },
-      {
-        type: "Task",
-        description: "Ingested 12 property listings",
-        time: "3 days ago",
-        status: "Completed",
-      },
-      {
-        type: "Task",
-        description: "Archived 2023 records",
-        time: "1 week ago",
-        status: "Completed",
-      },
-      {
-        type: "Task",
-        description: "Synced Google Drive documents",
-        time: "1 week ago",
-        status: "Completed",
-      },
-    ],
-  },
-  {
-    id: "ops",
-    name: "Ops",
-    role: "Automation Runner",
-    status: "special",
-    currentTask: "Running scheduled reports",
-    lastActive: "5 min ago",
-    // Bottom row, right L-desk
-    scenePosition: DeskPositions[4],
-    spriteImage: "/sprites/sprite-ops.png",
-    avatarColour: "bg-rose-600",
-    stats: { totalTasks: 84, todayTasks: 4, avgDuration: "3m 10s" },
-    recentJobs: [
-      {
-        type: "Task",
-        description: "Weekly leads report generated",
-        time: "Today, 17:00",
-        status: "In Progress",
-      },
-      {
-        type: "Task",
-        description: "Daily email digest sent",
-        time: "Today, 08:00",
-        status: "Completed",
-      },
-      {
-        type: "Task",
-        description: "Nightly backup completed",
-        time: "Yesterday, 02:00",
-        status: "Completed",
-      },
-      {
-        type: "Task",
-        description: "Monthly analytics report",
-        time: "1 week ago",
-        status: "Completed",
-      },
-      {
-        type: "Task",
-        description: "Lead qualification batch run",
-        time: "1 week ago",
-        status: "Completed",
-      },
-    ],
-  },
-];
+function formatRelative(iso: string | null): string {
+  if (!iso) return "—";
+  const diffMs = Date.now() - new Date(iso).getTime();
+  if (diffMs < 60_000) return "Just now";
+  const minutes = Math.floor(diffMs / 60_000);
+  if (minutes < 60) return `${minutes} min ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} hr ago`;
+  const days = Math.floor(hours / 24);
+  return `${days} day${days === 1 ? "" : "s"} ago`;
+}
 
 interface OfficeProps {
   readonly onQuickChat?: () => void;
@@ -325,6 +74,8 @@ interface OfficeProps {
 type ViewMode = "desk" | "list";
 
 export function Office({ onQuickChat }: OfficeProps) {
+  const navigate = useNavigate();
+  const { agents, loading, error } = useAgentTasks();
   const [viewMode, setViewMode] = React.useState<ViewMode>("desk");
   const [activeAgent, setActiveAgent] = React.useState<string | undefined>(
     undefined,
@@ -333,7 +84,14 @@ export function Office({ onQuickChat }: OfficeProps) {
   const sceneRef = React.useRef<HTMLDivElement>(null);
   const accordionRef = React.useRef<HTMLDivElement>(null);
 
-  // Sprite height scales with the scene container (background) size
+  const handleQuickChat = React.useCallback(() => {
+    if (onQuickChat) {
+      onQuickChat();
+      return;
+    }
+    navigate("/dashboard/chat");
+  }, [navigate, onQuickChat]);
+
   const spriteHeightPx = Math.max(
     40,
     Math.min(120, sceneHeightPx * SPRITE_HEIGHT_RATIO),
@@ -365,10 +123,16 @@ export function Office({ onQuickChat }: OfficeProps) {
   function handleTabChange(value: string) {
     const mode = value as ViewMode;
     setViewMode(mode);
-    if (mode === "list" && !activeAgent) {
-      setActiveAgent(agents[0].id);
+    if (mode === "list" && !activeAgent && agents.length > 0) {
+      setActiveAgent(agents[0].metadata.id);
     }
   }
+
+  const hasAnyActivity = agents.some((a) => a.tasks.length > 0);
+  const positionedAgents = agents.map((agent, i) => ({
+    ...agent,
+    scenePosition: DeskPositions[Math.min(i, DeskPositions.length - 1)],
+  }));
 
   return (
     <div className="flex flex-col flex-1 min-h-0 p-6">
@@ -412,11 +176,11 @@ export function Office({ onQuickChat }: OfficeProps) {
               style={{ imageRendering: "pixelated" }}
               draggable={false}
             />
-            {agents.map((agent) => {
-              const isActive = activeAgent === agent.id;
+            {positionedAgents.map((agent) => {
+              const isActive = activeAgent === agent.metadata.id;
               return (
                 <button
-                  key={agent.id}
+                  key={agent.metadata.id}
                   type="button"
                   className="absolute cursor-pointer group z-10 bg-transparent border-0 p-0 focus:outline-none flex flex-col items-center"
                   style={{
@@ -424,16 +188,18 @@ export function Office({ onQuickChat }: OfficeProps) {
                     left: agent.scenePosition.left,
                     transform: "translate(-50%, -100%)",
                   }}
-                  onClick={() => handleAgentClick(agent.id)}
+                  onClick={() => handleAgentClick(agent.metadata.id)}
                 >
                   <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover:block bg-surface-raised/95 backdrop-blur-xl text-white text-xs p-3 rounded-xl shadow-xl z-20 min-w-44 border border-border-accent pointer-events-none">
-                    <div className="font-semibold">{agent.name}</div>
+                    <div className="font-semibold">{agent.metadata.name}</div>
                     <div className="text-white/60 mb-1 text-[10px]">
-                      {agent.role}
+                      {agent.metadata.role}
                     </div>
-                    <div className="text-white/90">{agent.currentTask}</div>
+                    <div className="text-white/90">
+                      {agent.currentTask ?? "Ready and waiting"}
+                    </div>
                     <div className="text-white/40 mt-1 text-[10px]">
-                      Last active: {agent.lastActive}
+                      Last active: {formatRelative(agent.lastActiveAt)}
                     </div>
                   </div>
                   <div className="flex items-center gap-1.5 mb-1 bg-surface-raised/80 backdrop-blur-sm px-2 py-0.5 rounded-full border border-border-accent">
@@ -448,12 +214,12 @@ export function Office({ onQuickChat }: OfficeProps) {
                       )}
                     </div>
                     <span className="text-white text-[10px] whitespace-nowrap leading-tight">
-                      {agent.name}
+                      {agent.metadata.name}
                     </span>
                   </div>
                   <img
-                    src={agent.spriteImage}
-                    alt={agent.name}
+                    src={agent.metadata.spriteImage}
+                    alt={agent.metadata.name}
                     style={{
                       height: spriteHeightPx,
                       width: "auto",
@@ -468,9 +234,39 @@ export function Office({ onQuickChat }: OfficeProps) {
                 </button>
               );
             })}
+
+            {!loading && !hasAnyActivity && (
+              <div className="absolute inset-x-0 bottom-20 flex flex-col items-center gap-2 text-center pointer-events-none">
+                <div className="bg-surface-raised/90 backdrop-blur-xl px-4 py-3 rounded-xl border border-border-accent pointer-events-auto max-w-sm">
+                  <div className="font-display font-semibold text-text mb-1">
+                    Axel is ready and waiting.
+                  </div>
+                  <p className="text-sm text-text-secondary mb-3">
+                    Start a conversation to put your assistant to work.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={handleQuickChat}
+                    className="text-sm text-accent font-medium hover:underline"
+                  >
+                    Go to Chat →
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {error && (
+              <div
+                role="alert"
+                className="absolute top-4 left-1/2 -translate-x-1/2 bg-destructive/15 text-destructive text-xs px-3 py-1.5 rounded-full border border-destructive/30"
+              >
+                {error}
+              </div>
+            )}
+
             <button
               className="absolute bottom-4 right-4 z-10 bg-surface-raised/80 backdrop-blur-xl hover:bg-surface-elevated text-text text-sm px-4 py-2 rounded-full shadow-lg border border-border-accent transition-all duration-200 cursor-pointer hover:shadow-[0_0_20px_-4px_var(--color-accent-glow)]"
-              onClick={onQuickChat}
+              onClick={handleQuickChat}
             >
               💬 Quick Chat
             </button>
@@ -488,23 +284,23 @@ export function Office({ onQuickChat }: OfficeProps) {
             >
               {agents.map((agent) => (
                 <AccordionItem
-                  key={agent.id}
-                  value={agent.id}
-                  id={`agent-${agent.id}`}
+                  key={agent.metadata.id}
+                  value={agent.metadata.id}
+                  id={`agent-${agent.metadata.id}`}
                 >
                   <AccordionTrigger className="hover:no-underline px-2">
                     <div className="flex items-center gap-3 flex-1">
                       <div
-                        className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold text-white shrink-0 ${agent.avatarColour}`}
+                        className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold text-white shrink-0 ${agent.metadata.avatarColour}`}
                       >
-                        {agent.name[0]}
+                        {agent.metadata.name[0]}
                       </div>
                       <div className="flex-1 text-left">
                         <span className="font-semibold text-sm">
-                          {agent.name}
+                          {agent.metadata.name}
                         </span>
                         <span className="text-text-secondary text-sm ml-2">
-                          {agent.role}
+                          {agent.metadata.role}
                         </span>
                       </div>
                       <div className="flex items-center gap-2 mr-2">
@@ -535,36 +331,45 @@ export function Office({ onQuickChat }: OfficeProps) {
                       </div>
                       <div className="glass-card rounded-xl px-4 py-2.5 text-center min-w-20">
                         <div className="text-sm font-semibold">
-                          {agent.stats.avgDuration}
+                          {agent.stats.avgDuration || "—"}
                         </div>
                         <div className="text-xs text-text-secondary">
                           Avg duration
                         </div>
                       </div>
                     </div>
-                    <div className="space-y-0">
-                      {agent.recentJobs.map((job, i) => (
-                        <div
-                          key={i}
-                          className="flex items-center gap-3 py-2 border-b border-border-subtle last:border-0"
-                        >
-                          <Badge variant="outline" className="text-xs shrink-0">
-                            {job.type}
-                          </Badge>
-                          <span className="text-sm flex-1 min-w-0 truncate">
-                            {job.description}
-                          </span>
-                          <span className="text-xs text-text-secondary shrink-0 hidden sm:block">
-                            {job.time}
-                          </span>
-                          <Badge
-                            className={`text-xs shrink-0 border-0 ${jobStatusColours[job.status]}`}
+                    {agent.tasks.length === 0 ? (
+                      <div className="py-4 text-sm text-text-secondary">
+                        No tasks yet. Start a conversation to get going.
+                      </div>
+                    ) : (
+                      <div className="space-y-0">
+                        {agent.tasks.slice(0, 5).map((job: TaskListItem) => (
+                          <div
+                            key={job.id}
+                            className="flex items-center gap-3 py-2 border-b border-border-subtle last:border-0"
                           >
-                            {job.status}
-                          </Badge>
-                        </div>
-                      ))}
-                    </div>
+                            <Badge
+                              variant="outline"
+                              className="text-xs shrink-0"
+                            >
+                              {agent.metadata.name}
+                            </Badge>
+                            <span className="text-sm flex-1 min-w-0 truncate">
+                              {job.taskSummary ?? "(no summary)"}
+                            </span>
+                            <span className="text-xs text-text-secondary shrink-0 hidden sm:block">
+                              {formatRelative(job.createdAt)}
+                            </span>
+                            <Badge
+                              className={`text-xs shrink-0 border-0 ${taskStatusColours[job.state]}`}
+                            >
+                              {taskStatusLabels[job.state]}
+                            </Badge>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </AccordionContent>
                 </AccordionItem>
               ))}
