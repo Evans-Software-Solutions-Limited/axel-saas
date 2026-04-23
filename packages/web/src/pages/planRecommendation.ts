@@ -1,10 +1,10 @@
-import { waitlistSignupHref } from "@/lib/waitlist";
-
 export type Plan = {
   name: string;
   /**
    * Internal tier ID used for Stripe checkout.
    * `null` for tiers that are not self-serve (Enterprise — contact us).
+   * Consumers (`Subscribe.tsx`, `DiscoveryPanel.tsx`) branch on this:
+   * `null` → "Contact sales" CTA, otherwise → "Get started" → checkout.
    */
   tierId: "free" | "premium" | null;
   price: string;
@@ -12,9 +12,6 @@ export type Plan = {
   tagline: string;
   description: string;
   features: string[];
-  /** CTA for the pricing card. Defaults to the standard "Get started" flow. */
-  ctaLabel?: string;
-  ctaHref?: string;
 };
 
 export type Recommendation = {
@@ -75,8 +72,6 @@ export const PLANS: Plan[] = [
       "Custom retention",
       "Dedicated support",
     ],
-    ctaLabel: "Contact us",
-    ctaHref: waitlistSignupHref("enterprise"),
   },
 ];
 
