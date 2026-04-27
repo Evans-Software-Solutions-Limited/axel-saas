@@ -38,17 +38,9 @@ import { filterTasks, type DateRange } from "./tasks/tasksFilter";
 import {
   STATUS_COLOURS,
   STATUS_LABELS,
+  formatDuration,
   formatRelative,
 } from "./tasks/taskDisplay";
-
-function formatDurationMs(ms: number): string {
-  if (!Number.isFinite(ms) || ms <= 0) return "—";
-  const totalSeconds = Math.round(ms / 1000);
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  if (minutes === 0) return `${seconds}s`;
-  return `${minutes}m ${seconds.toString().padStart(2, "0")}s`;
-}
 
 export function Tasks() {
   const navigate = useNavigate();
@@ -406,7 +398,7 @@ function TaskDetailPanel({
         )}
         {!loading && detail && (
           <div className="mt-2 text-xs text-text-secondary">
-            Duration: {formatDurationMs(duration)}
+            Duration: {formatDuration(duration, { empty: "—" })}
           </div>
         )}
       </div>

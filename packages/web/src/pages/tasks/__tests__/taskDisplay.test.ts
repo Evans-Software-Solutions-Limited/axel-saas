@@ -1,5 +1,10 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { STATUS_COLOURS, STATUS_LABELS, formatRelative } from "../taskDisplay";
+import {
+  STATUS_COLOURS,
+  STATUS_LABELS,
+  formatDuration,
+  formatRelative,
+} from "../taskDisplay";
 
 afterEach(() => {
   vi.useRealTimers();
@@ -62,5 +67,30 @@ describe("formatRelative", () => {
     ).toISOString();
     expect(formatRelative(oneDay)).toBe("1 day ago");
     expect(formatRelative(fiveDays)).toBe("5 days ago");
+  });
+});
+
+describe("formatDuration", () => {
+  it("returns the empty default ('') for non-positive durations", () => {
+    expect(formatDuration(0)).toBe("");
+    expect(formatDuration(-50)).toBe("");
+    expect(formatDuration(Number.NaN)).toBe("");
+    expect(formatDuration(Number.POSITIVE_INFINITY)).toBe("");
+  });
+
+  it("honours the empty override (Tasks page renders an em-dash)", () => {
+    expect(formatDuration(0, { empty: "—" })).toBe("—");
+    expect(formatDuration(Number.NaN, { empty: "—" })).toBe("—");
+  });
+
+  it("renders sub-minute durations as seconds", () => {
+    expect(formatDuration(500)).toBe("1s");
+    expect(formatDuration(45_000)).toBe("45s");
+  });
+
+  it("renders multi-minute durations as 'Nm SSs' with zero-padded seconds", () => {
+    expect(formatDuration(60_000)).toBe("1m 00s");
+    expect(formatDuration(90_000)).toBe("1m 30s");
+    expect(formatDuration(125_000)).toBe("2m 05s");
   });
 });

@@ -116,6 +116,33 @@ describe("useAgentTasks", () => {
     await waitFor(() => expect(getTasksMock).toHaveBeenCalledTimes(2));
   });
 
+  it("keeps polling for tasks in 'unknown' state (no events yet)", async () => {
+    // Backend `isTerminalState("unknown") === false` — a brand new task with
+    // no events is non-terminal and the hook must keep polling until it
+    // transitions. Regression: an earlier `task.state !== "running"` short
+    // circuit treated unknown as terminal and dropped polling immediately.
+    vi.useFakeTimers();
+    getTasksMock
+      .mockResolvedValueOnce([
+        task({ id: "u1", state: "unknown", isTerminal: false }),
+      ])
+      .mockResolvedValueOnce([
+        task({ id: "u1", state: "completed", isTerminal: true }),
+      ]);
+    const { result } = renderHook(() => useAgentTasks());
+    await vi.waitFor(() => expect(result.current.loading).toBe(false));
+    expect(getTasksMock).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10_000);
+    });
+    await vi.waitFor(() => expect(getTasksMock).toHaveBeenCalledTimes(2));
+    // Now terminal — no further polls.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(30_000);
+    });
+    expect(getTasksMock).toHaveBeenCalledTimes(2);
+  });
+
   it("keeps polling after a transient fetch error", async () => {
     vi.useFakeTimers();
     getTasksMock

@@ -6,6 +6,7 @@ import {
   type AgentMetadata,
   getAgentMetadata,
 } from "@/lib/agentMetadata";
+import { formatDuration } from "@/pages/tasks/taskDisplay";
 
 const POLL_INTERVAL_MS = 10_000;
 const WORKING_WINDOW_MS = 5 * 60 * 1000;
@@ -43,16 +44,11 @@ export interface UseAgentTasksResult {
 }
 
 function isTerminal(task: TaskListItem): boolean {
-  return task.isTerminal || task.state !== "running";
-}
-
-function formatDuration(ms: number): string {
-  if (!Number.isFinite(ms) || ms <= 0) return "";
-  const totalSeconds = Math.round(ms / 1000);
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  if (minutes === 0) return `${seconds}s`;
-  return `${minutes}m ${seconds.toString().padStart(2, "0")}s`;
+  // Trust the backend's projection (`taskStateProjector.isTerminalState`).
+  // Don't second-guess by also treating non-running states as terminal — that
+  // misclassifies "unknown" (a task with no events yet) and would stop
+  // polling before the first real state transition arrives.
+  return task.isTerminal;
 }
 
 function startOfTodayIso(now: Date): number {

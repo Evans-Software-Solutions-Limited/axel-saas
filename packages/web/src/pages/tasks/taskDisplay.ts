@@ -34,3 +34,22 @@ export function formatRelative(iso: string | null | undefined): string {
   const days = Math.floor(hours / 24);
   return `${days} day${days === 1 ? "" : "s"} ago`;
 }
+
+/**
+ * Format a duration in milliseconds as a compact "Nm SSs" / "Ns" string.
+ * Returns `opts.empty` (default `""`) for non-finite or non-positive inputs;
+ * Office uses the empty string in stats whereas Tasks renders an em-dash in
+ * its detail panel.
+ */
+export function formatDuration(
+  ms: number,
+  opts: { empty?: string } = {},
+): string {
+  const empty = opts.empty ?? "";
+  if (!Number.isFinite(ms) || ms <= 0) return empty;
+  const totalSeconds = Math.round(ms / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  if (minutes === 0) return `${seconds}s`;
+  return `${minutes}m ${seconds.toString().padStart(2, "0")}s`;
+}
