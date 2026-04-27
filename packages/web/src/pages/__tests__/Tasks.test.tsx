@@ -211,6 +211,40 @@ describe("Tasks page", () => {
     expect(screen.queryByText("Event timeline")).toBeNull();
   });
 
+  it("clears stale detail when switching to a different row", async () => {
+    const t1 = makeTask({ id: "t-1", taskSummary: "Task one" });
+    const t2 = makeTask({ id: "t-2", taskSummary: "Task two" });
+    getTasksMock.mockResolvedValueOnce([t1, t2]);
+    getTaskDetailMock
+      .mockResolvedValueOnce({
+        ...t1,
+        latestEvent: null,
+        events: [
+          {
+            id: "ev-1",
+            taskId: "t-1",
+            eventType: "task.completed",
+            source: "axel",
+            payload: {},
+            createdAt: t1.createdAt,
+          },
+        ],
+      })
+      // Second detail held pending so we can assert the in-flight state.
+      .mockReturnValueOnce(new Promise(() => {}));
+    render(
+      <MemoryRouter>
+        <Tasks />
+      </MemoryRouter>,
+    );
+    fireEvent.click(await screen.findByText("Task one"));
+    await screen.findByText("task.completed");
+    fireEvent.click(screen.getByText("Task two"));
+    // Stale event from the previous task must be cleared immediately.
+    expect(screen.queryByText("task.completed")).toBeNull();
+    expect(screen.getByText(/Loading detail/i)).toBeDefined();
+  });
+
   it("keyboard Enter key expands a row", async () => {
     const task = makeTask({ id: "t-4", taskSummary: "Keyboard row" });
     getTasksMock.mockResolvedValueOnce([task]);

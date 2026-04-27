@@ -115,6 +115,33 @@ describe("useAgentTasks", () => {
     });
     await waitFor(() => expect(getTasksMock).toHaveBeenCalledTimes(2));
   });
+
+  it("keeps polling after a transient fetch error", async () => {
+    vi.useFakeTimers();
+    getTasksMock
+      .mockResolvedValueOnce([
+        task({ id: "r1", state: "running", isTerminal: false }),
+      ])
+      .mockRejectedValueOnce(new Error("transient"))
+      .mockResolvedValueOnce([
+        task({ id: "r1", state: "completed", isTerminal: true }),
+      ]);
+    const { result } = renderHook(() => useAgentTasks());
+    await vi.waitFor(() => expect(result.current.loading).toBe(false));
+    expect(getTasksMock).toHaveBeenCalledTimes(1);
+    // Second poll fails — the bug was that this killed the polling cycle.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10_000);
+    });
+    await vi.waitFor(() => expect(getTasksMock).toHaveBeenCalledTimes(2));
+    await vi.waitFor(() => expect(result.current.error).toBe("transient"));
+    // Third poll must still fire and recover.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10_000);
+    });
+    await vi.waitFor(() => expect(getTasksMock).toHaveBeenCalledTimes(3));
+    await vi.waitFor(() => expect(result.current.error).toBeNull());
+  });
 });
 
 describe("groupTasksByAgent", () => {
@@ -232,6 +259,26 @@ describe("groupTasksByAgent", () => {
     // Unknown source is grouped under axel (our guard).
     const axel = groups.find((g) => g.metadata.id === "axel");
     expect(axel?.tasks).toHaveLength(1);
+  });
+
+  it("uses UTC (not local) midnight for today stats", () => {
+    // `now` is just past UTC midnight; the task is just before it.
+    // In any TZ with a positive UTC offset, `setHours(0,0,0,0)` would push
+    // local midnight back into the previous UTC day and wrongly include the
+    // task in today's count. The fix uses `setUTCHours`.
+    const now = new Date("2026-04-22T00:30:00Z");
+    const groups = groupTasksByAgent(
+      [
+        task({
+          source: "axel",
+          state: "completed",
+          createdAt: "2026-04-21T23:00:00Z",
+          updatedAt: "2026-04-21T23:00:00Z",
+        }),
+      ],
+      now,
+    );
+    expect(groups[0].stats.todayTasks).toBe(0);
   });
 
   it("returns empty avg duration when no terminal tasks", () => {

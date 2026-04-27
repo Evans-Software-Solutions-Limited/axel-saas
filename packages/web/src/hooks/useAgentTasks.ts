@@ -56,8 +56,10 @@ function formatDuration(ms: number): string {
 }
 
 function startOfTodayIso(now: Date): number {
+  // UTC, to match `startOfUtcDay` in tasksFilter.ts so Office's "today"
+  // count and the Tasks page's "today" filter agree across timezones.
   const d = new Date(now);
-  d.setHours(0, 0, 0, 0);
+  d.setUTCHours(0, 0, 0, 0);
   return d.getTime();
 }
 
@@ -168,18 +170,35 @@ export function useAgentTasks(): UseAgentTasksResult {
   const [error, setError] = useState<string | null>(null);
   const mountedRef = useRef(true);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Mirrors `tasks` state for use inside `load`'s catch path: if a poll
+  // fails we don't have fresh task data, so we fall back to whether the
+  // last known list still had active tasks to decide if polling should
+  // continue. Without this, a single transient error would otherwise
+  // drop us off the polling cycle permanently.
+  const tasksRef = useRef<TaskListItem[]>([]);
 
   const load = useCallback(async () => {
+    let nextActive = tasksRef.current.some((t) => !isTerminal(t));
     try {
       const fetched = await getTasks();
       if (!mountedRef.current) return;
-      setTasks(sortNewestFirst(fetched));
+      const sorted = sortNewestFirst(fetched);
+      tasksRef.current = sorted;
+      setTasks(sorted);
       setError(null);
+      nextActive = sorted.some((t) => !isTerminal(t));
     } catch (err) {
       if (!mountedRef.current) return;
       setError(err instanceof Error ? err.message : "Failed to fetch tasks");
+      // Keep `nextActive` at its previous value so we re-arm and try again.
     } finally {
       if (mountedRef.current) setLoading(false);
+    }
+    if (mountedRef.current && nextActive) {
+      if (timerRef.current) clearTimeout(timerRef.current);
+      timerRef.current = setTimeout(() => {
+        void load();
+      }, POLL_INTERVAL_MS);
     }
   }, []);
 
@@ -188,25 +207,12 @@ export function useAgentTasks(): UseAgentTasksResult {
     void load();
     return () => {
       mountedRef.current = false;
-      if (timerRef.current) clearTimeout(timerRef.current);
-    };
-  }, [load]);
-
-  // Polling: re-evaluate after each load whether any tasks are still active.
-  const hasActive = useMemo(() => tasks.some((t) => !isTerminal(t)), [tasks]);
-
-  useEffect(() => {
-    if (!hasActive) return;
-    timerRef.current = setTimeout(() => {
-      void load();
-    }, POLL_INTERVAL_MS);
-    return () => {
       if (timerRef.current) {
         clearTimeout(timerRef.current);
         timerRef.current = null;
       }
     };
-  }, [hasActive, tasks, load]);
+  }, [load]);
 
   const agents = useMemo(() => groupTasksByAgent(tasks), [tasks]);
 

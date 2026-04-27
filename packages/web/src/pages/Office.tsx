@@ -10,7 +10,11 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@axel-saas/ui/tabs";
 import { useAgentTasks, type AgentDerivedStatus } from "@/hooks/useAgentTasks";
 import type { TaskListItem } from "@/pages/tasks/tasksApi";
-import type { TaskState } from "@/pages/tasks/tasksApi";
+import {
+  STATUS_COLOURS as TASK_STATUS_COLOURS,
+  STATUS_LABELS as TASK_STATUS_LABELS,
+  formatRelative,
+} from "@/pages/tasks/taskDisplay";
 
 const statusColours: Record<AgentDerivedStatus, string> = {
   idle: "bg-success",
@@ -36,36 +40,6 @@ const DeskPositions = [
   { top: "90%", left: "57%" },
   { top: "90%", left: "85%" },
 ];
-
-const taskStatusColours: Record<TaskState, string> = {
-  running: "bg-warning/15 text-warning",
-  completed: "bg-success/15 text-success",
-  failed: "bg-destructive/15 text-destructive",
-  review_ready: "bg-accent-muted text-accent",
-  no_changes: "bg-muted/15 text-text-secondary",
-  unknown: "bg-muted/15 text-text-secondary",
-};
-
-const taskStatusLabels: Record<TaskState, string> = {
-  running: "In Progress",
-  completed: "Completed",
-  failed: "Failed",
-  review_ready: "Review Ready",
-  no_changes: "No Changes",
-  unknown: "Pending",
-};
-
-function formatRelative(iso: string | null): string {
-  if (!iso) return "—";
-  const diffMs = Date.now() - new Date(iso).getTime();
-  if (diffMs < 60_000) return "Just now";
-  const minutes = Math.floor(diffMs / 60_000);
-  if (minutes < 60) return `${minutes} min ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours} hr ago`;
-  const days = Math.floor(hours / 24);
-  return `${days} day${days === 1 ? "" : "s"} ago`;
-}
 
 interface OfficeProps {
   readonly onQuickChat?: () => void;
@@ -362,9 +336,9 @@ export function Office({ onQuickChat }: OfficeProps) {
                               {formatRelative(job.createdAt)}
                             </span>
                             <Badge
-                              className={`text-xs shrink-0 border-0 ${taskStatusColours[job.state]}`}
+                              className={`text-xs shrink-0 border-0 ${TASK_STATUS_COLOURS[job.state]}`}
                             >
-                              {taskStatusLabels[job.state]}
+                              {TASK_STATUS_LABELS[job.state]}
                             </Badge>
                           </div>
                         ))}
