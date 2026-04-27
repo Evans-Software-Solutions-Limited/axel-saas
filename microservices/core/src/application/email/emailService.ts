@@ -56,18 +56,23 @@ function getResendClient(): Resend | null {
 
 /**
  * Returns true if the caller should be throttled for this (template, recipient)
- * pair. Mutates the bucket to record the allowed send.
+ * pair. Read-only — does NOT record the send. Recording happens in
+ * `recordRateLimitedSend` after a confirmed successful Resend call so a
+ * failed send doesn't burn the 24h window.
  */
 function shouldRateLimit(template: EmailTemplate, recipient: string): boolean {
   if (!RATE_LIMITED_TEMPLATES.has(template)) return false;
   const key = `${template}:${recipient}`;
-  const now = Date.now();
   const last = rateLimitBucket.get(key);
-  if (last !== undefined && now - last < RATE_LIMIT_WINDOW_MS) {
-    return true;
-  }
-  rateLimitBucket.set(key, now);
-  return false;
+  return last !== undefined && Date.now() - last < RATE_LIMIT_WINDOW_MS;
+}
+
+function recordRateLimitedSend(
+  template: EmailTemplate,
+  recipient: string,
+): void {
+  if (!RATE_LIMITED_TEMPLATES.has(template)) return;
+  rateLimitBucket.set(`${template}:${recipient}`, Date.now());
 }
 
 /**
@@ -123,9 +128,12 @@ export async function sendEmail(params: SendEmailParams): Promise<void> {
       subject: rendered.subject,
       html: rendered.html,
     });
+    recordRateLimitedSend(template, to);
     console.info("[email] sent", { template, to });
   } catch (error) {
-    // Fire-and-forget — log only, never throw.
+    // Fire-and-forget — log only, never throw. The rate-limit bucket is
+    // intentionally not recorded so a transient Resend outage doesn't
+    // suppress the next 24h of sends for this (template, recipient).
     console.error("[email] send failed", {
       template,
       to,

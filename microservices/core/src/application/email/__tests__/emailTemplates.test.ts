@@ -51,6 +51,20 @@ describe("renderTemplate", () => {
     );
   });
 
+  it("renders usage-warning with the supplied usagePercent value", () => {
+    const rendered = renderTemplate("usage-warning", {
+      usagePercent: "92",
+    });
+    expect(rendered.html).toContain("92%");
+    // Defaults to 80 only when no value is provided.
+    expect(rendered.html).not.toContain("80%");
+  });
+
+  it("falls back to 80% when usagePercent is missing", () => {
+    const rendered = renderTemplate("usage-warning", {});
+    expect(rendered.html).toContain("80%");
+  });
+
   it("throws for unknown templates", () => {
     expect(() =>
       renderTemplate("not-a-template" as EmailTemplate, {}),

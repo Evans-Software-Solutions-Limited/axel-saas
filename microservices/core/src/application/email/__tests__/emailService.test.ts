@@ -133,6 +133,32 @@ describe("sendEmail", () => {
     expect(sendMock).toHaveBeenCalledTimes(2);
   });
 
+  it("does not burn the rate-limit window on a failed send", async () => {
+    // First attempt rejects (e.g. transient Resend outage). The bucket must
+    // NOT be marked, so a retry inside the 24h window is allowed through.
+    sendMock.mockRejectedValueOnce(new Error("resend down"));
+    await sendEmail({
+      template: "usage-warning",
+      to: "retry@example.com",
+      data: { usagePercent: "82" },
+    });
+    expect(sendMock).toHaveBeenCalledTimes(1);
+    // Second attempt (immediately after) must not be throttled.
+    await sendEmail({
+      template: "usage-warning",
+      to: "retry@example.com",
+      data: { usagePercent: "82" },
+    });
+    expect(sendMock).toHaveBeenCalledTimes(2);
+    // After a confirmed success the bucket IS recorded — third attempt is throttled.
+    await sendEmail({
+      template: "usage-warning",
+      to: "retry@example.com",
+      data: { usagePercent: "82" },
+    });
+    expect(sendMock).toHaveBeenCalledTimes(2);
+  });
+
   it("treats different recipients as separate rate-limit buckets", async () => {
     await sendEmail({
       template: "usage-warning",

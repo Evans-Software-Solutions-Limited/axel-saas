@@ -208,7 +208,8 @@ export function renderTemplate(
     }
 
     case "usage-warning": {
-      const percent = data.percent ?? "80";
+      // Callers pass `usagePercent` (matches the token-management path).
+      const percent = data.usagePercent ?? "80";
       const upgradeUrl = data.upgradeUrl ?? `${APP_URL}/subscribe`;
       return {
         subject: "You're approaching your Axel usage limit",

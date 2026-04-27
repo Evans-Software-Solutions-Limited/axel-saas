@@ -204,7 +204,9 @@ export const stripeHandler = new Elysia({ name: "StripeHandler" })
             void sendEmail({
               template: "subscription-confirmed",
               to: user.email,
-              data: { tier: metadata.tier },
+              // `metadata.tier` may carry legacy values (starter/pro/business);
+              // use the already-normalised value so the email matches the DB.
+              data: { tier: checkoutTier },
             });
           }
         } catch (err: unknown) {
