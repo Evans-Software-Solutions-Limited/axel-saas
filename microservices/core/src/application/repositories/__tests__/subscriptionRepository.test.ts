@@ -22,6 +22,8 @@ function mockChain<T>(result: T) {
     "orderBy",
     "leftJoin",
     "innerJoin",
+    "onConflictDoNothing",
+    "onConflictDoUpdate",
   ];
 
   for (const method of fluent) {
@@ -185,7 +187,36 @@ describe("SubscriptionRepository", () => {
       expect(sub.id).toBe(mockSubscriptionRow.id);
     });
 
-    it("throws when insert returns no row", async () => {
+    it("returns the winner's row when ON CONFLICT swallows the insert (race)", async () => {
+      // Two concurrent calls: this one finds no row, attempts insert, but the
+      // other call already inserted — onConflictDoNothing yields []. The repo
+      // must re-read and return the winner's row instead of throwing.
+      const winnerRow = {
+        ...mockSubscriptionRow,
+        tier: "free" as const,
+        status: "active" as const,
+        stripeCustomerId: null,
+        stripeSubscriptionId: null,
+      };
+      const select = mockDb.select as ReturnType<typeof vi.fn>;
+      select.mockReturnValueOnce(mockChain([])); // initial findByUserId — no row
+      select.mockReturnValueOnce(mockChain([winnerRow])); // post-conflict re-read
+      (mockDb.insert as ReturnType<typeof vi.fn>).mockReturnValue(
+        mockChain([]),
+      );
+
+      const sub = await repo.createFreeSubscription("user-uuid-1");
+
+      expect(mockDb.insert).toHaveBeenCalledOnce();
+      expect(sub.id).toBe(winnerRow.id);
+      expect(sub.tier).toBe("free");
+    });
+
+    it("throws when insert returns no row AND no row appears on re-read", async () => {
+      // Defensive case: shouldn't happen in practice (the unique constraint
+      // implies a row must exist if onConflictDoNothing fired), but if the DB
+      // somehow returns nothing both times, surface that as an error rather
+      // than a silent null.
       (mockDb.select as ReturnType<typeof vi.fn>).mockReturnValue(
         mockChain([]),
       );

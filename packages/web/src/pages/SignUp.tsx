@@ -40,10 +40,20 @@ export function SignUp() {
       if (result.success) {
         // Best-effort free-tier provisioning. The endpoint is idempotent and
         // protected; if Supabase has email confirmation on, the session
-        // isn't established yet and this 401s silently — provisioning then
-        // happens lazily on first authed touch (Subscribe / dashboard).
+        // isn't established yet and the call returns 401 — provisioning
+        // then happens lazily on first authed touch (Subscribe / dashboard).
+        //
+        // Eden treaty resolves `{ data, error }` rather than throwing on
+        // HTTP failures, so the 401 lands in `response.error`. The try/catch
+        // only catches genuine network/runtime throws.
         try {
-          await api.core.subscriptions.free.post();
+          const response = await api.core.subscriptions.free.post();
+          if (response.error) {
+            console.warn(
+              "[signup] free-tier provisioning deferred:",
+              response.error,
+            );
+          }
         } catch (provisionErr) {
           console.warn(
             "[signup] free-tier provisioning deferred:",

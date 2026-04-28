@@ -166,13 +166,17 @@ describe("SignUp", () => {
     expect(mockFreePost).toHaveBeenCalledOnce();
   });
 
-  it("still navigates when free-tier provisioning rejects (deferred to next authed touch)", async () => {
-    // Simulates Supabase email-confirmation flow: signUp resolves but the
-    // session isn't ready yet, so the /free POST 401s. The page must swallow
-    // that error and proceed with navigation — provisioning happens later.
+  it("logs and continues when /free returns an HTTP error (Eden response.error path)", async () => {
+    // Simulates the email-confirmation flow: signUp resolves but the session
+    // isn't ready yet, so /free returns 401. Eden treaty resolves with
+    // `{ data, error }` rather than throwing — the page must inspect
+    // response.error explicitly, log a warning, and still navigate.
     const signUp = vi.fn().mockResolvedValue({ success: true });
     vi.mocked(useAuth).mockReturnValue(mockAuth({ signUp }));
-    mockFreePost.mockRejectedValueOnce(new Error("401 Unauthorized"));
+    mockFreePost.mockResolvedValueOnce({
+      data: null,
+      error: { status: 401, value: { error: "Unauthorized" } },
+    });
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
     render(
@@ -198,8 +202,45 @@ describe("SignUp", () => {
     });
 
     expect(mockFreePost).toHaveBeenCalledOnce();
-    expect(signUp).toHaveBeenCalled();
-    // No error surface to the user — only a warn for diagnostics.
+    expect(warnSpy).toHaveBeenCalledWith(
+      "[signup] free-tier provisioning deferred:",
+      expect.objectContaining({ status: 401 }),
+    );
+    expect(screen.queryByText(/error occurred/i)).toBeNull();
+    warnSpy.mockRestore();
+  });
+
+  it("logs and continues when /free throws (network failure path)", async () => {
+    // Defensive: covers genuine throws (DNS, fetch reject) that bypass Eden's
+    // normal { data, error } resolution. Same outcome — warn, navigate on.
+    const signUp = vi.fn().mockResolvedValue({ success: true });
+    vi.mocked(useAuth).mockReturnValue(mockAuth({ signUp }));
+    mockFreePost.mockRejectedValueOnce(new Error("Network down"));
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    render(
+      <MemoryRouter>
+        <SignUp />
+      </MemoryRouter>,
+    );
+    await act(async () => {
+      fireEvent.change(screen.getByLabelText(/email/i), {
+        target: { value: "test@example.com" },
+      });
+      fireEvent.change(screen.getByLabelText(/^password/i), {
+        target: { value: "password123" },
+      });
+      const confirmInputs = screen.getAllByLabelText(/password/i);
+      const confirm = confirmInputs[confirmInputs.length - 1];
+      if (confirm)
+        fireEvent.change(confirm, { target: { value: "password123" } });
+      const form = screen
+        .getByRole("button", { name: /create account|sign up/i })
+        .closest("form");
+      if (form) fireEvent.submit(form);
+    });
+
+    expect(mockFreePost).toHaveBeenCalledOnce();
     expect(warnSpy).toHaveBeenCalled();
     expect(screen.queryByText(/error occurred/i)).toBeNull();
     warnSpy.mockRestore();

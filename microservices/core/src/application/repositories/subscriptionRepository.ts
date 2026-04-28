@@ -96,6 +96,12 @@ export class SubscriptionRepository {
    * row is returned unchanged. Otherwise a new row is inserted with
    * tier=free, status=active, and no Stripe IDs.
    *
+   * Concurrency-safe: a naive find-then-insert can race when two calls land
+   * for the same user (double-clicked signup, retried network call). The
+   * insert uses ON CONFLICT (user_id) DO NOTHING so the loser of the race
+   * gets back an empty result and re-reads the winner's row instead of
+   * crashing on the unique index.
+   *
    * This is the entry point for self-serve free-tier signup. A later premium
    * upgrade reuses the same row via upsertByStripeCustomerId's userId
    * fallback above.
@@ -104,18 +110,23 @@ export class SubscriptionRepository {
     const existing = await this.findByUserId(userId);
     if (existing) return existing;
 
-    const [row] = await this.db
+    const inserted = await this.db
       .insert(subscriptions)
       .values({
         userId,
         tier: "free",
         status: "active",
       })
+      .onConflictDoNothing({ target: subscriptions.userId })
       .returning();
 
-    if (!row)
+    if (inserted[0]) return inserted[0];
+
+    // Lost the race — another concurrent call inserted first. Re-read.
+    const winner = await this.findByUserId(userId);
+    if (!winner)
       throw new Error("Failed to create free subscription — no row returned");
-    return row;
+    return winner;
   }
 
   async updateStatus(
