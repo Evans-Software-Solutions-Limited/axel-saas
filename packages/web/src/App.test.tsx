@@ -103,6 +103,43 @@ describe("App", () => {
     expect(screen.getAllByText("Office")[0]).toBeDefined();
   });
 
+  it("renders the Login page for unauthenticated users at /login", () => {
+    vi.mocked(useAuth).mockReturnValue(mockAuth());
+    render(
+      <MemoryRouter initialEntries={["/login"]}>
+        <App />
+      </MemoryRouter>,
+    );
+    expect(screen.getByText(/welcome back/i)).toBeDefined();
+  });
+
+  it("renders the SignUp page for unauthenticated users at /signup", () => {
+    vi.mocked(useAuth).mockReturnValue(mockAuth());
+    render(
+      <MemoryRouter initialEntries={["/signup"]}>
+        <App />
+      </MemoryRouter>,
+    );
+    expect(screen.getByText(/create an account/i)).toBeDefined();
+  });
+
+  it("redirects authenticated users away from /signup to dashboard", () => {
+    vi.mocked(useAuth).mockReturnValue(
+      mockAuth({
+        isAuthenticated: true,
+        onboardingCompleted: true,
+        user: { id: "1", email: "a@b.com" },
+        session: {} as never,
+      }),
+    );
+    render(
+      <MemoryRouter initialEntries={["/signup"]}>
+        <App />
+      </MemoryRouter>,
+    );
+    expect(screen.getAllByText("Office")[0]).toBeDefined();
+  });
+
   it("redirects authenticated users away from /login to home (dashboard)", () => {
     vi.mocked(useAuth).mockReturnValue(
       mockAuth({

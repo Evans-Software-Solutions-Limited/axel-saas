@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router";
 import { useAuth } from "@/hooks/useAuth";
+import { api } from "@/lib/eden";
 import { MarketingLayout } from "@/components/MarketingLayout";
 import { Button } from "@axel-saas/ui/button";
 import {
@@ -37,6 +38,18 @@ export function SignUp() {
     try {
       const result = await signUp(email, password);
       if (result.success) {
+        // Best-effort free-tier provisioning. The endpoint is idempotent and
+        // protected; if Supabase has email confirmation on, the session
+        // isn't established yet and this 401s silently — provisioning then
+        // happens lazily on first authed touch (Subscribe / dashboard).
+        try {
+          await api.core.subscriptions.free.post();
+        } catch (provisionErr) {
+          console.warn(
+            "[signup] free-tier provisioning deferred:",
+            provisionErr,
+          );
+        }
         navigate("/subscribe");
       } else {
         setError(result.error || "Failed to create account");

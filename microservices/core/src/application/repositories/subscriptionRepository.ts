@@ -49,13 +49,20 @@ export class SubscriptionRepository {
     status: SubscriptionStatus;
     currentPeriodEnd?: Date;
   }): Promise<Subscription> {
-    // Check if subscription exists
-    const existing = await this.findByStripeCustomerId(input.stripeCustomerId);
+    // Try to match an existing row by stripeCustomerId first (the common
+    // re-entrant webhook path). If no row matches, fall back to userId so a
+    // pre-existing free row (created via createFreeSubscription before any
+    // Stripe interaction) is upgraded in place — the unique index on userId
+    // would otherwise reject a fresh insert.
+    const existing =
+      (await this.findByStripeCustomerId(input.stripeCustomerId)) ??
+      (await this.findByUserId(input.userId));
 
     if (existing) {
       await this.db
         .update(subscriptions)
         .set({
+          stripeCustomerId: input.stripeCustomerId,
           stripeSubscriptionId: input.stripeSubscriptionId,
           tier: input.tier,
           status: input.status,
@@ -80,6 +87,34 @@ export class SubscriptionRepository {
 
     if (!row)
       throw new Error("Failed to create subscription — no row returned");
+    return row;
+  }
+
+  /**
+   * Idempotent free-tier provisioning. If the user already has any
+   * subscription row (free, premium, enterprise — any status), the existing
+   * row is returned unchanged. Otherwise a new row is inserted with
+   * tier=free, status=active, and no Stripe IDs.
+   *
+   * This is the entry point for self-serve free-tier signup. A later premium
+   * upgrade reuses the same row via upsertByStripeCustomerId's userId
+   * fallback above.
+   */
+  async createFreeSubscription(userId: string): Promise<Subscription> {
+    const existing = await this.findByUserId(userId);
+    if (existing) return existing;
+
+    const [row] = await this.db
+      .insert(subscriptions)
+      .values({
+        userId,
+        tier: "free",
+        status: "active",
+      })
+      .returning();
+
+    if (!row)
+      throw new Error("Failed to create free subscription — no row returned");
     return row;
   }
 

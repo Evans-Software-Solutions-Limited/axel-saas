@@ -99,7 +99,7 @@ describe("SubscriptionRepository", () => {
   });
 
   describe("upsertByStripeCustomerId", () => {
-    it("creates new subscription when not exists", async () => {
+    it("creates new subscription when no row exists for either lookup", async () => {
       (mockDb.select as ReturnType<typeof vi.fn>).mockReturnValue(
         mockChain([]),
       );
@@ -114,7 +114,7 @@ describe("SubscriptionRepository", () => {
       expect(mockDb.insert).toHaveBeenCalledOnce();
     });
 
-    it("updates existing subscription", async () => {
+    it("updates existing subscription matched by stripeCustomerId", async () => {
       await repo.upsertByStripeCustomerId({
         userId: "user-uuid-1",
         stripeCustomerId: "cus_123",
@@ -123,6 +123,79 @@ describe("SubscriptionRepository", () => {
       });
 
       expect(mockDb.update).toHaveBeenCalledOnce();
+    });
+
+    it("upgrades a pre-existing free row matched by userId when no stripeCustomerId match", async () => {
+      // First select (findByStripeCustomerId) → no match.
+      // Second select (findByUserId) → existing free row, no Stripe IDs yet.
+      // The repo must update that row in place rather than insert.
+      const freeRow = {
+        ...mockSubscriptionRow,
+        tier: "free" as const,
+        status: "active" as const,
+        stripeCustomerId: null,
+        stripeSubscriptionId: null,
+      };
+      const select = mockDb.select as ReturnType<typeof vi.fn>;
+      select.mockReturnValueOnce(mockChain([])); // by stripeCustomerId
+      select.mockReturnValueOnce(mockChain([freeRow])); // by userId
+
+      await repo.upsertByStripeCustomerId({
+        userId: "user-uuid-1",
+        stripeCustomerId: "cus_new_456",
+        stripeSubscriptionId: "sub_new_789",
+        tier: "premium",
+        status: "active",
+      });
+
+      expect(mockDb.update).toHaveBeenCalledOnce();
+      expect(mockDb.insert).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("createFreeSubscription", () => {
+    it("inserts a new free row when the user has no subscription", async () => {
+      (mockDb.select as ReturnType<typeof vi.fn>).mockReturnValue(
+        mockChain([]),
+      );
+      const insertedRow = {
+        ...mockSubscriptionRow,
+        tier: "free" as const,
+        status: "active" as const,
+        stripeCustomerId: null,
+        stripeSubscriptionId: null,
+      };
+      (mockDb.insert as ReturnType<typeof vi.fn>).mockReturnValue(
+        mockChain([insertedRow]),
+      );
+
+      const sub = await repo.createFreeSubscription("user-uuid-1");
+
+      expect(mockDb.insert).toHaveBeenCalledOnce();
+      expect(sub.tier).toBe("free");
+      expect(sub.status).toBe("active");
+    });
+
+    it("returns the existing row unchanged when a subscription already exists (idempotent)", async () => {
+      // Default mockDb.select returns mockSubscriptionRow (premium/active).
+      const sub = await repo.createFreeSubscription("user-uuid-1");
+
+      expect(mockDb.insert).not.toHaveBeenCalled();
+      expect(sub.tier).toBe("premium");
+      expect(sub.id).toBe(mockSubscriptionRow.id);
+    });
+
+    it("throws when insert returns no row", async () => {
+      (mockDb.select as ReturnType<typeof vi.fn>).mockReturnValue(
+        mockChain([]),
+      );
+      (mockDb.insert as ReturnType<typeof vi.fn>).mockReturnValue(
+        mockChain([]),
+      );
+
+      await expect(repo.createFreeSubscription("user-uuid-1")).rejects.toThrow(
+        /no row returned/,
+      );
     });
   });
 

@@ -108,6 +108,40 @@ export const subscriptionHandler = new Elysia({
     },
   )
   .post(
+    "/subscriptions/free",
+    async (ctx) => {
+      const { set } = ctx;
+      const { sub: supabaseUserId } = getUser(ctx);
+
+      const db = getDb();
+      const userRepo = new UserRepository(db);
+      const dbUser = await userRepo.findBySupabaseId(supabaseUserId);
+      if (!dbUser) {
+        set.status = 404;
+        return { success: false, error: "User not found" };
+      }
+
+      const subRepo = new SubscriptionRepository(db);
+      const subscription = await subRepo.createFreeSubscription(dbUser.id);
+
+      return {
+        success: true,
+        subscription: {
+          tier: subscription.tier,
+          status: subscription.status,
+          currentPeriodEnd: subscription.currentPeriodEnd,
+        },
+      };
+    },
+    {
+      detail: {
+        description:
+          "Idempotently provision a free-tier subscription for the authenticated user. Returns the existing row unchanged if any subscription already exists.",
+        tags: ["Subscriptions"],
+      },
+    },
+  )
+  .post(
     "/subscriptions/checkout",
     async (ctx) => {
       const { body, set } = ctx;

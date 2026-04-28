@@ -7,6 +7,17 @@ vi.mock("@/hooks/useAuth", () => ({
   useAuth: vi.fn(),
 }));
 
+const mockFreePost = vi.fn().mockResolvedValue({ data: { success: true } });
+vi.mock("@/lib/eden", () => ({
+  api: {
+    core: {
+      subscriptions: {
+        free: { post: (...args: unknown[]) => mockFreePost(...args) },
+      },
+    },
+  },
+}));
+
 import { useAuth } from "@/hooks/useAuth";
 
 const mockAuth = (overrides: Partial<ReturnType<typeof useAuth>> = {}) => ({
@@ -29,6 +40,8 @@ describe("SignUp", () => {
     vi.mocked(useAuth).mockReturnValue(
       mockAuth({ signUp: vi.fn().mockResolvedValue({ success: true }) }),
     );
+    mockFreePost.mockReset();
+    mockFreePost.mockResolvedValue({ data: { success: true } });
   });
 
   it("renders sign up form and Axel branding", () => {
@@ -124,6 +137,72 @@ describe("SignUp", () => {
     expect(
       screen.getByText(/email already in use|failed to create account/i),
     ).toBeDefined();
+  });
+
+  it("provisions a free subscription after a successful signup", async () => {
+    const signUp = vi.fn().mockResolvedValue({ success: true });
+    vi.mocked(useAuth).mockReturnValue(mockAuth({ signUp }));
+    render(
+      <MemoryRouter>
+        <SignUp />
+      </MemoryRouter>,
+    );
+    await act(async () => {
+      fireEvent.change(screen.getByLabelText(/email/i), {
+        target: { value: "test@example.com" },
+      });
+      fireEvent.change(screen.getByLabelText(/^password/i), {
+        target: { value: "password123" },
+      });
+      const confirmInputs = screen.getAllByLabelText(/password/i);
+      const confirm = confirmInputs[confirmInputs.length - 1];
+      if (confirm)
+        fireEvent.change(confirm, { target: { value: "password123" } });
+      const form = screen
+        .getByRole("button", { name: /create account|sign up/i })
+        .closest("form");
+      if (form) fireEvent.submit(form);
+    });
+    expect(mockFreePost).toHaveBeenCalledOnce();
+  });
+
+  it("still navigates when free-tier provisioning rejects (deferred to next authed touch)", async () => {
+    // Simulates Supabase email-confirmation flow: signUp resolves but the
+    // session isn't ready yet, so the /free POST 401s. The page must swallow
+    // that error and proceed with navigation — provisioning happens later.
+    const signUp = vi.fn().mockResolvedValue({ success: true });
+    vi.mocked(useAuth).mockReturnValue(mockAuth({ signUp }));
+    mockFreePost.mockRejectedValueOnce(new Error("401 Unauthorized"));
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    render(
+      <MemoryRouter>
+        <SignUp />
+      </MemoryRouter>,
+    );
+    await act(async () => {
+      fireEvent.change(screen.getByLabelText(/email/i), {
+        target: { value: "test@example.com" },
+      });
+      fireEvent.change(screen.getByLabelText(/^password/i), {
+        target: { value: "password123" },
+      });
+      const confirmInputs = screen.getAllByLabelText(/password/i);
+      const confirm = confirmInputs[confirmInputs.length - 1];
+      if (confirm)
+        fireEvent.change(confirm, { target: { value: "password123" } });
+      const form = screen
+        .getByRole("button", { name: /create account|sign up/i })
+        .closest("form");
+      if (form) fireEvent.submit(form);
+    });
+
+    expect(mockFreePost).toHaveBeenCalledOnce();
+    expect(signUp).toHaveBeenCalled();
+    // No error surface to the user — only a warn for diagnostics.
+    expect(warnSpy).toHaveBeenCalled();
+    expect(screen.queryByText(/error occurred/i)).toBeNull();
+    warnSpy.mockRestore();
   });
 
   it("shows error when signUp throws", async () => {
