@@ -55,6 +55,20 @@ describe("sendEmail", () => {
     expect(sendMock.mock.calls[0][0].from).toBe("Custom <hi@example.com>");
   });
 
+  it("falls back to the default from-address when EMAIL_FROM_ADDRESS is empty", async () => {
+    // SST's `infra/api.ts` binds the env var as
+    // `process.env.EMAIL_FROM_ADDRESS || ""` so the Lambda env always has the
+    // key. The service must coalesce empty strings to the default — `??`
+    // would let "" through and Resend would reject the send.
+    process.env.EMAIL_FROM_ADDRESS = "";
+    await sendEmail({
+      template: "welcome",
+      to: "u@e.com",
+      data: { name: "X" },
+    });
+    expect(sendMock.mock.calls[0][0].from).toBe("Axel <hello@meetaxel.ai>");
+  });
+
   it("skips sending if RESEND_API_KEY is not set (no crash)", async () => {
     delete process.env.RESEND_API_KEY;
     resetEmailClient();
@@ -154,6 +168,33 @@ describe("sendEmail", () => {
     await sendEmail({
       template: "usage-warning",
       to: "retry@example.com",
+      data: { usagePercent: "82" },
+    });
+    expect(sendMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("treats Resend API errors (resolved with { error }) as failed sends", async () => {
+    // The Resend SDK resolves with `{ data: null, error: {...} }` on API
+    // errors rather than throwing. Without inspecting `result.error` the
+    // service silently logs a successful send AND records the rate-limit
+    // bucket, suppressing the next 24h of attempts.
+    sendMock.mockResolvedValueOnce({
+      data: null,
+      error: {
+        name: "validation_error",
+        message: "Invalid `to` field",
+      },
+    });
+    await sendEmail({
+      template: "usage-warning",
+      to: "broken@example.com",
+      data: { usagePercent: "82" },
+    });
+    expect(sendMock).toHaveBeenCalledTimes(1);
+    // Bucket must NOT be stamped — a retry within 24h goes through.
+    await sendEmail({
+      template: "usage-warning",
+      to: "broken@example.com",
       data: { usagePercent: "82" },
     });
     expect(sendMock).toHaveBeenCalledTimes(2);

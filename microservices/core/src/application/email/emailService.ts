@@ -33,7 +33,11 @@ const RATE_LIMITED_TEMPLATES: ReadonlySet<EmailTemplate> =
 const RATE_LIMIT_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 function getFromAddress(): string {
-  return process.env.EMAIL_FROM_ADDRESS ?? DEFAULT_FROM;
+  // `||` not `??`: infra binds `EMAIL_FROM_ADDRESS` to
+  // `process.env.EMAIL_FROM_ADDRESS || ""` so the Lambda env always has the
+  // key. With `??` we'd keep the empty string and Resend would reject every
+  // send for an unconfigured deploy. `||` falls back on both unset AND empty.
+  return process.env.EMAIL_FROM_ADDRESS || DEFAULT_FROM;
 }
 
 let cachedClient: Resend | null = null;
@@ -122,12 +126,24 @@ export async function sendEmail(params: SendEmailParams): Promise<void> {
   }
 
   try {
-    await client.emails.send({
+    const result = await client.emails.send({
       from: getFromAddress(),
       to,
       subject: rendered.subject,
       html: rendered.html,
     });
+    // The Resend SDK resolves with `{ data, error }` on API failures rather
+    // than throwing — only network/runtime issues throw. A populated `error`
+    // must be treated as a failed send: don't stamp the rate-limit bucket
+    // and don't log "[email] sent".
+    if (result?.error) {
+      console.error("[email] send failed (api error)", {
+        template,
+        to,
+        error: result.error.message ?? String(result.error),
+      });
+      return;
+    }
     recordRateLimitedSend(template, to);
     console.info("[email] sent", { template, to });
   } catch (error) {
