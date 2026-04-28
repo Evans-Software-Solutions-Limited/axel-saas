@@ -104,17 +104,15 @@ export function Tasks() {
   }, [expandedTaskId]);
 
   function toggleExpand(taskId: string) {
-    setExpandedTaskId((current) => {
-      const next = current === taskId ? null : taskId;
-      // Clear stale detail state on collapse OR when switching to a different
-      // row, otherwise the previous task's timeline keeps rendering until the
-      // new fetch resolves.
-      if (next !== current) {
-        setDetail(null);
-        setDetailError(null);
-      }
-      return next;
-    });
+    // Always clear stale detail state on toggle. `setExpandedTaskId` always
+    // changes the value (either null↔taskId or taskA↔taskB), so the
+    // previous task's timeline must be dropped either way. Doing this
+    // outside the updater keeps it pure — React invokes updaters twice in
+    // StrictMode to detect side effects, and a setter call inside would be
+    // exactly that kind of impurity.
+    setDetail(null);
+    setDetailError(null);
+    setExpandedTaskId((current) => (current === taskId ? null : taskId));
   }
 
   const hasTasks = tasks.length > 0;

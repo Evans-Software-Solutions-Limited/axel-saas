@@ -7,6 +7,7 @@ import {
   getAgentMetadata,
 } from "@/lib/agentMetadata";
 import { formatDuration } from "@/pages/tasks/taskDisplay";
+import { startOfUtcDay } from "@/pages/tasks/tasksFilter";
 
 const POLL_INTERVAL_MS = 10_000;
 const WORKING_WINDOW_MS = 5 * 60 * 1000;
@@ -51,14 +52,6 @@ function isTerminal(task: TaskListItem): boolean {
   return task.isTerminal;
 }
 
-function startOfTodayIso(now: Date): number {
-  // UTC, to match `startOfUtcDay` in tasksFilter.ts so Office's "today"
-  // count and the Tasks page's "today" filter agree across timezones.
-  const d = new Date(now);
-  d.setUTCHours(0, 0, 0, 0);
-  return d.getTime();
-}
-
 function deriveStatus(tasks: TaskListItem[], now: Date): AgentDerivedStatus {
   const nowMs = now.getTime();
   const hasRunning = tasks.some((t) => t.state === "running");
@@ -71,7 +64,7 @@ function deriveStatus(tasks: TaskListItem[], now: Date): AgentDerivedStatus {
 }
 
 function computeStats(tasks: TaskListItem[], now: Date): AgentStats {
-  const todayStart = startOfTodayIso(now);
+  const todayStart = startOfUtcDay(now);
   let todayCount = 0;
   const durations: number[] = [];
   for (const t of tasks) {

@@ -24,7 +24,13 @@ export interface TaskFilterOptions {
   now?: Date;
 }
 
-function startOfUtcDay(date: Date, daysBack = 0): number {
+/**
+ * Epoch ms for the start of the given UTC day, optionally `daysBack` days
+ * before. Exported so other consumers (e.g. `useAgentTasks` for the Office
+ * "today" stat) can use the same UTC-aligned definition rather than each
+ * file rolling their own `setUTCHours` clone.
+ */
+export function startOfUtcDay(date: Date, daysBack = 0): number {
   const d = new Date(date);
   d.setUTCDate(d.getUTCDate() - daysBack);
   d.setUTCHours(0, 0, 0, 0);
