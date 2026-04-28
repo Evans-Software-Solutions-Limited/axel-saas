@@ -50,7 +50,7 @@ function renderLayout(opts: LayoutOptions): string {
 
   const footerHtml = opts.unsubscribeLink
     ? `<p style="color:${BRAND_MUTED};font-size:12px;margin-top:48px;">You received this email because of your activity on Axel. <a href="${escapeHtml(opts.unsubscribeLink)}" style="color:${BRAND_MUTED};">Unsubscribe</a>.</p>`
-    : `<p style="color:${BRAND_MUTED};font-size:12px;margin-top:48px;">Axel · <a href="${MARKETING_URL}" style="color:${BRAND_MUTED};">meetaxel.ai</a></p>`;
+    : `<p style="color:${BRAND_MUTED};font-size:12px;margin-top:48px;">Axel · <a href="${escapeHtml(MARKETING_URL)}" style="color:${BRAND_MUTED};">meetaxel.ai</a></p>`;
 
   const preheader = opts.preheader
     ? `<div style="display:none;max-height:0;overflow:hidden;">${escapeHtml(opts.preheader)}</div>`

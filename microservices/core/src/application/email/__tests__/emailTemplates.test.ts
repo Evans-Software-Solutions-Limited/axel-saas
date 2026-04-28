@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { renderTemplate, type EmailTemplate } from "../emailTemplates";
 
 const ALL_TEMPLATES: EmailTemplate[] = [
@@ -28,6 +28,31 @@ describe("renderTemplate", () => {
       expect(rendered.html.length).toBeGreaterThan(0);
       expect(rendered.html).toContain("<body");
       expect(rendered.html).toContain("</body>");
+    }
+  });
+
+  it("escapes the footer MARKETING_URL like every other dynamic href", async () => {
+    // Regression: MARKETING_URL was interpolated raw into the default
+    // footer's `href` while CTA and unsubscribe URLs went through
+    // `escapeHtml`. A `MARKETING_URL` containing `"` would have closed
+    // the attribute. Reload the module with a pathological env value so
+    // the module-scoped const captures it.
+    const before = process.env.MARKETING_URL;
+    process.env.MARKETING_URL = 'https://example.com/"><script>x</script>';
+    try {
+      vi.resetModules();
+      const { renderTemplate: render } = await import("../emailTemplates");
+      // `welcome` has no unsubscribeLink → renders the default footer.
+      const rendered = render("welcome", { name: "X" });
+      expect(rendered.html).not.toContain("<script>x</script>");
+      expect(rendered.html).toContain("&quot;");
+    } finally {
+      if (before === undefined) {
+        delete process.env.MARKETING_URL;
+      } else {
+        process.env.MARKETING_URL = before;
+      }
+      vi.resetModules();
     }
   });
 
