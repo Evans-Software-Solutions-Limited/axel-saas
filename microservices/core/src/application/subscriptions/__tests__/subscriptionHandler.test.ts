@@ -47,19 +47,32 @@ vi.mock("@axel-saas/db", () => ({
   },
 }));
 
-const { mockFindByUserId, mockFindBySupabaseId } = vi.hoisted(() => ({
-  mockFindByUserId: vi.fn().mockResolvedValue(null),
-  mockFindBySupabaseId: vi.fn().mockResolvedValue({
-    id: "db-user-id",
-    email: "test@example.com",
-    fullName: "Test User",
-    supabaseUserId: "test-user-id",
-  }),
-}));
+const { mockFindByUserId, mockFindBySupabaseId, mockCreateFreeSubscription } =
+  vi.hoisted(() => ({
+    mockFindByUserId: vi.fn().mockResolvedValue(null),
+    mockFindBySupabaseId: vi.fn().mockResolvedValue({
+      id: "db-user-id",
+      email: "test@example.com",
+      fullName: "Test User",
+      supabaseUserId: "test-user-id",
+    }),
+    mockCreateFreeSubscription: vi.fn().mockResolvedValue({
+      id: "sub-free-123",
+      userId: "db-user-id",
+      stripeCustomerId: null,
+      stripeSubscriptionId: null,
+      tier: "free" as const,
+      status: "active" as const,
+      currentPeriodEnd: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    }),
+  }));
 
 vi.mock("../../repositories/subscriptionRepository", () => ({
   SubscriptionRepository: vi.fn().mockImplementation(() => ({
     findByUserId: mockFindByUserId,
+    createFreeSubscription: mockCreateFreeSubscription,
   })),
 }));
 
@@ -95,6 +108,17 @@ describe("SubscriptionHandler", () => {
       email: "test@example.com",
       fullName: "Test User",
       supabaseUserId: "test-user-id",
+    });
+    mockCreateFreeSubscription.mockResolvedValue({
+      id: "sub-free-123",
+      userId: "db-user-id",
+      stripeCustomerId: null,
+      stripeSubscriptionId: null,
+      tier: "free",
+      status: "active",
+      currentPeriodEnd: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
     });
   });
 
@@ -285,6 +309,81 @@ describe("SubscriptionHandler", () => {
     });
   });
 
+  describe("POST /subscriptions/free (protected)", () => {
+    it("returns 401 without authorization", async () => {
+      const result = await subscriptionHandler.handle(
+        new Request("http://localhost/subscriptions/free", { method: "POST" }),
+      );
+      expect(result.status).toBe(401);
+    });
+
+    it("returns 404 when the user is not found", async () => {
+      mockFindBySupabaseId.mockResolvedValue(null);
+
+      const result = await subscriptionHandler.handle(
+        new Request("http://localhost/subscriptions/free", {
+          method: "POST",
+          headers: { authorization: "Bearer test_token" },
+        }),
+      );
+
+      expect(result.status).toBe(404);
+      expect(mockCreateFreeSubscription).not.toHaveBeenCalled();
+    });
+
+    it("provisions a free subscription for the authenticated user", async () => {
+      const result = await subscriptionHandler.handle(
+        new Request("http://localhost/subscriptions/free", {
+          method: "POST",
+          headers: { authorization: "Bearer test_token" },
+        }),
+      );
+
+      expect(result.status).toBe(200);
+      expect(mockCreateFreeSubscription).toHaveBeenCalledWith("db-user-id");
+
+      const json = (await result.json()) as {
+        success: boolean;
+        subscription: { tier: string; status: string };
+      };
+      expect(json.success).toBe(true);
+      expect(json.subscription.tier).toBe("free");
+      expect(json.subscription.status).toBe("active");
+    });
+
+    it("returns the existing subscription when one already exists (idempotent)", async () => {
+      // createFreeSubscription itself is idempotent — when a row exists it
+      // returns that row unchanged. Verify the handler surfaces whatever the
+      // repo returns, including a premium row, without overwriting it.
+      mockCreateFreeSubscription.mockResolvedValue({
+        id: "sub-premium-existing",
+        userId: "db-user-id",
+        stripeCustomerId: "cus_existing",
+        stripeSubscriptionId: "sub_stripe_existing",
+        tier: "premium",
+        status: "active",
+        currentPeriodEnd: new Date("2026-06-01"),
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+
+      const result = await subscriptionHandler.handle(
+        new Request("http://localhost/subscriptions/free", {
+          method: "POST",
+          headers: { authorization: "Bearer test_token" },
+        }),
+      );
+
+      expect(result.status).toBe(200);
+      const json = (await result.json()) as {
+        success: boolean;
+        subscription: { tier: string; status: string };
+      };
+      expect(json.subscription.tier).toBe("premium");
+      expect(json.subscription.status).toBe("active");
+    });
+  });
+
   describe("GET /subscriptions/status (protected)", () => {
     it("returns 401 without authorization", async () => {
       const result = await subscriptionHandler.handle(
@@ -364,14 +463,18 @@ describe("SubscriptionHandler", () => {
       expect(route).toBeDefined();
     });
 
-    it("protected handler exposes POST /subscriptions/checkout and GET /subscriptions/status", () => {
+    it("protected handler exposes POST /subscriptions/checkout, POST /subscriptions/free, and GET /subscriptions/status", () => {
       const checkout = subscriptionHandler.routes.find(
         (r) => r.method === "POST" && r.path === "/subscriptions/checkout",
+      );
+      const free = subscriptionHandler.routes.find(
+        (r) => r.method === "POST" && r.path === "/subscriptions/free",
       );
       const status = subscriptionHandler.routes.find(
         (r) => r.method === "GET" && r.path === "/subscriptions/status",
       );
       expect(checkout).toBeDefined();
+      expect(free).toBeDefined();
       expect(status).toBeDefined();
     });
   });

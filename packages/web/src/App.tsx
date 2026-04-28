@@ -28,6 +28,8 @@ import UseCases from "./pages/UseCases";
 import Pricing from "./pages/Pricing";
 import About from "./pages/About";
 import WaitlistUnsubscribe from "./pages/WaitlistUnsubscribe";
+import Login from "./pages/Login";
+import SignUp from "./pages/SignUp";
 
 const queryClient = new QueryClient();
 
@@ -81,9 +83,23 @@ function App() {
           <Route path="/pricing" element={<Pricing />} />
           <Route path="/about" element={<About />} />
 
-          {/* Auth routes disabled during waitlist — send users home */}
-          <Route path="/login" element={<Navigate to="/" replace />} />
-          <Route path="/signup" element={<Navigate to="/" replace />} />
+          {/* Auth routes — authed users bounce to /dashboard */}
+          <Route
+            path="/login"
+            element={
+              isAuthenticated ? <Navigate to="/dashboard" replace /> : <Login />
+            }
+          />
+          <Route
+            path="/signup"
+            element={
+              isAuthenticated ? (
+                <Navigate to="/dashboard" replace />
+              ) : (
+                <SignUp />
+              )
+            }
+          />
 
           {/* Public waitlist unsubscribe — matches email link path */}
           <Route
