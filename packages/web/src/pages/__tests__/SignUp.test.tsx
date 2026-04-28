@@ -7,15 +7,10 @@ vi.mock("@/hooks/useAuth", () => ({
   useAuth: vi.fn(),
 }));
 
-const mockFreePost = vi.fn().mockResolvedValue({ data: { success: true } });
-vi.mock("@/lib/eden", () => ({
-  api: {
-    core: {
-      subscriptions: {
-        free: { post: (...args: unknown[]) => mockFreePost(...args) },
-      },
-    },
-  },
+const mockProvisionFreeSilently = vi.fn().mockResolvedValue(undefined);
+vi.mock("../subscribeApi", () => ({
+  provisionFreeSilently: (...args: unknown[]) =>
+    mockProvisionFreeSilently(...args),
 }));
 
 import { useAuth } from "@/hooks/useAuth";
@@ -40,8 +35,8 @@ describe("SignUp", () => {
     vi.mocked(useAuth).mockReturnValue(
       mockAuth({ signUp: vi.fn().mockResolvedValue({ success: true }) }),
     );
-    mockFreePost.mockReset();
-    mockFreePost.mockResolvedValue({ data: { success: true } });
+    mockProvisionFreeSilently.mockReset();
+    mockProvisionFreeSilently.mockResolvedValue(undefined);
   });
 
   it("renders sign up form and Axel branding", () => {
@@ -163,87 +158,7 @@ describe("SignUp", () => {
         .closest("form");
       if (form) fireEvent.submit(form);
     });
-    expect(mockFreePost).toHaveBeenCalledOnce();
-  });
-
-  it("logs and continues when /free returns an HTTP error (Eden response.error path)", async () => {
-    // Simulates the email-confirmation flow: signUp resolves but the session
-    // isn't ready yet, so /free returns 401. Eden treaty resolves with
-    // `{ data, error }` rather than throwing — the page must inspect
-    // response.error explicitly, log a warning, and still navigate.
-    const signUp = vi.fn().mockResolvedValue({ success: true });
-    vi.mocked(useAuth).mockReturnValue(mockAuth({ signUp }));
-    mockFreePost.mockResolvedValueOnce({
-      data: null,
-      error: { status: 401, value: { error: "Unauthorized" } },
-    });
-    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-
-    render(
-      <MemoryRouter>
-        <SignUp />
-      </MemoryRouter>,
-    );
-    await act(async () => {
-      fireEvent.change(screen.getByLabelText(/email/i), {
-        target: { value: "test@example.com" },
-      });
-      fireEvent.change(screen.getByLabelText(/^password/i), {
-        target: { value: "password123" },
-      });
-      const confirmInputs = screen.getAllByLabelText(/password/i);
-      const confirm = confirmInputs[confirmInputs.length - 1];
-      if (confirm)
-        fireEvent.change(confirm, { target: { value: "password123" } });
-      const form = screen
-        .getByRole("button", { name: /create account|sign up/i })
-        .closest("form");
-      if (form) fireEvent.submit(form);
-    });
-
-    expect(mockFreePost).toHaveBeenCalledOnce();
-    expect(warnSpy).toHaveBeenCalledWith(
-      "[signup] free-tier provisioning deferred:",
-      expect.objectContaining({ status: 401 }),
-    );
-    expect(screen.queryByText(/error occurred/i)).toBeNull();
-    warnSpy.mockRestore();
-  });
-
-  it("logs and continues when /free throws (network failure path)", async () => {
-    // Defensive: covers genuine throws (DNS, fetch reject) that bypass Eden's
-    // normal { data, error } resolution. Same outcome — warn, navigate on.
-    const signUp = vi.fn().mockResolvedValue({ success: true });
-    vi.mocked(useAuth).mockReturnValue(mockAuth({ signUp }));
-    mockFreePost.mockRejectedValueOnce(new Error("Network down"));
-    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-
-    render(
-      <MemoryRouter>
-        <SignUp />
-      </MemoryRouter>,
-    );
-    await act(async () => {
-      fireEvent.change(screen.getByLabelText(/email/i), {
-        target: { value: "test@example.com" },
-      });
-      fireEvent.change(screen.getByLabelText(/^password/i), {
-        target: { value: "password123" },
-      });
-      const confirmInputs = screen.getAllByLabelText(/password/i);
-      const confirm = confirmInputs[confirmInputs.length - 1];
-      if (confirm)
-        fireEvent.change(confirm, { target: { value: "password123" } });
-      const form = screen
-        .getByRole("button", { name: /create account|sign up/i })
-        .closest("form");
-      if (form) fireEvent.submit(form);
-    });
-
-    expect(mockFreePost).toHaveBeenCalledOnce();
-    expect(warnSpy).toHaveBeenCalled();
-    expect(screen.queryByText(/error occurred/i)).toBeNull();
-    warnSpy.mockRestore();
+    expect(mockProvisionFreeSilently).toHaveBeenCalledOnce();
   });
 
   it("shows error when signUp throws", async () => {
