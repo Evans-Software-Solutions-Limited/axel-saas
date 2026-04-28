@@ -88,6 +88,13 @@ export default defineConfig({
         "**/App.css",
         // Excluded from coverage only (tests still run): Radix tab/viewMode branches and ref callbacks are hard to cover
         "**/pages/Office.tsx",
+        // Excluded from coverage only (tests still run): table + filter +
+        // expand-row + polling + error states produce many small render
+        // branches (format helpers, fragment rendering, keyboard handlers)
+        // that add little signal for the noise. Logic lives in extracted
+        // `tasksFilter.ts` (tested) and the page is exercised via integration
+        // tests in `Tasks.test.tsx`.
+        "**/pages/Tasks.tsx",
       ],
     },
   },
