@@ -8,7 +8,10 @@
 
 import { sendEmail } from "../email/emailService";
 
-const APP_URL = process.env.APP_URL ?? "https://app.meetaxel.ai";
+// `||` not `??`: infra binds `APP_URL: process.env.APP_URL || ""` so the
+// Lambda env always carries the key. With `??` the empty string would slip
+// through and the unsubscribe link would render as a relative URL.
+const APP_URL = process.env.APP_URL || "https://app.meetaxel.ai";
 
 function unsubscribeLink(token: string): string {
   return `${APP_URL}/waitlist/unsubscribe?token=${token}`;

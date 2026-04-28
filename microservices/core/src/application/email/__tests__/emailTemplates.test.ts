@@ -51,6 +51,19 @@ describe("renderTemplate", () => {
     );
   });
 
+  it("subscription-cancelled renders the supplied endsAt instead of the generic fallback", () => {
+    const rendered = renderTemplate("subscription-cancelled", {
+      endsAt: "15 May 2026",
+    });
+    expect(rendered.html).toContain("15 May 2026");
+    expect(rendered.html).not.toContain("the end of your billing period");
+  });
+
+  it("subscription-cancelled falls back to a generic phrase when endsAt is omitted", () => {
+    const rendered = renderTemplate("subscription-cancelled", {});
+    expect(rendered.html).toContain("the end of your billing period");
+  });
+
   it("renders usage-warning with the supplied usagePercent value", () => {
     const rendered = renderTemplate("usage-warning", {
       usagePercent: "92",

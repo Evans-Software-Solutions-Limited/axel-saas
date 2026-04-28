@@ -26,8 +26,11 @@ const BRAND_BG = "#08090d";
 const BRAND_TEXT = "#e8ecef";
 const BRAND_MUTED = "#8a94a3";
 
-const APP_URL = process.env.APP_URL ?? "https://app.meetaxel.ai";
-const MARKETING_URL = process.env.MARKETING_URL ?? "https://meetaxel.ai";
+// `||` not `??`: infra binds `APP_URL: process.env.APP_URL || ""` etc., so
+// the Lambda env always carries the key. With `??` we'd keep the empty
+// string and every email link would render as a relative URL.
+const APP_URL = process.env.APP_URL || "https://app.meetaxel.ai";
+const MARKETING_URL = process.env.MARKETING_URL || "https://meetaxel.ai";
 
 interface LayoutOptions {
   title: string;

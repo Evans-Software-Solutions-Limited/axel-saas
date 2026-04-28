@@ -269,14 +269,27 @@ export const stripeHandler = new Elysia({ name: "StripeHandler" })
         if (sub) {
           await subRepo.updateStatus(sub.id, "cancelled");
 
-          // Cancellation email — fire-and-forget.
+          // Cancellation email — fire-and-forget. The template reads
+          // `endsAt` (the period the user keeps access until); if Stripe
+          // didn't supply `current_period_end`, omit the field and let
+          // the template render its generic fallback.
           try {
             const user = await userRepository.findById(sub.userId);
             if (user?.email) {
+              const data: Record<string, string> = {};
+              if (subscription.current_period_end) {
+                data.endsAt = new Date(
+                  subscription.current_period_end * 1000,
+                ).toLocaleDateString("en-GB", {
+                  day: "numeric",
+                  month: "long",
+                  year: "numeric",
+                });
+              }
               void sendEmail({
                 template: "subscription-cancelled",
                 to: user.email,
-                data: { tier: sub.tier },
+                data,
               });
             }
           } catch (err: unknown) {
@@ -292,14 +305,15 @@ export const stripeHandler = new Elysia({ name: "StripeHandler" })
         if (sub) {
           await subRepo.updateStatus(sub.id, "past_due");
 
-          // Payment failure email — fire-and-forget.
+          // Payment failure email — fire-and-forget. The template reads
+          // `billingUrl` (with a sensible default); no payload needed.
           try {
             const user = await userRepository.findById(sub.userId);
             if (user?.email) {
               void sendEmail({
                 template: "payment-failed",
                 to: user.email,
-                data: { tier: sub.tier },
+                data: {},
               });
             }
           } catch (err: unknown) {
