@@ -160,10 +160,21 @@ export function groupTasksByAgent(
   return result;
 }
 
+/** Period (ms) for the post-polling status tick. Coarser than the poll
+ * interval — we only need to flip working→idle after the working window
+ * expires, not in real time. */
+const STATUS_TICK_INTERVAL_MS = 60_000;
+
 export function useAgentTasks(): UseAgentTasksResult {
   const [tasks, setTasks] = useState<TaskListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Bumps every minute while any task is within the working window so
+  // `groupTasksByAgent`'s `now` re-evaluates after polling has stopped.
+  // Without this, a recently-completed task would keep its agent in the
+  // "working" state indefinitely (the Office sprite would stay glowing red
+  // until the user navigated away and back).
+  const [nowTick, setNowTick] = useState(0);
   const mountedRef = useRef(true);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Mirrors `tasks` state for use inside `load`'s catch path: if a poll
@@ -210,7 +221,38 @@ export function useAgentTasks(): UseAgentTasksResult {
     };
   }, [load]);
 
-  const agents = useMemo(() => groupTasksByAgent(tasks), [tasks]);
+  // Self-rescheduling tick that runs only while any task's `updatedAt` is
+  // still within the working window. Each tick bumps `nowTick`, forcing the
+  // `agents` memo to re-evaluate with a fresh `Date.now()` so the
+  // working→idle transition lands without requiring a remount.
+  useEffect(() => {
+    let cancelled = false;
+    let id: ReturnType<typeof setTimeout> | undefined;
+    function schedule() {
+      if (cancelled) return;
+      const hasRecent = tasks.some(
+        (t) => Date.now() - new Date(t.updatedAt).getTime() < WORKING_WINDOW_MS,
+      );
+      if (!hasRecent) return;
+      id = setTimeout(() => {
+        if (cancelled) return;
+        setNowTick((n) => n + 1);
+        schedule();
+      }, STATUS_TICK_INTERVAL_MS);
+    }
+    schedule();
+    return () => {
+      cancelled = true;
+      if (id) clearTimeout(id);
+    };
+  }, [tasks, nowTick]);
+
+  const agents = useMemo(
+    () => groupTasksByAgent(tasks, new Date()),
+    // `nowTick` is intentionally a dep so this memo re-evaluates as the
+    // working window expires after polling stops.
+    [tasks, nowTick],
+  );
 
   return {
     tasks,

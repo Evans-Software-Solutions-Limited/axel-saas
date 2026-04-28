@@ -116,6 +116,40 @@ describe("useAgentTasks", () => {
     await waitFor(() => expect(getTasksMock).toHaveBeenCalledTimes(2));
   });
 
+  it("transitions agent status from working to idle after WORKING_WINDOW expires", async () => {
+    // Regression: once polling stopped (all tasks terminal) the `agents`
+    // memo would freeze on the `tasks` reference and never re-evaluate, so
+    // a recently-completed task kept its agent in the "working" state
+    // indefinitely (Office sprite stuck glowing red until remount).
+    vi.useFakeTimers();
+    const baseTime = new Date("2026-04-22T12:00:00Z");
+    vi.setSystemTime(baseTime);
+    getTasksMock.mockResolvedValueOnce([
+      task({
+        id: "t1",
+        source: "axel",
+        state: "completed",
+        isTerminal: true,
+        createdAt: new Date(baseTime.getTime() - 30_000).toISOString(),
+        updatedAt: baseTime.toISOString(),
+      }),
+    ]);
+    const { result } = renderHook(() => useAgentTasks());
+    await vi.waitFor(() => expect(result.current.loading).toBe(false));
+    expect(
+      result.current.agents.find((a) => a.metadata.id === "axel")?.status,
+    ).toBe("working");
+    // Advance past the 5-min working window.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(6 * 60_000);
+    });
+    expect(
+      result.current.agents.find((a) => a.metadata.id === "axel")?.status,
+    ).toBe("idle");
+    // Polling did not sneakily resume — the task was terminal.
+    expect(getTasksMock).toHaveBeenCalledTimes(1);
+  });
+
   it("keeps polling for tasks in 'unknown' state (no events yet)", async () => {
     // Backend `isTerminalState("unknown") === false` — a brand new task with
     // no events is non-terminal and the hook must keep polling until it

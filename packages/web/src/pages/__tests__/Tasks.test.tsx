@@ -211,6 +211,54 @@ describe("Tasks page", () => {
     expect(screen.queryByText("Event timeline")).toBeNull();
   });
 
+  it("renders detail duration from task created→updated (not from latest event)", async () => {
+    // Regression: previously the duration used `events[0].createdAt`, but
+    // `getTaskDetail` only returns the LATEST event in `events`, so its
+    // createdAt ≈ `updatedAt` and the duration always rendered as ~0 / "—".
+    const createdAt = "2026-04-22T12:00:00Z";
+    const updatedAt = "2026-04-22T12:05:30Z"; // 5m 30s later
+    const t = makeTask({
+      id: "t-dur",
+      taskSummary: "Long task",
+      state: "completed",
+      isTerminal: true,
+      createdAt,
+      updatedAt,
+    });
+    getTasksMock.mockResolvedValueOnce([t]);
+    getTaskDetailMock.mockResolvedValueOnce({
+      ...t,
+      latestEvent: {
+        id: "ev-1",
+        taskId: "t-dur",
+        eventType: "task.completed",
+        source: "axel",
+        payload: {},
+        // Latest event lands at `updatedAt` — this is what made the old
+        // calculation collapse to ~0.
+        createdAt: updatedAt,
+      },
+      events: [
+        {
+          id: "ev-1",
+          taskId: "t-dur",
+          eventType: "task.completed",
+          source: "axel",
+          payload: {},
+          createdAt: updatedAt,
+        },
+      ],
+    });
+    render(
+      <MemoryRouter>
+        <Tasks />
+      </MemoryRouter>,
+    );
+    fireEvent.click(await screen.findByText("Long task"));
+    await screen.findByText("task.completed");
+    expect(screen.getByText(/Duration:\s+5m 30s/)).toBeDefined();
+  });
+
   it("clears stale detail when switching to a different row", async () => {
     const t1 = makeTask({ id: "t-1", taskSummary: "Task one" });
     const t2 = makeTask({ id: "t-2", taskSummary: "Task two" });

@@ -348,11 +348,16 @@ function TaskDetailPanel({
   loading,
   error,
 }: TaskDetailPanelProps) {
-  const duration =
-    detail && detail.events.length > 0
-      ? new Date(detail.updatedAt).getTime() -
-        new Date(detail.events[0].createdAt).getTime()
-      : 0;
+  // Total elapsed time = task.updatedAt - task.createdAt. The event-timeline
+  // approach (`updatedAt - events[0].createdAt`) is wrong because
+  // `getTaskDetail` only returns the LATEST event in `events`, so its
+  // createdAt is ~equal to `updatedAt` and the duration always renders as
+  // ~0. `computeStats` in useAgentTasks uses task.createdAt for the same
+  // reason — keep them aligned.
+  const duration = detail
+    ? new Date(detail.updatedAt).getTime() -
+      new Date(detail.createdAt).getTime()
+    : 0;
 
   return (
     <div className="space-y-3">
