@@ -23,8 +23,19 @@ export function useCheckoutSelection() {
         //     go to dashboard (otherwise we'd send them back through /signup).
         //   - Logged-out user clicked Free on Pricing → send through signup.
         if (isAuthenticated) {
-          await provisionFreeSilently();
-          window.location.assign("/dashboard");
+          // Set loadingTier so the Premium/Enterprise buttons disable while
+          // provisioning resolves — prevents a competing click double-firing
+          // navigation. Cleared on the assign() side; not strictly needed
+          // since the page is about to unload, but keeps the state honest if
+          // assign is somehow blocked.
+          setError(null);
+          setLoadingTier(tierId);
+          try {
+            await provisionFreeSilently();
+            window.location.assign("/dashboard");
+          } finally {
+            setLoadingTier(null);
+          }
         } else {
           window.location.assign("/signup");
         }

@@ -50,6 +50,21 @@ describe("SignUp", () => {
     expect(screen.getByLabelText(/^password$/i)).toBeDefined();
   });
 
+  it("renders Sign in link to /login for returning users", () => {
+    render(
+      <MemoryRouter>
+        <SignUp />
+      </MemoryRouter>,
+    );
+    // Two "Sign in" links may render: one in the marketing header (added in
+    // the same pass) and one in the page body. Both should point to /login.
+    const signInLinks = screen.getAllByRole("link", { name: /^sign in$/i });
+    expect(signInLinks.length).toBeGreaterThanOrEqual(1);
+    expect(signInLinks.every((l) => l.getAttribute("href") === "/login")).toBe(
+      true,
+    );
+  });
+
   it("shows error when passwords do not match", () => {
     render(
       <MemoryRouter>

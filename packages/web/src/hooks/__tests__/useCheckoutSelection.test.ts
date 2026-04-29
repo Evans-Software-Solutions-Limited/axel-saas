@@ -92,6 +92,37 @@ describe("useCheckoutSelection", () => {
     expect(createCheckoutSession).not.toHaveBeenCalled();
   });
 
+  it("free tier, authed user → sets loadingTier='free' while provisioning is pending", async () => {
+    // Disables sibling plan buttons during the async provision call so a
+    // double-click can't fire two competing navigations. Drives a
+    // deferred provisionFreeSilently so we can observe state mid-flight.
+    vi.mocked(useAuth).mockReturnValue(
+      mockAuthValue({ isAuthenticated: true }),
+    );
+    let resolveProvision: () => void = () => {};
+    const provisionPromise = new Promise<void>((resolve) => {
+      resolveProvision = resolve;
+    });
+    vi.mocked(provisionFreeSilently).mockReturnValueOnce(provisionPromise);
+
+    const { result } = renderHook(() => useCheckoutSelection());
+
+    let pendingSelect: Promise<void> | undefined;
+    act(() => {
+      pendingSelect = result.current.handleSelectPlan("free");
+    });
+
+    expect(result.current.loadingTier).toBe("free");
+
+    await act(async () => {
+      resolveProvision();
+      await pendingSelect;
+    });
+
+    expect(result.current.loadingTier).toBeNull();
+    expect(assignMock).toHaveBeenCalledWith("/dashboard");
+  });
+
   it("calls createCheckoutSession and redirects on premium success", async () => {
     const { result } = renderHook(() => useCheckoutSelection());
     await act(async () => {

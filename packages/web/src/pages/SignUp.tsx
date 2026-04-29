@@ -174,11 +174,12 @@ export function SignUp() {
 
               {/* Sign In Link */}
               <p className="text-center text-sm text-muted">
+                Already have an account?{" "}
                 <Link
-                  to="/"
+                  to="/login"
                   className="text-accent hover:text-accent/80 font-medium"
                 >
-                  Back to home
+                  Sign in
                 </Link>
               </p>
 

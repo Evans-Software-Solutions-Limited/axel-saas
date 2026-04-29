@@ -123,16 +123,27 @@ export function Login() {
                 Sign in with Google
               </Button>
 
-              {/* Sign Up Link */}
-              <p className="text-center text-sm text-muted">
-                Need access?{" "}
-                <Link
-                  to={waitlistSignupHref()}
-                  className="text-accent hover:text-accent/80 font-medium"
-                >
-                  Join the waitlist
-                </Link>
-              </p>
+              {/* Sign Up + Waitlist Links */}
+              <div className="text-center text-sm text-muted space-y-1">
+                <p>
+                  Don&apos;t have an account?{" "}
+                  <Link
+                    to="/signup"
+                    className="text-accent hover:text-accent/80 font-medium"
+                  >
+                    Sign up
+                  </Link>
+                </p>
+                <p>
+                  Need access?{" "}
+                  <Link
+                    to={waitlistSignupHref()}
+                    className="text-accent hover:text-accent/80 font-medium"
+                  >
+                    Join the waitlist
+                  </Link>
+                </p>
+              </div>
 
               {/* Legal Links */}
               <p className="text-center text-xs text-muted mt-4">

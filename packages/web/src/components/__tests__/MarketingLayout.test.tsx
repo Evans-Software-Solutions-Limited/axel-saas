@@ -34,7 +34,7 @@ describe("MarketingLayout", () => {
     expect(logoLinks.length).toBeGreaterThanOrEqual(1);
   });
 
-  it("renders nav links in correct order: Home, Use Cases, Pricing, About, Join waitlist", () => {
+  it("renders nav links in correct order: Home, Use Cases, Pricing, About, Sign in, Join waitlist", () => {
     renderAt("/");
     const nav = screen.getByRole("navigation", { name: /main navigation/i });
     const links = nav.querySelectorAll("a");
@@ -44,6 +44,7 @@ describe("MarketingLayout", () => {
       "Use Cases",
       "Pricing",
       "About",
+      "Sign in",
       "Join waitlist",
     ]);
   });

@@ -69,12 +69,20 @@ export function AppHeader() {
               Logout
             </button>
           ) : (
-            <Link
-              to={waitlistSignupHref()}
-              className="text-sm px-5 py-2 cursor-pointer rounded-full bg-gradient-to-br from-accent to-accent/80 text-[#08090d] font-semibold hover:from-accent-light hover:to-accent hover:shadow-[0_0_24px_-4px_var(--color-accent-glow)] transition-all duration-300"
-            >
-              Join waitlist
-            </Link>
+            <>
+              <Link
+                to="/login"
+                className="text-sm text-text-secondary hover:text-text transition-colors duration-200"
+              >
+                Sign in
+              </Link>
+              <Link
+                to={waitlistSignupHref()}
+                className="text-sm px-5 py-2 cursor-pointer rounded-full bg-gradient-to-br from-accent to-accent/80 text-[#08090d] font-semibold hover:from-accent-light hover:to-accent hover:shadow-[0_0_24px_-4px_var(--color-accent-glow)] transition-all duration-300"
+              >
+                Join waitlist
+              </Link>
+            </>
           )}
         </nav>
 
@@ -89,12 +97,20 @@ export function AppHeader() {
               Logout
             </button>
           ) : (
-            <Link
-              to={waitlistSignupHref()}
-              className="text-sm px-4 py-1.5 rounded-full bg-gradient-to-br from-accent to-accent/80 text-[#08090d] font-semibold"
-            >
-              Join waitlist
-            </Link>
+            <>
+              <Link
+                to="/login"
+                className="text-sm text-text-secondary hover:text-text"
+              >
+                Sign in
+              </Link>
+              <Link
+                to={waitlistSignupHref()}
+                className="text-sm px-4 py-1.5 rounded-full bg-gradient-to-br from-accent to-accent/80 text-[#08090d] font-semibold"
+              >
+                Join waitlist
+              </Link>
+            </>
           )}
           <button
             type="button"

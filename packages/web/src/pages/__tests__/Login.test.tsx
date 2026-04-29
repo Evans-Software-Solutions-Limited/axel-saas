@@ -58,6 +58,16 @@ describe("Login", () => {
     expect(link.getAttribute("href")).toBe("/#waitlist");
   });
 
+  it("renders Sign up link to /signup for users without an account", () => {
+    render(
+      <MemoryRouter>
+        <Login />
+      </MemoryRouter>,
+    );
+    const signUpLink = screen.getByRole("link", { name: /^sign up$/i });
+    expect(signUpLink.getAttribute("href")).toBe("/signup");
+  });
+
   it("calls signIn when form is submitted", async () => {
     const signIn = vi.fn().mockResolvedValue({ success: true });
     vi.mocked(useAuth).mockReturnValue(mockAuth({ signIn, error: null }));
