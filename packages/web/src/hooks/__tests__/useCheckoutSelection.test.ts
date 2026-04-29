@@ -1,18 +1,44 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderHook, act } from "@testing-library/react";
 import { useCheckoutSelection } from "../useCheckoutSelection";
-import { createCheckoutSession } from "@/pages/subscribeApi";
+import {
+  createCheckoutSession,
+  provisionFreeSilently,
+} from "@/pages/subscribeApi";
+import { useAuth } from "@/hooks/useAuth";
 
 vi.mock("@/pages/subscribeApi", () => ({
   createCheckoutSession: vi
     .fn()
     .mockResolvedValue({ url: "https://checkout.stripe.com/pay/cs_test" }),
+  provisionFreeSilently: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock("@/hooks/useAuth", () => ({
+  useAuth: vi.fn(),
 }));
 
 const assignMock = vi.fn();
 
+const mockAuthValue = (overrides: { isAuthenticated?: boolean } = {}) =>
+  ({
+    isAuthenticated: false,
+    isLoading: false,
+    onboardingCompleted: false,
+    user: null,
+    session: null,
+    error: null,
+    setOnboardingCompleted: vi.fn(),
+    refreshOnboardingStatus: vi.fn().mockResolvedValue(undefined),
+    signIn: vi.fn().mockResolvedValue({ success: true }),
+    signUp: vi.fn().mockResolvedValue({ success: true }),
+    signOut: vi.fn().mockResolvedValue({ success: true }),
+    ...overrides,
+  }) as unknown as ReturnType<typeof useAuth>;
+
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.mocked(useAuth).mockReturnValue(mockAuthValue());
   Object.defineProperty(window, "location", {
     value: { assign: assignMock },
     writable: true,
@@ -37,13 +63,64 @@ describe("useCheckoutSelection", () => {
     expect(createCheckoutSession).not.toHaveBeenCalled();
   });
 
-  it("redirects to /signup for the free tier (no Stripe checkout)", async () => {
+  it("free tier, unauthed user → redirects to /signup", async () => {
+    vi.mocked(useAuth).mockReturnValue(
+      mockAuthValue({ isAuthenticated: false }),
+    );
     const { result } = renderHook(() => useCheckoutSelection());
     await act(async () => {
       await result.current.handleSelectPlan("free");
     });
     expect(assignMock).toHaveBeenCalledWith("/signup");
     expect(createCheckoutSession).not.toHaveBeenCalled();
+    expect(provisionFreeSilently).not.toHaveBeenCalled();
+  });
+
+  it("free tier, authed user → provisions and redirects to /dashboard (no /signup loop)", async () => {
+    // Closes the loop where an already-signed-in user clicked Free on the
+    // Subscribe page and was bounced back to /signup.
+    vi.mocked(useAuth).mockReturnValue(
+      mockAuthValue({ isAuthenticated: true }),
+    );
+    const { result } = renderHook(() => useCheckoutSelection());
+    await act(async () => {
+      await result.current.handleSelectPlan("free");
+    });
+    expect(provisionFreeSilently).toHaveBeenCalledOnce();
+    expect(assignMock).toHaveBeenCalledWith("/dashboard");
+    expect(assignMock).not.toHaveBeenCalledWith("/signup");
+    expect(createCheckoutSession).not.toHaveBeenCalled();
+  });
+
+  it("free tier, authed user → sets loadingTier='free' while provisioning is pending", async () => {
+    // Disables sibling plan buttons during the async provision call so a
+    // double-click can't fire two competing navigations. Drives a
+    // deferred provisionFreeSilently so we can observe state mid-flight.
+    vi.mocked(useAuth).mockReturnValue(
+      mockAuthValue({ isAuthenticated: true }),
+    );
+    let resolveProvision: () => void = () => {};
+    const provisionPromise = new Promise<void>((resolve) => {
+      resolveProvision = resolve;
+    });
+    vi.mocked(provisionFreeSilently).mockReturnValueOnce(provisionPromise);
+
+    const { result } = renderHook(() => useCheckoutSelection());
+
+    let pendingSelect: Promise<void> | undefined;
+    act(() => {
+      pendingSelect = result.current.handleSelectPlan("free");
+    });
+
+    expect(result.current.loadingTier).toBe("free");
+
+    await act(async () => {
+      resolveProvision();
+      await pendingSelect;
+    });
+
+    expect(result.current.loadingTier).toBeNull();
+    expect(assignMock).toHaveBeenCalledWith("/dashboard");
   });
 
   it("calls createCheckoutSession and redirects on premium success", async () => {

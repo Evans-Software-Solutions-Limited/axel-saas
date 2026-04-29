@@ -2,16 +2,49 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { Subscribe } from "../Subscribe";
-import { createCheckoutSession } from "../subscribeApi";
+import { createCheckoutSession, provisionFreeSilently } from "../subscribeApi";
 import * as planRecommendation from "../planRecommendation";
 
 vi.mock("../subscribeApi", () => ({
   createCheckoutSession: vi
     .fn()
     .mockResolvedValue({ url: "https://checkout.stripe.com/pay/cs_test" }),
+  provisionFreeSilently: vi.fn().mockResolvedValue(undefined),
+}));
+
+// useCheckoutSelection now reads useAuth to branch the free-tier path.
+// Default to unauthed so the existing tests (Premium checkout, Free→/signup)
+// behave as before; the Subscribe page itself is rendered via ProtectedRoute
+// in production, so authed-only assertions live in useCheckoutSelection.test.
+vi.mock("@/hooks/useAuth", () => ({
+  useAuth: () => ({
+    isAuthenticated: false,
+    isLoading: false,
+    onboardingCompleted: false,
+    user: null,
+    session: null,
+    error: null,
+    setOnboardingCompleted: vi.fn(),
+    refreshOnboardingStatus: vi.fn().mockResolvedValue(undefined),
+    signIn: vi.fn().mockResolvedValue({ success: true }),
+    signUp: vi.fn().mockResolvedValue({ success: true }),
+    signOut: vi.fn().mockResolvedValue({ success: true }),
+  }),
 }));
 
 describe("Subscribe", () => {
+  it("provisions a free subscription on mount (email-confirm-flow safety net)", async () => {
+    vi.mocked(provisionFreeSilently).mockClear();
+    render(
+      <MemoryRouter>
+        <Subscribe />
+      </MemoryRouter>,
+    );
+    await waitFor(() => {
+      expect(provisionFreeSilently).toHaveBeenCalledOnce();
+    });
+  });
+
   it("renders the three pricing plans", () => {
     render(
       <MemoryRouter>

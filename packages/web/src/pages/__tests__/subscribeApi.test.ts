@@ -1,11 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createCheckoutSession } from "../subscribeApi";
+import { createCheckoutSession, provisionFreeSilently } from "../subscribeApi";
 
 const { mockApi } = vi.hoisted(() => ({
   mockApi: {
     core: {
       stripe: {
         "create-checkout-session": {
+          post: vi.fn(),
+        },
+      },
+      subscriptions: {
+        free: {
           post: vi.fn(),
         },
       },
@@ -63,6 +68,51 @@ describe("subscribeApi", () => {
       await expect(createCheckoutSession("premium")).rejects.toThrow(
         "Failed to create checkout session",
       );
+    });
+  });
+
+  describe("provisionFreeSilently", () => {
+    it("resolves without warning on a successful response", async () => {
+      mockApi.core.subscriptions.free.post.mockResolvedValue({
+        data: { success: true, subscription: { tier: "free" } },
+        error: null,
+      } as never);
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      await expect(provisionFreeSilently()).resolves.toBeUndefined();
+      expect(warnSpy).not.toHaveBeenCalled();
+      warnSpy.mockRestore();
+    });
+
+    it("warns and resolves when Eden returns response.error (HTTP error path)", async () => {
+      // Eden treaty resolves with `{ data, error }` on HTTP failures rather
+      // than throwing. The 401 from the email-confirmation flow lands here.
+      mockApi.core.subscriptions.free.post.mockResolvedValue({
+        data: null,
+        error: { status: 401, value: { error: "Unauthorized" } },
+      } as never);
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      await expect(provisionFreeSilently()).resolves.toBeUndefined();
+      expect(warnSpy).toHaveBeenCalledWith(
+        "[free-tier] provisioning deferred:",
+        expect.objectContaining({ status: 401 }),
+      );
+      warnSpy.mockRestore();
+    });
+
+    it("warns and resolves when the call throws (network failure)", async () => {
+      mockApi.core.subscriptions.free.post.mockRejectedValue(
+        new Error("Network down"),
+      );
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      await expect(provisionFreeSilently()).resolves.toBeUndefined();
+      expect(warnSpy).toHaveBeenCalledWith(
+        "[free-tier] provisioning deferred:",
+        expect.any(Error),
+      );
+      warnSpy.mockRestore();
     });
   });
 });

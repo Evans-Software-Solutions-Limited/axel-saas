@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Button } from "@axel-saas/ui/button";
 import {
   Card,
@@ -9,6 +10,7 @@ import {
 import { Badge } from "@axel-saas/ui/badge";
 import { IconCheck } from "@tabler/icons-react";
 import { PLANS, getRecommendedPlan } from "./planRecommendation";
+import { provisionFreeSilently } from "./subscribeApi";
 import { useCheckoutSelection } from "@/hooks/useCheckoutSelection";
 
 export function Subscribe() {
@@ -16,6 +18,14 @@ export function Subscribe() {
   // No onboarding signals available on the generic pricing page — recommendation
   // is only shown when real user signals (from discovery/onboarding chat) exist.
   const recommendation = getRecommendedPlan();
+
+  // Catches the email-confirmation flow: SignUp can't reach /free until the
+  // session is established, so the user's first authed page hit (here, on
+  // ProtectedRoute) is the safety net. Idempotent on the backend — a no-op
+  // for users who already have a row.
+  useEffect(() => {
+    void provisionFreeSilently();
+  }, []);
 
   return (
     <div className="min-h-screen bg-surface p-6">

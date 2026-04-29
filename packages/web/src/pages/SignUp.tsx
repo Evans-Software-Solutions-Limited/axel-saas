@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router";
 import { useAuth } from "@/hooks/useAuth";
-import { api } from "@/lib/eden";
+import { provisionFreeSilently } from "./subscribeApi";
 import { MarketingLayout } from "@/components/MarketingLayout";
 import { Button } from "@axel-saas/ui/button";
 import {
@@ -38,28 +38,10 @@ export function SignUp() {
     try {
       const result = await signUp(email, password);
       if (result.success) {
-        // Best-effort free-tier provisioning. The endpoint is idempotent and
-        // protected; if Supabase has email confirmation on, the session
-        // isn't established yet and the call returns 401 — provisioning
-        // then happens lazily on first authed touch (Subscribe / dashboard).
-        //
-        // Eden treaty resolves `{ data, error }` rather than throwing on
-        // HTTP failures, so the 401 lands in `response.error`. The try/catch
-        // only catches genuine network/runtime throws.
-        try {
-          const response = await api.core.subscriptions.free.post();
-          if (response.error) {
-            console.warn(
-              "[signup] free-tier provisioning deferred:",
-              response.error,
-            );
-          }
-        } catch (provisionErr) {
-          console.warn(
-            "[signup] free-tier provisioning deferred:",
-            provisionErr,
-          );
-        }
+        // Best-effort free-tier provisioning. If the Supabase session isn't
+        // established yet (email-confirmation flow), this 401s silently and
+        // Subscribe.tsx will retry on mount.
+        await provisionFreeSilently();
         navigate("/subscribe");
       } else {
         setError(result.error || "Failed to create account");
@@ -192,11 +174,12 @@ export function SignUp() {
 
               {/* Sign In Link */}
               <p className="text-center text-sm text-muted">
+                Already have an account?{" "}
                 <Link
-                  to="/"
+                  to="/login"
                   className="text-accent hover:text-accent/80 font-medium"
                 >
-                  Back to home
+                  Sign in
                 </Link>
               </p>
 

@@ -38,6 +38,30 @@ describe("AppHeader", () => {
     expect(waitlistLinks[0]!.getAttribute("href")).toBe(waitlistSignupHref());
   });
 
+  it("renders Sign in link to /login when unauthenticated", () => {
+    render(
+      <MemoryRouter>
+        <AppHeader />
+      </MemoryRouter>,
+    );
+    const signInLinks = screen.getAllByRole("link", { name: /sign in/i });
+    expect(signInLinks.length).toBeGreaterThanOrEqual(1);
+    expect(signInLinks[0]!.getAttribute("href")).toBe("/login");
+  });
+
+  it("does not render Sign in when authenticated (Logout shown instead)", () => {
+    vi.mocked(useAuth).mockReturnValue({
+      isAuthenticated: true,
+      signOut: vi.fn(),
+    } as unknown as ReturnType<typeof useAuth>);
+    render(
+      <MemoryRouter>
+        <AppHeader />
+      </MemoryRouter>,
+    );
+    expect(screen.queryByRole("link", { name: /sign in/i })).toBeNull();
+  });
+
   it("renders Home nav and Logout when authenticated (no Dashboard link)", () => {
     vi.mocked(useAuth).mockReturnValue({
       isAuthenticated: true,

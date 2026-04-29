@@ -76,6 +76,7 @@ vi.mock("../subscribeApi", () => ({
   createCheckoutSession: vi
     .fn()
     .mockResolvedValue({ url: "https://checkout.stripe.com/pay/cs_test" }),
+  provisionFreeSilently: vi.fn().mockResolvedValue(undefined),
 }));
 
 describe("Chat onboarding integration", () => {
@@ -1939,6 +1940,55 @@ describe("Chat onboarding integration", () => {
       expect(await screen.findByText("Choose your plan")).toBeDefined();
       // Should NOT navigate away — user stays in chat
       expect(navigateMock).not.toHaveBeenCalled();
+    });
+
+    it("self-heals subscription_required by provisioning a free row and continuing without redirect", async () => {
+      // First /agent call sees no subscription. ChatContainer provisions a
+      // free row, then re-fetches /agent — second call returns active. The
+      // user must NOT be bounced to /subscribe; they should land in chat.
+      const { provisionFreeSilently } = await import("../subscribeApi");
+      vi.mocked(useAuth).mockReturnValue({
+        isAuthenticated: true,
+        isLoading: false,
+        onboardingCompleted: true,
+        setOnboardingCompleted,
+        refreshOnboardingStatus,
+        user: { id: "user-1", email: "test@example.com" },
+        session: {} as never,
+        error: null,
+        signIn: vi.fn(),
+        signUp: vi.fn(),
+        signOut: vi.fn(),
+      });
+      vi.mocked(getAgentStatus)
+        .mockResolvedValueOnce({
+          success: true,
+          status: "subscription_required",
+        })
+        .mockResolvedValueOnce({ success: true, status: "active" });
+      vi.mocked(getOnboardingState).mockResolvedValue({
+        state: {
+          id: "state-1",
+          status: "completed",
+          outstandingQuestions: [],
+          collectedAnswers: {},
+          completedAt: new Date().toISOString(),
+          lastMessageAt: null,
+        },
+        messages: [],
+        nextQuestion: null,
+      });
+
+      render(
+        <MemoryRouter>
+          <Chat />
+        </MemoryRouter>,
+      );
+
+      await waitFor(() => {
+        expect(provisionFreeSilently).toHaveBeenCalledOnce();
+      });
+      expect(navigateMock).not.toHaveBeenCalledWith("/subscribe");
     });
 
     it("navigates to /subscribe (not discovery) when subscription_required and onboarding already completed", async () => {

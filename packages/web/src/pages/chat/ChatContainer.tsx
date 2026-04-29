@@ -16,6 +16,7 @@ import {
   type ChatMessage,
 } from "./chatApi";
 import { getRecommendedPlan } from "../planRecommendation";
+import { provisionFreeSilently } from "../subscribeApi";
 import { useCheckoutSelection } from "@/hooks/useCheckoutSelection";
 import { ChatPresenter } from "./ChatPresenter";
 
@@ -87,6 +88,11 @@ export function ChatContainer() {
   const postCheckoutRef = useRef(searchParams.get("checkout") === "success");
   const pollingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mountedRef = useRef(true);
+  // One-shot self-heal: if /users/me/agent reports subscription_required we
+  // attempt to provision a free row and re-fetch — at most once per mount.
+  // Without this, users without a subscription row get trapped bouncing
+  // between /dashboard/chat and /subscribe.
+  const subscriptionProvisionAttemptedRef = useRef(false);
   // When payment-confirm poll sees subscription active, we request a reload
   // via state so the load effect runs without a callback ref.
   const [reloadTrigger, setReloadTrigger] = useState(0);
@@ -257,6 +263,33 @@ export function ChatContainer() {
       } catch {
         // getAgentStatus throws for new users - that's fine, fall through to onboarding
         // This is expected when user hasn't completed onboarding yet
+      }
+
+      // Self-heal a missing subscription row before deciding whether to
+      // bounce the user out to /subscribe. If they signed up before /free
+      // was wired, or if email-confirmation deferred provisioning, the
+      // backend reports subscription_required even though Free is meant to
+      // be the default. Provision once and re-fetch; if it's still
+      // subscription_required after that, fall through to the existing
+      // redirect logic below — the user really does need to pick a plan.
+      //
+      // Skip when the user just returned from Stripe checkout
+      // (postCheckoutRef): the webhook is still in flight and we must let
+      // the confirming-payment poll resolve to premium rather than racing
+      // it with a free-tier provision.
+      if (
+        agentStatus?.success &&
+        agentStatus.status === "subscription_required" &&
+        !postCheckoutRef.current &&
+        !subscriptionProvisionAttemptedRef.current
+      ) {
+        subscriptionProvisionAttemptedRef.current = true;
+        await provisionFreeSilently();
+        try {
+          agentStatus = await getAgentStatus();
+        } catch {
+          agentStatus = null;
+        }
       }
 
       // Handle subscription_required status from the agent endpoint.
