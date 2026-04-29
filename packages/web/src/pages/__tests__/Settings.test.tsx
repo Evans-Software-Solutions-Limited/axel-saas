@@ -1,42 +1,255 @@
-import { describe, it, expect, afterEach } from "vitest";
-import { render, screen, fireEvent, cleanup } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import {
+  render,
+  screen,
+  cleanup,
+  waitFor,
+  fireEvent,
+} from "@testing-library/react";
 import { Settings } from "../Settings";
+import {
+  fetchInvoices,
+  fetchSubscriptionStatus,
+  openCustomerPortal,
+  type SubscriptionInfo,
+  type InvoiceSummary,
+} from "../settings/settingsApi";
+
+vi.mock("../settings/settingsApi", () => ({
+  fetchSubscriptionStatus: vi.fn(),
+  fetchInvoices: vi.fn(),
+  openCustomerPortal: vi.fn(),
+}));
+
+const assignMock = vi.fn();
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  Object.defineProperty(window, "location", {
+    value: { assign: assignMock },
+    writable: true,
+  });
+  // Default fetches resolve to a free-tier user with no invoices so basic
+  // render tests don't have to set up mocks individually.
+  vi.mocked(fetchSubscriptionStatus).mockResolvedValue({
+    tier: "free",
+    status: "active",
+    currentPeriodEnd: null,
+  } satisfies SubscriptionInfo);
+  vi.mocked(fetchInvoices).mockResolvedValue([]);
+});
 
 afterEach(() => {
   cleanup();
 });
 
 describe("Settings", () => {
-  it("renders profile and notifications", () => {
+  it("renders profile, notifications and billing sections", async () => {
     render(<Settings />);
     expect(screen.getByText("Profile")).toBeDefined();
     expect(screen.getByLabelText(/name/i)).toBeDefined();
     expect(screen.getByLabelText(/email/i)).toBeDefined();
     expect(screen.getByText("Notifications")).toBeDefined();
     expect(screen.getByText("Billing")).toBeDefined();
+    await waitFor(() => {
+      expect(screen.getByText("Free")).toBeDefined();
+    });
   });
 
-  it("toggles notifications", () => {
+  it("toggles notifications (still UI-only stub)", () => {
     render(<Settings />);
     const toggle = screen.getByRole("button", { name: /on|off/i });
-    expect(toggle).toBeDefined();
     fireEvent.click(toggle);
     expect(screen.getByRole("button", { name: /off/i })).toBeDefined();
   });
 
-  it("updates profile name and email", () => {
-    render(<Settings />);
-    fireEvent.change(screen.getByLabelText(/name/i), {
-      target: { value: "Jane Doe" },
+  describe("billing", () => {
+    it("shows a loading state before the subscription resolves", () => {
+      vi.mocked(fetchSubscriptionStatus).mockImplementation(
+        () => new Promise(() => {}),
+      );
+      render(<Settings />);
+      expect(screen.getByText(/loading/i)).toBeDefined();
     });
-    fireEvent.change(screen.getByLabelText(/email/i), {
-      target: { value: "jane@example.com" },
+
+    it("shows an error message when the fetch fails", async () => {
+      vi.mocked(fetchSubscriptionStatus).mockRejectedValue(
+        new Error("Subscription endpoint unavailable"),
+      );
+      render(<Settings />);
+      await waitFor(() => {
+        expect(
+          screen.getByText(/subscription endpoint unavailable/i),
+        ).toBeDefined();
+      });
     });
-    expect((screen.getByLabelText(/name/i) as HTMLInputElement).value).toBe(
-      "Jane Doe",
-    );
-    expect((screen.getByLabelText(/email/i) as HTMLInputElement).value).toBe(
-      "jane@example.com",
-    );
+
+    it("renders the Free tier upgrade CTA and routes to /subscribe", async () => {
+      render(<Settings />);
+      await waitFor(() => {
+        expect(
+          screen.getByRole("button", { name: /upgrade to premium/i }),
+        ).toBeDefined();
+      });
+      fireEvent.click(
+        screen.getByRole("button", { name: /upgrade to premium/i }),
+      );
+      expect(assignMock).toHaveBeenCalledWith("/subscribe");
+    });
+
+    it("does not render Manage / Cancel buttons for Free tier", async () => {
+      render(<Settings />);
+      await waitFor(() => {
+        expect(screen.getByText("Free")).toBeDefined();
+      });
+      expect(
+        screen.queryByRole("button", { name: /manage subscription/i }),
+      ).toBeNull();
+      expect(screen.queryByRole("button", { name: /cancel plan/i })).toBeNull();
+    });
+
+    it("does not render the invoices section for Free tier", async () => {
+      render(<Settings />);
+      await waitFor(() => {
+        expect(screen.getByText("Free")).toBeDefined();
+      });
+      expect(screen.queryByText(/recent invoices/i)).toBeNull();
+    });
+
+    it("renders the Premium tier with renewal date and invoices", async () => {
+      vi.mocked(fetchSubscriptionStatus).mockResolvedValue({
+        tier: "premium",
+        status: "active",
+        currentPeriodEnd: "2026-05-15T00:00:00.000Z",
+      });
+      vi.mocked(fetchInvoices).mockResolvedValue([
+        {
+          id: "inv_1",
+          number: "INV-001",
+          status: "paid",
+          amountPaid: 4900,
+          currency: "gbp",
+          created: 1715731200, // 15 May 2024
+          hostedInvoiceUrl: "https://stripe.com/invoice/inv_1",
+          invoicePdf: "https://stripe.com/invoice/inv_1.pdf",
+          periodStart: 1713139200,
+          periodEnd: 1715731200,
+        } satisfies InvoiceSummary,
+      ]);
+
+      render(<Settings />);
+
+      await waitFor(() => {
+        expect(screen.getByText("Premium")).toBeDefined();
+      });
+      expect(
+        screen.getByText(/£49\/month · renews 15 may 2026/i),
+      ).toBeDefined();
+      expect(
+        screen.getByRole("button", { name: /manage subscription/i }),
+      ).toBeDefined();
+      expect(
+        screen.getByRole("button", { name: /cancel plan/i }),
+      ).toBeDefined();
+      expect(screen.getByText(/recent invoices/i)).toBeDefined();
+      expect(screen.getByText("£49.00")).toBeDefined();
+      expect(
+        screen.getByRole("link", { name: /^view$/i }).getAttribute("href"),
+      ).toBe("https://stripe.com/invoice/inv_1");
+    });
+
+    it("Premium → Manage subscription → opens Stripe portal default flow", async () => {
+      vi.mocked(fetchSubscriptionStatus).mockResolvedValue({
+        tier: "premium",
+        status: "active",
+        currentPeriodEnd: "2026-05-15T00:00:00.000Z",
+      });
+      vi.mocked(openCustomerPortal).mockResolvedValue({
+        url: "https://billing.stripe.com/p/session/manage_test",
+      });
+
+      render(<Settings />);
+      const button = await screen.findByRole("button", {
+        name: /manage subscription/i,
+      });
+      fireEvent.click(button);
+
+      await waitFor(() => {
+        expect(openCustomerPortal).toHaveBeenCalledWith(undefined);
+      });
+      expect(assignMock).toHaveBeenCalledWith(
+        "https://billing.stripe.com/p/session/manage_test",
+      );
+    });
+
+    it("Premium → Cancel plan → opens Stripe portal cancel flow", async () => {
+      vi.mocked(fetchSubscriptionStatus).mockResolvedValue({
+        tier: "premium",
+        status: "active",
+        currentPeriodEnd: "2026-05-15T00:00:00.000Z",
+      });
+      vi.mocked(openCustomerPortal).mockResolvedValue({
+        url: "https://billing.stripe.com/p/session/cancel_test",
+      });
+
+      render(<Settings />);
+      const button = await screen.findByRole("button", {
+        name: /cancel plan/i,
+      });
+      fireEvent.click(button);
+
+      await waitFor(() => {
+        expect(openCustomerPortal).toHaveBeenCalledWith("cancel");
+      });
+      expect(assignMock).toHaveBeenCalledWith(
+        "https://billing.stripe.com/p/session/cancel_test",
+      );
+    });
+
+    it("shows a portal error and re-enables the buttons when the call fails", async () => {
+      vi.mocked(fetchSubscriptionStatus).mockResolvedValue({
+        tier: "premium",
+        status: "active",
+        currentPeriodEnd: "2026-05-15T00:00:00.000Z",
+      });
+      vi.mocked(openCustomerPortal).mockRejectedValue(
+        new Error("Stripe is having a moment"),
+      );
+
+      render(<Settings />);
+      const button = await screen.findByRole("button", {
+        name: /manage subscription/i,
+      });
+      fireEvent.click(button);
+
+      await waitFor(() => {
+        expect(screen.getByText(/stripe is having a moment/i)).toBeDefined();
+      });
+      // Buttons re-enabled so the user can retry.
+      expect(
+        (
+          screen.getByRole("button", {
+            name: /manage subscription/i,
+          }) as HTMLButtonElement
+        ).disabled,
+      ).toBe(false);
+    });
+
+    it("renders the Enterprise tier without billing actions", async () => {
+      vi.mocked(fetchSubscriptionStatus).mockResolvedValue({
+        tier: "enterprise",
+        status: "active",
+        currentPeriodEnd: null,
+      });
+      render(<Settings />);
+      await waitFor(() => {
+        expect(screen.getByText("Enterprise")).toBeDefined();
+      });
+      expect(screen.queryByRole("button", { name: /upgrade/i })).toBeNull();
+      expect(
+        screen.queryByRole("button", { name: /manage subscription/i }),
+      ).toBeNull();
+      expect(screen.queryByRole("button", { name: /cancel plan/i })).toBeNull();
+    });
   });
 });
