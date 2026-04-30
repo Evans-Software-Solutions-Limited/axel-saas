@@ -64,7 +64,12 @@ export function Settings() {
   );
   const [invoices, setInvoices] = useState<InvoiceSummary[]>([]);
   const [billingLoading, setBillingLoading] = useState(true);
+  // Subscription error fails the whole section — without a tier we can't
+  // render the right CTAs. Invoices error is rendered inline within the
+  // invoices subsection so a Stripe outage doesn't hide the locally-known
+  // tier or the Manage / Cancel buttons.
   const [billingError, setBillingError] = useState<string | null>(null);
+  const [invoicesError, setInvoicesError] = useState<string | null>(null);
 
   const [portalLoading, setPortalLoading] = useState<
     "manage" | "cancel" | null
@@ -73,26 +78,33 @@ export function Settings() {
 
   useEffect(() => {
     let cancelled = false;
-    // Initial state already has loading=true / error=null, so the effect
-    // doesn't need to re-set them — avoids a redundant render and the
-    // "setState synchronously within an effect" lint trigger.
-    Promise.all([fetchSubscriptionStatus(), fetchInvoices()])
-      .then(([sub, invs]) => {
+    // Promise.allSettled keeps the two fetches independent. The subscription
+    // call hits our DB; the invoices call hits Stripe — they have different
+    // failure modes and the page must not couple them.
+    void Promise.allSettled([fetchSubscriptionStatus(), fetchInvoices()]).then(
+      ([subResult, invResult]) => {
         if (cancelled) return;
-        setSubscription(sub);
-        setInvoices(invs);
-      })
-      .catch((err) => {
-        if (cancelled) return;
-        setBillingError(
-          err instanceof Error
-            ? err.message
-            : "Could not load your billing information",
-        );
-      })
-      .finally(() => {
-        if (!cancelled) setBillingLoading(false);
-      });
+        if (subResult.status === "fulfilled") {
+          setSubscription(subResult.value);
+        } else {
+          setBillingError(
+            subResult.reason instanceof Error
+              ? subResult.reason.message
+              : "Could not load your billing information",
+          );
+        }
+        if (invResult.status === "fulfilled") {
+          setInvoices(invResult.value);
+        } else {
+          setInvoicesError(
+            invResult.reason instanceof Error
+              ? invResult.reason.message
+              : "Could not load your invoices",
+          );
+        }
+        setBillingLoading(false);
+      },
+    );
     return () => {
       cancelled = true;
     };
@@ -215,6 +227,7 @@ export function Settings() {
               <BillingPanel
                 subscription={subscription}
                 invoices={invoices}
+                invoicesError={invoicesError}
                 portalLoading={portalLoading}
                 portalError={portalError}
                 onUpgrade={handleUpgrade}
@@ -232,6 +245,7 @@ export function Settings() {
 interface BillingPanelProps {
   subscription: SubscriptionInfo | null;
   invoices: InvoiceSummary[];
+  invoicesError: string | null;
   portalLoading: "manage" | "cancel" | null;
   portalError: string | null;
   onUpgrade: () => void;
@@ -242,6 +256,7 @@ interface BillingPanelProps {
 function BillingPanel({
   subscription,
   invoices,
+  invoicesError,
   portalLoading,
   portalError,
   onUpgrade,
@@ -254,6 +269,11 @@ function BillingPanel({
     ? STATUS_LABELS[subscription.status]
     : "Active";
   const renewal = formatRenewalDate(subscription?.currentPeriodEnd ?? null);
+  // Premium rows can carry status="cancelled" (subscription.deleted webhook
+  // marks the row cancelled but never downgrades the tier). Treat those as
+  // an "ended" state — different copy, no Cancel button.
+  const isCancelled = subscription?.status === "cancelled";
+  const isPastDue = subscription?.status === "past_due";
 
   return (
     <>
@@ -270,8 +290,13 @@ function BillingPanel({
           )}
           {tier === "premium" && (
             <p className="text-sm text-text-secondary mt-0.5">
-              £49/month
-              {renewal && ` · Renews ${renewal}`}
+              {isCancelled
+                ? renewal
+                  ? `Premium access ended ${renewal}`
+                  : "Premium access ended"
+                : isPastDue
+                  ? "£49/month · Payment failed — please update your payment method"
+                  : `£49/month${renewal ? ` · Renews ${renewal}` : ""}`}
             </p>
           )}
           {tier === "enterprise" && (
@@ -297,16 +322,22 @@ function BillingPanel({
               >
                 {portalLoading === "manage"
                   ? "Opening…"
-                  : "Manage subscription"}
+                  : isCancelled
+                    ? "Manage billing"
+                    : "Manage subscription"}
               </Button>
-              <Button
-                variant="outline"
-                onClick={onCancel}
-                disabled={portalLoading !== null}
-                className="text-xs text-destructive border-destructive/40 hover:bg-destructive/10"
-              >
-                {portalLoading === "cancel" ? "Opening…" : "Cancel plan"}
-              </Button>
+              {/* Hide Cancel for already-cancelled rows — the Stripe portal
+                  cancel flow would error against a deleted subscription. */}
+              {!isCancelled && (
+                <Button
+                  variant="outline"
+                  onClick={onCancel}
+                  disabled={portalLoading !== null}
+                  className="text-xs text-destructive border-destructive/40 hover:bg-destructive/10"
+                >
+                  {portalLoading === "cancel" ? "Opening…" : "Cancel plan"}
+                </Button>
+              )}
             </>
           )}
         </div>
@@ -317,7 +348,9 @@ function BillingPanel({
       {tier !== "free" && (
         <div className="space-y-2">
           <h3 className="text-sm font-medium text-text">Recent invoices</h3>
-          {invoices.length === 0 ? (
+          {invoicesError ? (
+            <p className="text-sm text-destructive">{invoicesError}</p>
+          ) : invoices.length === 0 ? (
             <p className="text-sm text-text-secondary">
               No invoices yet — your first one will appear here after your next
               billing cycle.

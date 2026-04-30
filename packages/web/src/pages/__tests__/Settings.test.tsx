@@ -72,7 +72,9 @@ describe("Settings", () => {
       expect(screen.getByText(/loading/i)).toBeDefined();
     });
 
-    it("shows an error message when the fetch fails", async () => {
+    it("shows an error message when the subscription fetch fails", async () => {
+      // Subscription failure is fatal for the section — without a tier we
+      // can't render the right CTAs.
       vi.mocked(fetchSubscriptionStatus).mockRejectedValue(
         new Error("Subscription endpoint unavailable"),
       );
@@ -82,6 +84,33 @@ describe("Settings", () => {
           screen.getByText(/subscription endpoint unavailable/i),
         ).toBeDefined();
       });
+    });
+
+    it("still renders billing actions when only the invoices fetch fails", async () => {
+      // A Stripe outage on /stripe/invoices must not hide the locally-known
+      // tier or the Manage / Cancel buttons.
+      vi.mocked(fetchSubscriptionStatus).mockResolvedValue({
+        tier: "premium",
+        status: "active",
+        currentPeriodEnd: "2026-05-15T00:00:00.000Z",
+      });
+      vi.mocked(fetchInvoices).mockRejectedValue(new Error("Stripe is down"));
+
+      render(<Settings />);
+
+      // Subscription section renders normally.
+      await waitFor(() => {
+        expect(screen.getByText("Premium")).toBeDefined();
+      });
+      expect(
+        screen.getByRole("button", { name: /manage subscription/i }),
+      ).toBeDefined();
+      expect(
+        screen.getByRole("button", { name: /cancel plan/i }),
+      ).toBeDefined();
+
+      // Invoices error appears inline within its own subsection.
+      expect(screen.getByText(/stripe is down/i)).toBeDefined();
     });
 
     it("renders the Free tier upgrade CTA and routes to /subscribe", async () => {
@@ -233,6 +262,61 @@ describe("Settings", () => {
           }) as HTMLButtonElement
         ).disabled,
       ).toBe(false);
+    });
+
+    it("renders the cancelled-premium state with Manage billing only and no contradictory copy", async () => {
+      // The customer.subscription.deleted webhook flips status to "cancelled"
+      // but never downgrades the tier. The UI must reflect that — no
+      // "Renews [date]" line, no Cancel button (the Stripe portal cancel
+      // flow would error against a deleted subscription).
+      vi.mocked(fetchSubscriptionStatus).mockResolvedValue({
+        tier: "premium",
+        status: "cancelled",
+        currentPeriodEnd: "2026-05-15T00:00:00.000Z",
+      });
+
+      render(<Settings />);
+
+      await waitFor(() => {
+        expect(screen.getByText("Premium")).toBeDefined();
+      });
+      expect(screen.getByText(/premium access ended/i)).toBeDefined();
+      expect(screen.queryByText(/renews/i)).toBeNull();
+      expect(screen.queryByText(/£49\/month/)).toBeNull();
+
+      // Manage stays so the user can resubscribe / view past invoices via
+      // the portal — the label changes to reflect that there's no active
+      // subscription to manage.
+      expect(
+        screen.getByRole("button", { name: /manage billing/i }),
+      ).toBeDefined();
+      expect(screen.queryByRole("button", { name: /cancel plan/i })).toBeNull();
+    });
+
+    it("renders the past-due premium state with both Manage and Cancel buttons", async () => {
+      vi.mocked(fetchSubscriptionStatus).mockResolvedValue({
+        tier: "premium",
+        status: "past_due",
+        currentPeriodEnd: "2026-05-15T00:00:00.000Z",
+      });
+
+      render(<Settings />);
+
+      await waitFor(() => {
+        expect(screen.getByText("Premium")).toBeDefined();
+      });
+      // Both the Cancelled/Past-due status badge and the body copy use the
+      // phrase "Payment failed". Match the body line specifically.
+      expect(
+        screen.getByText(/please update your payment method/i),
+      ).toBeDefined();
+      expect(
+        screen.getByRole("button", { name: /manage subscription/i }),
+      ).toBeDefined();
+      // Cancel still available — past-due users should be able to cancel.
+      expect(
+        screen.getByRole("button", { name: /cancel plan/i }),
+      ).toBeDefined();
     });
 
     it("renders the Enterprise tier without billing actions", async () => {
