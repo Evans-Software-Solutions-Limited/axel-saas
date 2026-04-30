@@ -67,7 +67,13 @@ export async function fetchInvoices(limit = 10): Promise<InvoiceSummary[]> {
     success: boolean;
     invoices: InvoiceSummary[];
   } | null;
-  return body?.invoices ?? [];
+  if (!body?.success) {
+    // A 200 with success:false would otherwise silently render as an empty
+    // list and hide the failure from the user. Match the sibling functions
+    // and surface it.
+    throw new Error("Invoices response was not successful");
+  }
+  return body.invoices ?? [];
 }
 
 /**

@@ -124,6 +124,18 @@ describe("settingsApi", () => {
 
       await expect(fetchInvoices()).rejects.toThrow(/500/);
     });
+
+    it("throws when the body says success: false", async () => {
+      // 200 OK with success:false should surface as an error rather than
+      // silently rendering an empty invoices list. Matches the
+      // fetchSubscriptionStatus / openCustomerPortal pattern.
+      mockApi.core.stripe.invoices.get.mockResolvedValue({
+        data: { success: false, invoices: [] },
+        error: null,
+      });
+
+      await expect(fetchInvoices()).rejects.toThrow(/not successful/i);
+    });
   });
 
   describe("openCustomerPortal", () => {
