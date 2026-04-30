@@ -12,6 +12,10 @@ export interface SubscriptionInfo {
   tier: SubscriptionTier;
   status: SubscriptionStatus;
   currentPeriodEnd: string | null;
+  // Mirror of Stripe's cancel_at_period_end. True between a portal-driven
+  // cancellation and the period actually ending — the UI uses it to render
+  // "Cancellation scheduled" rather than "Renews [date]".
+  cancelAtPeriodEnd: boolean;
 }
 
 export interface InvoiceSummary {

@@ -97,6 +97,7 @@ export const subscriptionHandler = new Elysia({
           tier: subscription.tier,
           status: subscription.status,
           currentPeriodEnd: subscription.currentPeriodEnd,
+          cancelAtPeriodEnd: subscription.cancelAtPeriodEnd,
         },
       };
     },

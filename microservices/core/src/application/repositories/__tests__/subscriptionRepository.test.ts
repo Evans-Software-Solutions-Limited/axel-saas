@@ -251,4 +251,16 @@ describe("SubscriptionRepository", () => {
       expect(mockDb.update).toHaveBeenCalledOnce();
     });
   });
+
+  describe("updateCancelAtPeriodEnd", () => {
+    it("flips the flag to true for portal-scheduled cancellation", async () => {
+      await repo.updateCancelAtPeriodEnd("sub-uuid-1", true);
+      expect(mockDb.update).toHaveBeenCalledOnce();
+    });
+
+    it("flips the flag back to false when the user resumes via the portal", async () => {
+      await repo.updateCancelAtPeriodEnd("sub-uuid-1", false);
+      expect(mockDb.update).toHaveBeenCalledOnce();
+    });
+  });
 });

@@ -37,6 +37,7 @@ describe("settingsApi", () => {
             tier: "premium",
             status: "active",
             currentPeriodEnd: "2026-05-15T00:00:00.000Z",
+            cancelAtPeriodEnd: false,
           },
         },
         error: null,
@@ -46,6 +47,25 @@ describe("settingsApi", () => {
 
       expect(result?.tier).toBe("premium");
       expect(result?.status).toBe("active");
+      expect(result?.cancelAtPeriodEnd).toBe(false);
+    });
+
+    it("surfaces cancelAtPeriodEnd=true for portal-scheduled cancellations", async () => {
+      mockApi.core.subscriptions.status.get.mockResolvedValue({
+        data: {
+          success: true,
+          subscription: {
+            tier: "premium",
+            status: "active",
+            currentPeriodEnd: "2026-05-15T00:00:00.000Z",
+            cancelAtPeriodEnd: true,
+          },
+        },
+        error: null,
+      });
+
+      const result = await fetchSubscriptionStatus();
+      expect(result?.cancelAtPeriodEnd).toBe(true);
     });
 
     it("returns null when the user has no subscription row", async () => {

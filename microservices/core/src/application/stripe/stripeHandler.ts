@@ -259,6 +259,20 @@ export const stripeHandler = new Elysia({ name: "StripeHandler" })
           if (newStatus !== sub.status) {
             await subRepo.updateStatus(sub.id, newStatus);
           }
+
+          // Stripe portal cancellations send updated (status=active,
+          // cancel_at_period_end=true) and only fire `deleted` when the
+          // period actually ends. Persist the flag so the UI can render
+          // "Cancellation scheduled" instead of "Renews [date]". Reverting
+          // a cancellation in the portal flips it back to false in the same
+          // event type.
+          const nextCancelAtPeriodEnd = !!subscription.cancel_at_period_end;
+          if (nextCancelAtPeriodEnd !== sub.cancelAtPeriodEnd) {
+            await subRepo.updateCancelAtPeriodEnd(
+              sub.id,
+              nextCancelAtPeriodEnd,
+            );
+          }
         }
       } else if (event.type === "customer.subscription.deleted") {
         const subscription = event.data.object as Stripe.Subscription;

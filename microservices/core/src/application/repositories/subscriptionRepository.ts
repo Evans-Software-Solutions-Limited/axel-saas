@@ -158,4 +158,14 @@ export class SubscriptionRepository {
       .set({ currentPeriodEnd, updatedAt: new Date() })
       .where(eq(subscriptions.id, subscriptionId));
   }
+
+  async updateCancelAtPeriodEnd(
+    subscriptionId: string,
+    cancelAtPeriodEnd: boolean,
+  ): Promise<void> {
+    await this.db
+      .update(subscriptions)
+      .set({ cancelAtPeriodEnd, updatedAt: new Date() })
+      .where(eq(subscriptions.id, subscriptionId));
+  }
 }

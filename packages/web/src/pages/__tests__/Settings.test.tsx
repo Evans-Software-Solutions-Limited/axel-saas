@@ -35,6 +35,7 @@ beforeEach(() => {
     tier: "free",
     status: "active",
     currentPeriodEnd: null,
+    cancelAtPeriodEnd: false,
   } satisfies SubscriptionInfo);
   vi.mocked(fetchInvoices).mockResolvedValue([]);
 });
@@ -93,6 +94,7 @@ describe("Settings", () => {
         tier: "premium",
         status: "active",
         currentPeriodEnd: "2026-05-15T00:00:00.000Z",
+        cancelAtPeriodEnd: false,
       });
       vi.mocked(fetchInvoices).mockRejectedValue(new Error("Stripe is down"));
 
@@ -150,6 +152,7 @@ describe("Settings", () => {
         tier: "premium",
         status: "active",
         currentPeriodEnd: "2026-05-15T00:00:00.000Z",
+        cancelAtPeriodEnd: false,
       });
       vi.mocked(fetchInvoices).mockResolvedValue([
         {
@@ -192,6 +195,7 @@ describe("Settings", () => {
         tier: "premium",
         status: "active",
         currentPeriodEnd: "2026-05-15T00:00:00.000Z",
+        cancelAtPeriodEnd: false,
       });
       vi.mocked(openCustomerPortal).mockResolvedValue({
         url: "https://billing.stripe.com/p/session/manage_test",
@@ -216,6 +220,7 @@ describe("Settings", () => {
         tier: "premium",
         status: "active",
         currentPeriodEnd: "2026-05-15T00:00:00.000Z",
+        cancelAtPeriodEnd: false,
       });
       vi.mocked(openCustomerPortal).mockResolvedValue({
         url: "https://billing.stripe.com/p/session/cancel_test",
@@ -240,6 +245,7 @@ describe("Settings", () => {
         tier: "premium",
         status: "active",
         currentPeriodEnd: "2026-05-15T00:00:00.000Z",
+        cancelAtPeriodEnd: false,
       });
       vi.mocked(openCustomerPortal).mockRejectedValue(
         new Error("Stripe is having a moment"),
@@ -273,6 +279,7 @@ describe("Settings", () => {
         tier: "premium",
         status: "cancelled",
         currentPeriodEnd: "2026-05-15T00:00:00.000Z",
+        cancelAtPeriodEnd: false,
       });
 
       render(<Settings />);
@@ -298,6 +305,7 @@ describe("Settings", () => {
         tier: "premium",
         status: "past_due",
         currentPeriodEnd: "2026-05-15T00:00:00.000Z",
+        cancelAtPeriodEnd: false,
       });
 
       render(<Settings />);
@@ -319,11 +327,43 @@ describe("Settings", () => {
       ).toBeDefined();
     });
 
-    it("renders the Enterprise tier without billing actions", async () => {
+    it("renders 'Cancellation scheduled' (not 'Renews') when cancelAtPeriodEnd is true", async () => {
+      // Stripe portal cancellations send subscription.updated with
+      // status=active + cancel_at_period_end=true. The DB stays active
+      // until period end, so without surfacing the flag the UI would
+      // misleadingly show "Renews [date]" right after the user cancelled.
+      vi.mocked(fetchSubscriptionStatus).mockResolvedValue({
+        tier: "premium",
+        status: "active",
+        currentPeriodEnd: "2026-05-15T00:00:00.000Z",
+        cancelAtPeriodEnd: true,
+      });
+
+      render(<Settings />);
+
+      await waitFor(() => {
+        expect(screen.getByText("Premium")).toBeDefined();
+      });
+      expect(screen.getByText(/cancellation scheduled/i)).toBeDefined();
+      expect(screen.getByText(/active until 15 may 2026/i)).toBeDefined();
+      expect(screen.queryByText(/renews/i)).toBeNull();
+
+      // Manage stays (lets the user resume the cancellation via the portal).
+      // Cancel is hidden — they've already cancelled.
+      expect(
+        screen.getByRole("button", { name: /manage subscription/i }),
+      ).toBeDefined();
+      expect(screen.queryByRole("button", { name: /cancel plan/i })).toBeNull();
+    });
+
+    it("renders the Enterprise tier without billing actions and without an invoices section", async () => {
+      // Enterprise customers are on custom invoicing handled outside Stripe
+      // — showing them an empty Stripe invoices panel is misleading.
       vi.mocked(fetchSubscriptionStatus).mockResolvedValue({
         tier: "enterprise",
         status: "active",
         currentPeriodEnd: null,
+        cancelAtPeriodEnd: false,
       });
       render(<Settings />);
       await waitFor(() => {
@@ -334,6 +374,7 @@ describe("Settings", () => {
         screen.queryByRole("button", { name: /manage subscription/i }),
       ).toBeNull();
       expect(screen.queryByRole("button", { name: /cancel plan/i })).toBeNull();
+      expect(screen.queryByText(/recent invoices/i)).toBeNull();
     });
   });
 });

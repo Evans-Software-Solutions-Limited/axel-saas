@@ -274,6 +274,14 @@ function BillingPanel({
   // an "ended" state — different copy, no Cancel button.
   const isCancelled = subscription?.status === "cancelled";
   const isPastDue = subscription?.status === "past_due";
+  // Stripe portal cancellations don't delete the subscription immediately
+  // — they flip cancel_at_period_end. Status stays "active" until the
+  // period ends and `customer.subscription.deleted` fires. While the flag
+  // is true, render "Cancellation scheduled · Active until [date]" rather
+  // than "Renews [date]" so the user isn't told their cancelled plan is
+  // about to renew.
+  const isCancellationScheduled =
+    subscription?.cancelAtPeriodEnd === true && !isCancelled;
 
   return (
     <>
@@ -294,9 +302,13 @@ function BillingPanel({
                 ? renewal
                   ? `Premium access ended ${renewal}`
                   : "Premium access ended"
-                : isPastDue
-                  ? "£49/month · Payment failed — please update your payment method"
-                  : `£49/month${renewal ? ` · Renews ${renewal}` : ""}`}
+                : isCancellationScheduled
+                  ? renewal
+                    ? `Cancellation scheduled · Active until ${renewal}`
+                    : "Cancellation scheduled"
+                  : isPastDue
+                    ? "£49/month · Payment failed — please update your payment method"
+                    : `£49/month${renewal ? ` · Renews ${renewal}` : ""}`}
             </p>
           )}
           {tier === "enterprise" && (
@@ -327,8 +339,12 @@ function BillingPanel({
                     : "Manage subscription"}
               </Button>
               {/* Hide Cancel for already-cancelled rows — the Stripe portal
-                  cancel flow would error against a deleted subscription. */}
-              {!isCancelled && (
+                  cancel flow would error against a deleted subscription —
+                  and for rows that are already mid-cancellation (the
+                  cancel_at_period_end flag is set, just not yet expired).
+                  Resuming a scheduled cancellation lives in the Stripe
+                  portal, accessed via Manage subscription. */}
+              {!isCancelled && !isCancellationScheduled && (
                 <Button
                   variant="outline"
                   onClick={onCancel}
@@ -345,7 +361,11 @@ function BillingPanel({
 
       {portalError && <p className="text-sm text-destructive">{portalError}</p>}
 
-      {tier !== "free" && (
+      {/* Invoices are only meaningful for self-serve Stripe billing.
+          Enterprise customers are on custom invoicing handled outside
+          Stripe — showing them an "empty Stripe invoices" panel is
+          misleading. Free users have no Stripe customer at all. */}
+      {tier === "premium" && (
         <div className="space-y-2">
           <h3 className="text-sm font-medium text-text">Recent invoices</h3>
           {invoicesError ? (
