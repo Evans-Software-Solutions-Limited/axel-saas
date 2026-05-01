@@ -282,6 +282,13 @@ export const stripeHandler = new Elysia({ name: "StripeHandler" })
 
         if (sub) {
           await subRepo.updateStatus(sub.id, "cancelled");
+          // Clear cancel_at_period_end now that the cancellation has
+          // landed — the flag was meaningful while pending, but a row
+          // with status="cancelled" is no longer "scheduled to cancel".
+          // Keeps state consistent if the user later resubscribes.
+          if (sub.cancelAtPeriodEnd) {
+            await subRepo.updateCancelAtPeriodEnd(sub.id, false);
+          }
 
           // Cancellation email — fire-and-forget. The template reads
           // `endsAt` (the period the user keeps access until); if Stripe

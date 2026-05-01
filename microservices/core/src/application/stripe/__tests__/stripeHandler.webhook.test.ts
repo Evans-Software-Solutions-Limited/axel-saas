@@ -343,11 +343,52 @@ describe("StripeHandler webhook behaviour", () => {
         type: "customer.subscription.deleted",
         data: { object: { customer: "cus_del" } },
       });
-      mockFindByStripeCustomer.mockResolvedValueOnce({ id: "sub-del" });
+      mockFindByStripeCustomer.mockResolvedValueOnce({
+        id: "sub-del",
+        cancelAtPeriodEnd: false,
+      });
 
       const response = await postWebhook();
       expect(response.status).toBe(200);
       expect(mockUpdateStatus).toHaveBeenCalledWith("sub-del", "cancelled");
+    });
+
+    it("clears cancelAtPeriodEnd when the row had a pending cancellation", async () => {
+      // The flag was set during the portal cancel-at-period-end window.
+      // Once `deleted` lands, the row is fully cancelled — the "scheduled"
+      // semantics no longer apply. Clear it so a future resubscribe doesn't
+      // inherit a stale true.
+      mockConstructEvent.mockReturnValueOnce({
+        type: "customer.subscription.deleted",
+        data: { object: { customer: "cus_del" } },
+      });
+      mockFindByStripeCustomer.mockResolvedValueOnce({
+        id: "sub-del",
+        cancelAtPeriodEnd: true,
+      });
+
+      await postWebhook();
+
+      expect(mockUpdateCancelAtPeriodEnd).toHaveBeenCalledWith(
+        "sub-del",
+        false,
+      );
+    });
+
+    it("does not write cancelAtPeriodEnd when it was already false", async () => {
+      // Edge case: admin-initiated immediate cancellation skips the
+      // cancel-at-period-end state. No write needed.
+      mockConstructEvent.mockReturnValueOnce({
+        type: "customer.subscription.deleted",
+        data: { object: { customer: "cus_del" } },
+      });
+      mockFindByStripeCustomer.mockResolvedValueOnce({
+        id: "sub-del",
+        cancelAtPeriodEnd: false,
+      });
+
+      await postWebhook();
+      expect(mockUpdateCancelAtPeriodEnd).not.toHaveBeenCalled();
     });
   });
 
