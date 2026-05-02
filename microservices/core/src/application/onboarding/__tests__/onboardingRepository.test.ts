@@ -319,7 +319,7 @@ describe("OnboardingRepository Methods", () => {
         id: "msg-2",
         role: "assistant" as const,
         content:
-          "Hey there! I've just been set up for you. Before I can be useful, I need to get to know you a bit. Before I can be useful, what should I call you?",
+          "Hey there! I've just been set up for you. Before I can be useful, I need to get to know you a bit. What should I call you?",
       };
 
       const selectMock = vi.fn();
@@ -525,9 +525,7 @@ describe("OnboardingRepository Methods", () => {
       } as any;
       const response = repo.generateAssistantResponse(state, "");
       expect(response.toLowerCase()).toContain("set up");
-      expect(response).toContain(
-        "Before I can be useful, what should I call you?",
-      );
+      expect(response).toContain("What should I call you?");
     });
 
     it("should ask next outstanding question", () => {

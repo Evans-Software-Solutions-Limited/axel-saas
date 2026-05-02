@@ -4,6 +4,8 @@ import {
   stripeSecretKey,
   stripeWebhookSecret,
   resendApiKey,
+  googleOauthClientSecret,
+  slackOauthClientSecret,
 } from "./secrets";
 
 export const coreAPI = new sst.aws.ApiGatewayV2("api-core", {
@@ -49,5 +51,16 @@ coreAPI.route("$default", {
     MARKETING_URL: process.env.MARKETING_URL || "",
     NODE_ENV: process.env.NODE_ENV || "development",
     VITE_WEB_URL: process.env.VITE_WEB_URL || "http://localhost:5173",
+    // Public-facing base URL of this API. Used by the integrations OAuth
+    // flow to register the callback redirect_uri with providers — must
+    // match exactly what's registered in the Google / Slack app consoles.
+    API_BASE_URL: process.env.API_BASE_URL || "",
+    // Integrations OAuth client credentials. Client IDs are not secrets
+    // (they're embedded in redirect URLs) so they ride env directly;
+    // secrets come through SST.
+    GOOGLE_OAUTH_CLIENT_ID: process.env.GOOGLE_OAUTH_CLIENT_ID || "",
+    GOOGLE_OAUTH_CLIENT_SECRET: googleOauthClientSecret.value,
+    SLACK_OAUTH_CLIENT_ID: process.env.SLACK_OAUTH_CLIENT_ID || "",
+    SLACK_OAUTH_CLIENT_SECRET: slackOauthClientSecret.value,
   },
 });
