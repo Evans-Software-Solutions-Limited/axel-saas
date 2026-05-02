@@ -153,9 +153,17 @@ export class OauthService {
       response_type: "code",
       scope: provider.scopes.join(" "),
       state: stateToken,
-      access_type: "offline",
-      prompt: "consent",
     });
+
+    // Provider-specific authorize-time params (e.g. Google's
+    // access_type=offline + prompt=consent for refresh tokens). Slack
+    // doesn't recognise those keys, so they live in provider config
+    // rather than being applied universally.
+    if (provider.authorizationExtras) {
+      for (const [key, value] of Object.entries(provider.authorizationExtras)) {
+        params.set(key, value);
+      }
+    }
 
     return {
       success: true,
@@ -241,6 +249,20 @@ export class OauthService {
     }
 
     const payload = exchange.payload as Record<string, unknown> | null;
+
+    // Some providers (notably Slack's oauth.v2.access) return HTTP 200
+    // for failures and signal them via `{ ok: false, error: "..." }`.
+    // Run the per-provider detector first so the real error message
+    // surfaces instead of a misleading "missing access_token".
+    const providerError = provider.detectTokenResponseError?.(payload);
+    if (providerError) {
+      return {
+        success: false,
+        error: providerError,
+        returnPath: stateRow.returnPath,
+      };
+    }
+
     const accessToken =
       payload && typeof payload.access_token === "string"
         ? payload.access_token

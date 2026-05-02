@@ -150,6 +150,37 @@ describe("OauthService.start", () => {
       "https://api.example.com/integrations/google/oauth/callback",
     );
   });
+
+  it("applies Google-specific authorize extras (access_type=offline, prompt=consent)", async () => {
+    const { service } = setup();
+    const result = await service.start("user-uuid-1", "google", null);
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+
+    const url = new URL(result.redirectUrl);
+    // Google needs these to receive a refresh token. They were previously
+    // hardcoded for every provider, which would break stricter providers.
+    expect(url.searchParams.get("access_type")).toBe("offline");
+    expect(url.searchParams.get("prompt")).toBe("consent");
+  });
+
+  it("does not apply Google's extras when starting a Slack flow", async () => {
+    const { service } = setup();
+    const result = await service.start("user-uuid-1", "slack", null);
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+
+    const url = new URL(result.redirectUrl);
+    expect(url.origin + url.pathname).toBe(
+      "https://slack.com/oauth/v2/authorize",
+    );
+    // Slack ignores them today but a future tightening would reject them
+    // — so they must not be present in the Slack URL.
+    expect(url.searchParams.get("access_type")).toBeNull();
+    expect(url.searchParams.get("prompt")).toBeNull();
+    expect(url.searchParams.get("client_id")).toBe("slack-client");
+    expect(url.searchParams.get("scope")).toContain("chat:write");
+  });
 });
 
 describe("OauthService.complete", () => {
@@ -304,5 +335,107 @@ describe("OauthService.complete", () => {
     });
     const result = await service.complete("google", "code", "state-token-abc");
     expect(result.success).toBe(false);
+  });
+
+  describe("Slack-style 200-OK error responses", () => {
+    function setupSlackComplete(opts: {
+      tokenResponse: { ok: boolean; status: number; payload: unknown };
+    }) {
+      // Slack flow needs the state row to point at slack.
+      const result = setup({ tokenResponse: opts.tokenResponse });
+      result.stateRepo.findByToken.mockResolvedValue(
+        makeStateRow({ integrationId: "slack" }),
+      );
+      return result;
+    }
+
+    it("surfaces Slack's `error` code when payload is { ok: false, error: ... }", async () => {
+      // oauth.v2.access returns HTTP 200 even on failure — without the
+      // per-provider detector this would fall through to the generic
+      // "Token response missing access_token" branch and lose the real
+      // error message.
+      const { service, secrets } = setupSlackComplete({
+        tokenResponse: {
+          ok: true,
+          status: 200,
+          payload: { ok: false, error: "invalid_code" },
+        },
+      });
+
+      const result = await service.complete(
+        "slack",
+        "bad-code",
+        "state-token-abc",
+      );
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error).toContain("invalid_code");
+      }
+      // No secret persisted on a failed exchange.
+      expect(secrets.putSecret).not.toHaveBeenCalled();
+    });
+
+    it("falls back to generic Slack error copy when ok=false but no error code", async () => {
+      const { service } = setupSlackComplete({
+        tokenResponse: {
+          ok: true,
+          status: 200,
+          payload: { ok: false },
+        },
+      });
+
+      const result = await service.complete(
+        "slack",
+        "bad-code",
+        "state-token-abc",
+      );
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.toLowerCase()).toContain("slack");
+      }
+    });
+
+    it("flags an empty Slack payload as an error (defensive against parse failures)", async () => {
+      const { service } = setupSlackComplete({
+        tokenResponse: { ok: true, status: 200, payload: null },
+      });
+
+      const result = await service.complete("slack", "code", "state-token-abc");
+      expect(result.success).toBe(false);
+    });
+
+    it("succeeds on a healthy Slack token response (ok=true + access_token)", async () => {
+      const { service, secrets, integrationRepo } = setupSlackComplete({
+        tokenResponse: {
+          ok: true,
+          status: 200,
+          payload: {
+            ok: true,
+            access_token: "xoxb-bot-token-example",
+            token_type: "bot",
+            scope: "chat:write,channels:read",
+          },
+        },
+      });
+
+      const result = await service.complete(
+        "slack",
+        "good-code",
+        "state-token-abc",
+      );
+      expect(result.success).toBe(true);
+      expect(secrets.putSecret).toHaveBeenCalledOnce();
+      const [, payload] = (secrets.putSecret as ReturnType<typeof vi.fn>).mock
+        .calls[0]!;
+      const parsed = JSON.parse(payload as string);
+      expect(parsed.access_token).toBe("xoxb-bot-token-example");
+      expect(integrationRepo.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          integrationId: "slack",
+          status: "connected",
+        }),
+      );
+    });
   });
 });
