@@ -3,6 +3,16 @@ import { render, screen, fireEvent, act } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { SignUp } from "../SignUp";
 
+const mockNavigate = vi.fn();
+vi.mock("react-router", async () => {
+  const actual =
+    await vi.importActual<typeof import("react-router")>("react-router");
+  return {
+    ...actual,
+    useNavigate: () => mockNavigate,
+  };
+});
+
 vi.mock("@/hooks/useAuth", () => ({
   useAuth: vi.fn(),
 }));
@@ -25,7 +35,12 @@ const mockAuth = (overrides: Partial<ReturnType<typeof useAuth>> = {}) => ({
   setOnboardingCompleted: vi.fn(),
   refreshOnboardingStatus: vi.fn().mockResolvedValue(undefined),
   signIn: vi.fn().mockResolvedValue({ success: true }),
-  signUp: vi.fn().mockResolvedValue({ success: true }),
+  // Default: session-immediately path (email confirmation disabled or
+  // already-verified). Tests for the "check your email" view override
+  // signUp explicitly with requiresEmailConfirmation: true.
+  signUp: vi
+    .fn()
+    .mockResolvedValue({ success: true, requiresEmailConfirmation: false }),
   signOut: vi.fn().mockResolvedValue({ success: true }),
   ...overrides,
 });
@@ -33,10 +48,16 @@ const mockAuth = (overrides: Partial<ReturnType<typeof useAuth>> = {}) => ({
 describe("SignUp", () => {
   beforeEach(() => {
     vi.mocked(useAuth).mockReturnValue(
-      mockAuth({ signUp: vi.fn().mockResolvedValue({ success: true }) }),
+      mockAuth({
+        signUp: vi.fn().mockResolvedValue({
+          success: true,
+          requiresEmailConfirmation: false,
+        }),
+      }),
     );
     mockProvisionFreeSilently.mockReset();
     mockProvisionFreeSilently.mockResolvedValue(undefined);
+    mockNavigate.mockReset();
   });
 
   it("renders sign up form and Axel branding", () => {
@@ -86,7 +107,9 @@ describe("SignUp", () => {
   });
 
   it("calls signUp when form is submitted with matching passwords", async () => {
-    const signUp = vi.fn().mockResolvedValue({ success: true });
+    const signUp = vi
+      .fn()
+      .mockResolvedValue({ success: true, requiresEmailConfirmation: false });
     vi.mocked(useAuth).mockReturnValue(mockAuth({ signUp }));
     render(
       <MemoryRouter>
@@ -149,8 +172,10 @@ describe("SignUp", () => {
     ).toBeDefined();
   });
 
-  it("provisions a free subscription after a successful signup", async () => {
-    const signUp = vi.fn().mockResolvedValue({ success: true });
+  it("provisions a free subscription after a successful signup with immediate session", async () => {
+    const signUp = vi
+      .fn()
+      .mockResolvedValue({ success: true, requiresEmailConfirmation: false });
     vi.mocked(useAuth).mockReturnValue(mockAuth({ signUp }));
     render(
       <MemoryRouter>
@@ -204,5 +229,97 @@ describe("SignUp", () => {
       if (form) fireEvent.submit(form);
     });
     expect(screen.getByText(/error occurred|please try again/i)).toBeDefined();
+  });
+
+  // Helper for the verify-email branch — submits the form, asserts the
+  // success state took over, and returns the matching email node so callers
+  // can drill into it.
+  type SignUpFn = ReturnType<typeof useAuth>["signUp"];
+  const submitVerifyEmailFlow = async (signUp: SignUpFn) => {
+    vi.mocked(useAuth).mockReturnValue(mockAuth({ signUp }));
+    render(
+      <MemoryRouter>
+        <SignUp />
+      </MemoryRouter>,
+    );
+    await act(async () => {
+      const nameInput = screen.getByLabelText(/name/i);
+      if (nameInput)
+        fireEvent.change(nameInput, { target: { value: "Test User" } });
+      fireEvent.change(screen.getByLabelText(/email/i), {
+        target: { value: "verify-me@example.com" },
+      });
+      fireEvent.change(screen.getByLabelText(/^password/i), {
+        target: { value: "password123" },
+      });
+      const confirmInputs = screen.getAllByLabelText(/password/i);
+      const confirm = confirmInputs[confirmInputs.length - 1];
+      if (confirm)
+        fireEvent.change(confirm, { target: { value: "password123" } });
+      const form = screen
+        .getByRole("button", { name: /create account|sign up/i })
+        .closest("form");
+      if (form) fireEvent.submit(form);
+    });
+  };
+
+  describe("when signUp succeeds but requires email confirmation", () => {
+    it("renders the check-your-email view with the user's email", async () => {
+      const signUp = vi
+        .fn()
+        .mockResolvedValue({ success: true, requiresEmailConfirmation: true });
+      await submitVerifyEmailFlow(signUp);
+
+      // Heading flips from "Create an account" to "Check your email".
+      expect(screen.getByText(/check your email/i)).toBeDefined();
+      expect(screen.getByText("verify-me@example.com")).toBeDefined();
+      expect(
+        screen.queryByRole("button", { name: /create account/i }),
+      ).toBeNull();
+    });
+
+    it("does not call provisionFreeSilently (would 401 without a session)", async () => {
+      const signUp = vi
+        .fn()
+        .mockResolvedValue({ success: true, requiresEmailConfirmation: true });
+      await submitVerifyEmailFlow(signUp);
+      expect(mockProvisionFreeSilently).not.toHaveBeenCalled();
+    });
+
+    it("does not navigate to /subscribe", async () => {
+      const signUp = vi
+        .fn()
+        .mockResolvedValue({ success: true, requiresEmailConfirmation: true });
+      await submitVerifyEmailFlow(signUp);
+      expect(mockNavigate).not.toHaveBeenCalled();
+    });
+
+    it("offers a Sign-in link for users who already verified", async () => {
+      const signUp = vi
+        .fn()
+        .mockResolvedValue({ success: true, requiresEmailConfirmation: true });
+      await submitVerifyEmailFlow(signUp);
+      const signInLinks = screen.getAllByRole("link", { name: /sign in/i });
+      expect(signInLinks.some((l) => l.getAttribute("href") === "/login")).toBe(
+        true,
+      );
+    });
+
+    it("'try a different address' returns to the form", async () => {
+      const signUp = vi
+        .fn()
+        .mockResolvedValue({ success: true, requiresEmailConfirmation: true });
+      await submitVerifyEmailFlow(signUp);
+
+      fireEvent.click(
+        screen.getByRole("button", { name: /try a different address/i }),
+      );
+
+      // Form is back; success state is gone.
+      expect(
+        screen.getByRole("button", { name: /create account/i }),
+      ).toBeDefined();
+      expect(screen.queryByText(/check your email/i)).toBeNull();
+    });
   });
 });
