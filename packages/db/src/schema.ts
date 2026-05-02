@@ -380,6 +380,42 @@ export const userIntegrations = pgTable(
 export type UserIntegration = typeof userIntegrations.$inferSelect;
 export type NewUserIntegration = typeof userIntegrations.$inferInsert;
 
+// ─── OAuth State ───────────────────────────────────────────────────────────────
+
+// Short-lived CSRF state for the integrations OAuth flow. The callback is
+// unauthenticated (providers redirect with no Authorization header), so the
+// row's userId is what lets us complete a connection without trusting the
+// query string. Hard-deleted on consumption; replay-blocked by the unique
+// index on state_token.
+export const oauthState = pgTable(
+  "oauth_state",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id").notNull(),
+    integrationId: text("integration_id").notNull(),
+    stateToken: text("state_token").notNull(),
+    returnPath: text("return_path"),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => ({
+    stateTokenIdx: uniqueIndex("oauth_state_state_token_idx").on(
+      table.stateToken,
+    ),
+    userIdIdx: index("oauth_state_user_id_idx").on(table.userId),
+    oauthStateUserFk: foreignKey({
+      columns: [table.userId],
+      foreignColumns: [users.id],
+      name: "oauth_state_user_id_fkey",
+    }).onDelete("cascade"),
+  }),
+);
+
+export type OauthState = typeof oauthState.$inferSelect;
+export type NewOauthState = typeof oauthState.$inferInsert;
+
 // ─── Waitlist ──────────────────────────────────────────────────────────────────
 
 export const waitlistInterestedInEnum = pgEnum("waitlist_interested_in", [

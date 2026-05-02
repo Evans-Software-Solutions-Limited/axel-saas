@@ -71,6 +71,13 @@
       "when": 1777680000000,
       "tag": "0009_subscription_cancel_at_period_end",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1778544000000,
+      "tag": "0010_oauth_state",
+      "breakpoints": true
     }
   ]
 }
