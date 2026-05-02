@@ -34,7 +34,7 @@ export type QuestionKey = (typeof ALL_QUESTIONS)[number];
 // what good support looks like, and where they need proactive monitoring.
 // Goal: help Axel infer the job, then understand how to proactively help day-to-day.
 export const QUESTION_PROMPTS: Record<QuestionKey, string> = {
-  name: "Before I can be useful, what should I call you?",
+  name: "What should I call you?",
   role: "Tell me a bit about you — what's your world like? What do you do, and what matters to you in your work?",
   typicalDay:
     "Walk me through a typical week. What kind of work takes up most of your time? (e.g. coding, emails, documentation, Jira work, meetings, reporting, etc.)",
