@@ -67,10 +67,22 @@ export class SubscriptionRepository {
           tier: input.tier,
           status: input.status,
           currentPeriodEnd: input.currentPeriodEnd,
+          // Always reset on upsert. The only caller is the
+          // checkout.session.completed webhook, which represents a fresh
+          // (possibly re-) subscription — the user just paid, so any stale
+          // `cancelAtPeriodEnd: true` from a prior cancellation must clear,
+          // otherwise the UI would render "Cancellation scheduled" for the
+          // brand-new sub until the next subscription.updated event arrives.
+          cancelAtPeriodEnd: false,
           updatedAt: new Date(),
         })
         .where(eq(subscriptions.id, existing.id));
-      return { ...existing, ...input, updatedAt: new Date() };
+      return {
+        ...existing,
+        ...input,
+        cancelAtPeriodEnd: false,
+        updatedAt: new Date(),
+      };
     }
 
     const [row] = await this.db
@@ -156,6 +168,16 @@ export class SubscriptionRepository {
     await this.db
       .update(subscriptions)
       .set({ currentPeriodEnd, updatedAt: new Date() })
+      .where(eq(subscriptions.id, subscriptionId));
+  }
+
+  async updateCancelAtPeriodEnd(
+    subscriptionId: string,
+    cancelAtPeriodEnd: boolean,
+  ): Promise<void> {
+    await this.db
+      .update(subscriptions)
+      .set({ cancelAtPeriodEnd, updatedAt: new Date() })
       .where(eq(subscriptions.id, subscriptionId));
   }
 }

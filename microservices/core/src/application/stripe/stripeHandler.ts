@@ -259,6 +259,20 @@ export const stripeHandler = new Elysia({ name: "StripeHandler" })
           if (newStatus !== sub.status) {
             await subRepo.updateStatus(sub.id, newStatus);
           }
+
+          // Stripe portal cancellations send updated (status=active,
+          // cancel_at_period_end=true) and only fire `deleted` when the
+          // period actually ends. Persist the flag so the UI can render
+          // "Cancellation scheduled" instead of "Renews [date]". Reverting
+          // a cancellation in the portal flips it back to false in the same
+          // event type.
+          const nextCancelAtPeriodEnd = !!subscription.cancel_at_period_end;
+          if (nextCancelAtPeriodEnd !== sub.cancelAtPeriodEnd) {
+            await subRepo.updateCancelAtPeriodEnd(
+              sub.id,
+              nextCancelAtPeriodEnd,
+            );
+          }
         }
       } else if (event.type === "customer.subscription.deleted") {
         const subscription = event.data.object as Stripe.Subscription;
@@ -268,6 +282,13 @@ export const stripeHandler = new Elysia({ name: "StripeHandler" })
 
         if (sub) {
           await subRepo.updateStatus(sub.id, "cancelled");
+          // Clear cancel_at_period_end now that the cancellation has
+          // landed — the flag was meaningful while pending, but a row
+          // with status="cancelled" is no longer "scheduled to cancel".
+          // Keeps state consistent if the user later resubscribes.
+          if (sub.cancelAtPeriodEnd) {
+            await subRepo.updateCancelAtPeriodEnd(sub.id, false);
+          }
 
           // Cancellation email — fire-and-forget. The template reads
           // `endsAt` (the period the user keeps access until); if Stripe
@@ -457,5 +478,67 @@ export const stripeHandler = new Elysia({ name: "StripeHandler" })
       }
       set.status = 500;
       return { success: false, error: "Failed to fetch invoice" };
+    }
+  })
+  .post("/stripe/customer-portal", async (ctx) => {
+    const { body, set } = ctx;
+    const { sub: supabaseUserId } = getUser(ctx);
+
+    const db = getDb();
+    const dbUser = await userRepository.getUserBySupabaseId(supabaseUserId);
+    if (!dbUser) {
+      set.status = 404;
+      return { success: false, error: "User not found" };
+    }
+
+    const subRepo = new SubscriptionRepository(db);
+    const subscription = await subRepo.findByUserId(dbUser.id);
+    if (!subscription?.stripeCustomerId) {
+      // Free-tier users have no Stripe customer to manage. The frontend
+      // should hide the "Manage subscription" CTA in that case; this 404
+      // is a defensive check for clients that call anyway.
+      set.status = 404;
+      return { success: false, error: "No Stripe customer for this user" };
+    }
+
+    const flow = (body as { flow?: string } | null)?.flow;
+    if (flow && flow !== "cancel") {
+      set.status = 400;
+      return { success: false, error: "Unsupported flow" };
+    }
+
+    const stripe = getStripeInstance();
+    const webUrl = process.env.VITE_WEB_URL || "http://localhost:5173";
+    const returnUrl = `${webUrl}/dashboard/settings`;
+
+    try {
+      const params: Stripe.BillingPortal.SessionCreateParams = {
+        customer: subscription.stripeCustomerId,
+        return_url: returnUrl,
+      };
+      if (flow === "cancel" && subscription.stripeSubscriptionId) {
+        params.flow_data = {
+          type: "subscription_cancel",
+          subscription_cancel: {
+            subscription: subscription.stripeSubscriptionId,
+          },
+        };
+      }
+
+      const session = await stripe.billingPortal.sessions.create(params);
+
+      if (!session.url) {
+        set.status = 500;
+        return {
+          success: false,
+          error: "Stripe did not return a portal URL",
+        };
+      }
+
+      return { success: true, url: session.url };
+    } catch (err) {
+      console.error("Create customer portal session error:", err);
+      set.status = 500;
+      return { success: false, error: "Failed to open billing portal" };
     }
   });

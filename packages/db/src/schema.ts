@@ -77,6 +77,10 @@ export const subscriptions = pgTable(
     tier: subscriptionTierEnum("tier").notNull(),
     status: subscriptionStatusEnum("status").notNull().default("incomplete"),
     currentPeriodEnd: timestamp("current_period_end", { withTimezone: true }),
+    // Mirror of Stripe's cancel_at_period_end. True between a portal-driven
+    // cancellation and the period actually ending; lets the UI render
+    // "Cancellation scheduled" rather than "Renews [date]".
+    cancelAtPeriodEnd: boolean("cancel_at_period_end").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

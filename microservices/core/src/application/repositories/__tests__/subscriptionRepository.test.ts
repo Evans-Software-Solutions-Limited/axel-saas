@@ -127,6 +127,32 @@ describe("SubscriptionRepository", () => {
       expect(mockDb.update).toHaveBeenCalledOnce();
     });
 
+    it("resets cancelAtPeriodEnd to false on the UPDATE path (resubscription clears stale flag)", async () => {
+      // After a portal cancellation, cancelAtPeriodEnd is true. When the
+      // user resubscribes, checkout.session.completed → upsert must clear
+      // the stale flag — otherwise the UI shows "Cancellation scheduled"
+      // for the brand-new sub until the next subscription.updated arrives.
+      const cancelledRow = {
+        ...mockSubscriptionRow,
+        status: "cancelled" as const,
+        cancelAtPeriodEnd: true,
+      };
+      const select = mockDb.select as ReturnType<typeof vi.fn>;
+      select.mockReturnValueOnce(mockChain([cancelledRow])); // findByStripeCustomerId
+
+      const result = await repo.upsertByStripeCustomerId({
+        userId: "user-uuid-1",
+        stripeCustomerId: "cus_123",
+        stripeSubscriptionId: "sub_new_after_resub",
+        tier: "premium",
+        status: "active",
+      });
+
+      expect(mockDb.update).toHaveBeenCalledOnce();
+      // Returned object reflects the reset.
+      expect(result.cancelAtPeriodEnd).toBe(false);
+    });
+
     it("upgrades a pre-existing free row matched by userId when no stripeCustomerId match", async () => {
       // First select (findByStripeCustomerId) → no match.
       // Second select (findByUserId) → existing free row, no Stripe IDs yet.
@@ -248,6 +274,18 @@ describe("SubscriptionRepository", () => {
     it("updates current period end", async () => {
       const newDate = new Date("2025-07-01");
       await repo.updatePeriodEnd("sub-uuid-1", newDate);
+      expect(mockDb.update).toHaveBeenCalledOnce();
+    });
+  });
+
+  describe("updateCancelAtPeriodEnd", () => {
+    it("flips the flag to true for portal-scheduled cancellation", async () => {
+      await repo.updateCancelAtPeriodEnd("sub-uuid-1", true);
+      expect(mockDb.update).toHaveBeenCalledOnce();
+    });
+
+    it("flips the flag back to false when the user resumes via the portal", async () => {
+      await repo.updateCancelAtPeriodEnd("sub-uuid-1", false);
       expect(mockDb.update).toHaveBeenCalledOnce();
     });
   });

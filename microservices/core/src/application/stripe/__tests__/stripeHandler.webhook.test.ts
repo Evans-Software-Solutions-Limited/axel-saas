@@ -23,6 +23,7 @@ const mockFindByStripeCustomer = vi.fn();
 const mockUpdateTier = vi.fn();
 const mockUpdatePeriodEnd = vi.fn();
 const mockUpdateStatus = vi.fn();
+const mockUpdateCancelAtPeriodEnd = vi.fn();
 
 vi.mock("../../repositories/subscriptionRepository", () => ({
   SubscriptionRepository: vi.fn().mockImplementation(() => ({
@@ -31,6 +32,7 @@ vi.mock("../../repositories/subscriptionRepository", () => ({
     updateTier: mockUpdateTier,
     updatePeriodEnd: mockUpdatePeriodEnd,
     updateStatus: mockUpdateStatus,
+    updateCancelAtPeriodEnd: mockUpdateCancelAtPeriodEnd,
   })),
 }));
 
@@ -255,6 +257,84 @@ describe("StripeHandler webhook behaviour", () => {
       expect(mockUpdateStatus).not.toHaveBeenCalled();
       expect(mockUpdateTier).not.toHaveBeenCalled();
     });
+
+    it("flips cancelAtPeriodEnd to true when the user schedules a portal cancellation", async () => {
+      // Stripe's portal cancel-at-period-end fires customer.subscription.updated
+      // with status="active", cancel_at_period_end=true. The webhook must
+      // persist the flag so the UI can render "Cancellation scheduled".
+      mockConstructEvent.mockReturnValueOnce({
+        type: "customer.subscription.updated",
+        data: {
+          object: {
+            customer: "cus_999",
+            status: "active",
+            cancel_at_period_end: true,
+            items: { data: [] },
+          },
+        },
+      });
+      mockFindByStripeCustomer.mockResolvedValueOnce({
+        id: "sub-row-1",
+        status: "active",
+        cancelAtPeriodEnd: false,
+      });
+
+      await postWebhook();
+
+      expect(mockUpdateCancelAtPeriodEnd).toHaveBeenCalledWith(
+        "sub-row-1",
+        true,
+      );
+    });
+
+    it("flips cancelAtPeriodEnd back to false when the user resumes via the portal", async () => {
+      mockConstructEvent.mockReturnValueOnce({
+        type: "customer.subscription.updated",
+        data: {
+          object: {
+            customer: "cus_999",
+            status: "active",
+            cancel_at_period_end: false,
+            items: { data: [] },
+          },
+        },
+      });
+      mockFindByStripeCustomer.mockResolvedValueOnce({
+        id: "sub-row-1",
+        status: "active",
+        cancelAtPeriodEnd: true,
+      });
+
+      await postWebhook();
+
+      expect(mockUpdateCancelAtPeriodEnd).toHaveBeenCalledWith(
+        "sub-row-1",
+        false,
+      );
+    });
+
+    it("does not write cancelAtPeriodEnd when the value is unchanged", async () => {
+      // Idempotent for replays — only update when the flag actually changed.
+      mockConstructEvent.mockReturnValueOnce({
+        type: "customer.subscription.updated",
+        data: {
+          object: {
+            customer: "cus_999",
+            status: "active",
+            cancel_at_period_end: false,
+            items: { data: [] },
+          },
+        },
+      });
+      mockFindByStripeCustomer.mockResolvedValueOnce({
+        id: "sub-row-1",
+        status: "active",
+        cancelAtPeriodEnd: false,
+      });
+
+      await postWebhook();
+      expect(mockUpdateCancelAtPeriodEnd).not.toHaveBeenCalled();
+    });
   });
 
   describe("customer.subscription.deleted", () => {
@@ -263,11 +343,52 @@ describe("StripeHandler webhook behaviour", () => {
         type: "customer.subscription.deleted",
         data: { object: { customer: "cus_del" } },
       });
-      mockFindByStripeCustomer.mockResolvedValueOnce({ id: "sub-del" });
+      mockFindByStripeCustomer.mockResolvedValueOnce({
+        id: "sub-del",
+        cancelAtPeriodEnd: false,
+      });
 
       const response = await postWebhook();
       expect(response.status).toBe(200);
       expect(mockUpdateStatus).toHaveBeenCalledWith("sub-del", "cancelled");
+    });
+
+    it("clears cancelAtPeriodEnd when the row had a pending cancellation", async () => {
+      // The flag was set during the portal cancel-at-period-end window.
+      // Once `deleted` lands, the row is fully cancelled — the "scheduled"
+      // semantics no longer apply. Clear it so a future resubscribe doesn't
+      // inherit a stale true.
+      mockConstructEvent.mockReturnValueOnce({
+        type: "customer.subscription.deleted",
+        data: { object: { customer: "cus_del" } },
+      });
+      mockFindByStripeCustomer.mockResolvedValueOnce({
+        id: "sub-del",
+        cancelAtPeriodEnd: true,
+      });
+
+      await postWebhook();
+
+      expect(mockUpdateCancelAtPeriodEnd).toHaveBeenCalledWith(
+        "sub-del",
+        false,
+      );
+    });
+
+    it("does not write cancelAtPeriodEnd when it was already false", async () => {
+      // Edge case: admin-initiated immediate cancellation skips the
+      // cancel-at-period-end state. No write needed.
+      mockConstructEvent.mockReturnValueOnce({
+        type: "customer.subscription.deleted",
+        data: { object: { customer: "cus_del" } },
+      });
+      mockFindByStripeCustomer.mockResolvedValueOnce({
+        id: "sub-del",
+        cancelAtPeriodEnd: false,
+      });
+
+      await postWebhook();
+      expect(mockUpdateCancelAtPeriodEnd).not.toHaveBeenCalled();
     });
   });
 

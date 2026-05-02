@@ -411,7 +411,7 @@ describe("SubscriptionHandler", () => {
       expect(json.subscription).toBeNull();
     });
 
-    it("returns subscription data (tier, status, period end) when one exists", async () => {
+    it("returns subscription data (tier, status, period end, cancelAtPeriodEnd) when one exists", async () => {
       mockFindByUserId.mockResolvedValue({
         id: "sub-123",
         userId: "db-user-id",
@@ -420,6 +420,7 @@ describe("SubscriptionHandler", () => {
         tier: "premium",
         status: "active",
         currentPeriodEnd: new Date("2026-04-01"),
+        cancelAtPeriodEnd: false,
         createdAt: new Date(),
         updatedAt: new Date(),
       });
@@ -434,11 +435,43 @@ describe("SubscriptionHandler", () => {
       expect(result.status).toBe(200);
       const json = (await result.json()) as {
         success: boolean;
-        subscription: { tier: string; status: string };
+        subscription: {
+          tier: string;
+          status: string;
+          cancelAtPeriodEnd: boolean;
+        };
       };
       expect(json.success).toBe(true);
       expect(json.subscription?.tier).toBe("premium");
       expect(json.subscription?.status).toBe("active");
+      expect(json.subscription?.cancelAtPeriodEnd).toBe(false);
+    });
+
+    it("surfaces cancelAtPeriodEnd=true when a portal cancellation is scheduled", async () => {
+      mockFindByUserId.mockResolvedValue({
+        id: "sub-123",
+        userId: "db-user-id",
+        stripeCustomerId: "cus_test",
+        stripeSubscriptionId: "sub_test",
+        tier: "premium",
+        status: "active",
+        currentPeriodEnd: new Date("2026-05-15"),
+        cancelAtPeriodEnd: true,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+
+      const result = await subscriptionHandler.handle(
+        new Request("http://localhost/subscriptions/status", {
+          method: "GET",
+          headers: { authorization: "Bearer test_token" },
+        }),
+      );
+
+      const json = (await result.json()) as {
+        subscription: { cancelAtPeriodEnd: boolean };
+      };
+      expect(json.subscription?.cancelAtPeriodEnd).toBe(true);
     });
 
     it("returns 404 when the user is not found", async () => {

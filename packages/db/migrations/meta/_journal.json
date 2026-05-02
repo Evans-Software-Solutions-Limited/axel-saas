@@ -64,6 +64,13 @@
       "when": 1776067200000,
       "tag": "0008_tier_alignment",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1777680000000,
+      "tag": "0009_subscription_cancel_at_period_end",
+      "breakpoints": true
     }
   ]
 }
