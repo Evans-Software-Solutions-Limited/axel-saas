@@ -21,7 +21,18 @@ export interface AuthContextValue extends AuthState {
   signUp: (
     email: string,
     password: string,
-  ) => Promise<{ success: boolean; error?: string }>;
+  ) => Promise<{
+    success: boolean;
+    error?: string;
+    /**
+     * True when Supabase returns a user but no session — the user must
+     * click the email-verification link before they're authenticated.
+     * The SignUp page uses this to render a "check your email" state
+     * instead of routing to /subscribe (which would 401 on the free-tier
+     * provisioning call because no session exists yet).
+     */
+    requiresEmailConfirmation?: boolean;
+  }>;
   signIn: (
     email: string,
     password: string,

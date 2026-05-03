@@ -61,9 +61,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signUp = async (email: string, password: string) => {
     setError(null);
     try {
-      const { error } = await supabase.auth.signUp({ email, password });
+      const { data, error } = await supabase.auth.signUp({ email, password });
       if (error) throw error;
-      return { success: true };
+      // When email confirmation is enabled, Supabase returns the user but no
+      // session — the user has to click the verification link before they're
+      // authenticated. SignUp.tsx uses this flag to skip provisionFreeSilently
+      // (which would 401 without a session) and render a "check your email"
+      // view instead of routing to /subscribe.
+      return {
+        success: true,
+        requiresEmailConfirmation: !data?.session,
+      };
     } catch (err) {
       const message = err instanceof Error ? err.message : "Sign up failed";
       setError(message);

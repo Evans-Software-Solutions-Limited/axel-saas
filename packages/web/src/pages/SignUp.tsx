@@ -13,6 +13,7 @@ import {
 } from "@axel-saas/ui/card";
 import { Input } from "@axel-saas/ui/input";
 import { Label } from "@axel-saas/ui/label";
+import { IconMailFilled } from "@tabler/icons-react";
 import { RELEASE_EXPECTATION_COPY, waitlistSignupHref } from "@/lib/waitlist";
 
 export function SignUp() {
@@ -22,6 +23,13 @@ export function SignUp() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Set when Supabase returns success-without-session — i.e. the user
+  // needs to click the verification email before the session exists. We
+  // render a "check your email" view in this state rather than routing
+  // to /subscribe (which would 401 on free-tier provisioning).
+  const [pendingVerificationEmail, setPendingVerificationEmail] = useState<
+    string | null
+  >(null);
   const { signUp } = useAuth();
   const navigate = useNavigate();
 
@@ -38,11 +46,18 @@ export function SignUp() {
     try {
       const result = await signUp(email, password);
       if (result.success) {
-        // Best-effort free-tier provisioning. If the Supabase session isn't
-        // established yet (email-confirmation flow), this 401s silently and
-        // Subscribe.tsx will retry on mount.
-        await provisionFreeSilently();
-        navigate("/subscribe");
+        if (result.requiresEmailConfirmation) {
+          // No session yet — skip provisionFreeSilently (it would 401)
+          // and surface a "check your email" success state. The free
+          // row gets created on Subscribe mount-time / ChatContainer
+          // self-heal once the user clicks through the verify link.
+          setPendingVerificationEmail(email);
+        } else {
+          // Session was issued immediately (email confirmation disabled
+          // in this Supabase project) — keep the existing flow.
+          await provisionFreeSilently();
+          navigate("/subscribe");
+        }
       } else {
         setError(result.error || "Failed to create account");
       }
@@ -51,6 +66,68 @@ export function SignUp() {
     }
     setIsLoading(false);
   };
+
+  if (pendingVerificationEmail) {
+    return (
+      <MarketingLayout>
+        <div className="flex-1 flex items-center justify-center p-4 py-12">
+          <div className="w-full max-w-md space-y-8">
+            <div className="text-center space-y-2">
+              <h1 className="text-3xl font-bold text-text">
+                <span className="text-accent">A</span>xel
+              </h1>
+              <p className="text-sm text-muted">
+                One assistant. Every kind of work.
+              </p>
+            </div>
+
+            <Card className="border border-border">
+              <CardHeader>
+                <div className="mx-auto w-12 h-12 rounded-full bg-accent-muted flex items-center justify-center mb-2">
+                  <IconMailFilled
+                    className="w-6 h-6 text-accent"
+                    stroke={1.5}
+                  />
+                </div>
+                <CardTitle className="text-text text-center">
+                  Check your email
+                </CardTitle>
+                <CardDescription className="text-center">
+                  We&apos;ve sent a confirmation link to{" "}
+                  <span className="text-text font-medium">
+                    {pendingVerificationEmail}
+                  </span>
+                  . Click the link to finish setting up your account.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <p className="text-sm text-muted text-center">
+                  No email after a couple of minutes? Check your spam folder, or{" "}
+                  <button
+                    type="button"
+                    onClick={() => setPendingVerificationEmail(null)}
+                    className="text-accent hover:underline font-medium"
+                  >
+                    try a different address
+                  </button>
+                  .
+                </p>
+                <p className="text-center text-sm text-muted">
+                  Already verified?{" "}
+                  <Link
+                    to="/login"
+                    className="text-accent hover:text-accent/80 font-medium"
+                  >
+                    Sign in
+                  </Link>
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </MarketingLayout>
+    );
+  }
 
   return (
     <MarketingLayout>
