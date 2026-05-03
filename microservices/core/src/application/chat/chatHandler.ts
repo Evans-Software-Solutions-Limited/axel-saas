@@ -13,12 +13,18 @@ import {
   estimateMessageTokens,
   projectMessageOutputTokens,
 } from "../usage/tokenUsageService";
+import { RateLimitService } from "../rate-limiting/rateLimitService";
 import type { SubscriptionTier } from "../integrations/tierGate";
+import {
+  applyRateLimitHeaders,
+  buildRateLimitedBody,
+} from "../rate-limiting/rateLimitHeaders";
 
 // Create instance for use in handler
 const provisioningRepo = new ProvisioningRepository();
 const taskRepo = new TaskRepository();
 const tokenUsageService = new TokenUsageService();
+const rateLimitService = new RateLimitService();
 
 // Types for API responses
 export interface ChatMessageRequest {
@@ -338,6 +344,29 @@ export const chatHandler = new Elysia({ name: "ChatHandler" })
           };
         }
 
+        const tier = (subscription.tier ?? null) as SubscriptionTier | null;
+
+        // Per-user rate limit — caps request volume (Free 10/min,
+        // Premium/Enterprise 30/min). Runs before the token cap and
+        // gateway dispatch so a user spamming the chat endpoint stops
+        // costing us DDB writes for usage records and Lambda time
+        // before the burst even reaches AI inference. Token cap covers
+        // total cost; rate limit covers burst frequency — they're
+        // complementary.
+        const rateLimit = await rateLimitService.checkAndConsume({
+          userId: dbUser.id,
+          category: "chat",
+          tier,
+        });
+        applyRateLimitHeaders(ctx, rateLimit);
+        if (!rateLimit.allowed) {
+          set.status = 429;
+          return buildRateLimitedBody(
+            rateLimit,
+            "Slow down — Axel needs a moment.",
+          );
+        }
+
         // Token cap check — enforced before dispatching to the gateway
         // so a user already at the cap doesn't trigger a paid model
         // call. The estimator uses the brief's `messageLength / 4`
@@ -349,7 +378,6 @@ export const chatHandler = new Elysia({ name: "ChatHandler" })
         // and overshoot the daily output cap before the recorded
         // usage catches up. Free tier is enforced daily, Premium
         // monthly, Enterprise unlimited.
-        const tier = (subscription.tier ?? null) as SubscriptionTier | null;
         const estimatedInput = estimateMessageTokens(body.message);
         const estimatedOutput = projectMessageOutputTokens(estimatedInput);
         const cap = await tokenUsageService.checkCap(dbUser.id, tier, {

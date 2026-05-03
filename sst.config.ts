@@ -21,6 +21,9 @@ export default $config({
     };
   },
   async run() {
+    // Storage must be evaluated before api so the api Lambda can link the
+    // table — sst infers permissions from the linked component graph.
+    await import("./infra/storage");
     const api = await import("./infra/api");
     const web = await import("./infra/web");
     return {

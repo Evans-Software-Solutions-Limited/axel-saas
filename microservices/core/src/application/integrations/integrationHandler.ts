@@ -13,6 +13,12 @@ import { OauthStateRepository } from "./oauthStateRepository";
 import { OauthService } from "./oauthService";
 import { AwsSecretsClient } from "./secretsClient";
 import { checkIntegrationTierGate, type SubscriptionTier } from "./tierGate";
+import { RateLimitService } from "../rate-limiting/rateLimitService";
+import {
+  applyRateLimitHeaders,
+  buildRateLimitedBody,
+} from "../rate-limiting/rateLimitHeaders";
+import type { RateLimitCategory } from "../rate-limiting/rateLimitConfig";
 
 const integrationRepository = new IntegrationRepository();
 const oauthStateRepository = new OauthStateRepository();
@@ -30,6 +36,40 @@ const oauthService = new OauthService({
     env: process.env,
   },
 });
+const rateLimitService = new RateLimitService();
+
+/**
+ * Helper for the three protected integration mutations
+ * (`/connect`, `/revoke`, `/oauth/start`). Returns the 429 body when
+ * blocked, or `null` to continue. Headers are applied either way so
+ * the frontend can read remaining quota even on success.
+ */
+async function applyIntegrationRateLimit(
+  // Permissive context shape — same approach as `applyRateLimitHeaders`.
+  // Elysia's `set` is a branded type that doesn't structurally match
+  // narrow inline definitions, so the helper accepts anything with a
+  // status + headers bag and lets the headers write happen in place.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ctx: { set: { status?: any; headers?: any } },
+  userId: string,
+  tier: SubscriptionTier | null,
+  category: RateLimitCategory,
+) {
+  const decision = await rateLimitService.checkAndConsume({
+    userId,
+    category,
+    tier,
+  });
+  applyRateLimitHeaders(ctx, decision);
+  if (!decision.allowed) {
+    ctx.set.status = 429;
+    return buildRateLimitedBody(
+      decision,
+      "You're moving fast — give it a moment and try again.",
+    );
+  }
+  return null;
+}
 
 function appUrl(): string {
   return (process.env.APP_URL || "http://localhost:5173").replace(/\/$/, "");
@@ -111,6 +151,14 @@ export const integrationHandler = new Elysia({
       const subscription = await subRepo.findByUserId(dbUser.id);
       const tier = (subscription?.tier ?? null) as SubscriptionTier | null;
 
+      const blocked = await applyIntegrationRateLimit(
+        ctx,
+        dbUser.id,
+        tier,
+        "write",
+      );
+      if (blocked) return blocked;
+
       const gate = checkIntegrationTierGate(params.integrationId, tier);
       if (!gate.allowed) {
         set.status = 403;
@@ -154,6 +202,16 @@ export const integrationHandler = new Elysia({
         return { success: false, error: "User not found" };
       }
 
+      const tier = (dbUser.subscription?.tier ??
+        null) as SubscriptionTier | null;
+      const blocked = await applyIntegrationRateLimit(
+        ctx,
+        dbUser.id,
+        tier,
+        "read",
+      );
+      if (blocked) return blocked;
+
       const integrations = await integrationService.list(dbUser.id);
       return { success: true, integrations };
     },
@@ -178,6 +236,16 @@ export const integrationHandler = new Elysia({
         set.status = 404;
         return { success: false, error: "User not found" };
       }
+
+      const tier = (dbUser.subscription?.tier ??
+        null) as SubscriptionTier | null;
+      const blocked = await applyIntegrationRateLimit(
+        ctx,
+        dbUser.id,
+        tier,
+        "read",
+      );
+      if (blocked) return blocked;
 
       const integration = await integrationService.get(
         dbUser.id,
@@ -209,6 +277,16 @@ export const integrationHandler = new Elysia({
         set.status = 404;
         return { success: false, error: "User not found" };
       }
+
+      const tier = (dbUser.subscription?.tier ??
+        null) as SubscriptionTier | null;
+      const blocked = await applyIntegrationRateLimit(
+        ctx,
+        dbUser.id,
+        tier,
+        "write",
+      );
+      if (blocked) return blocked;
 
       const result = await integrationService.revoke(
         dbUser.id,
@@ -244,6 +322,14 @@ export const integrationHandler = new Elysia({
       const subRepo = new SubscriptionRepository(db);
       const subscription = await subRepo.findByUserId(dbUser.id);
       const tier = (subscription?.tier ?? null) as SubscriptionTier | null;
+
+      const blocked = await applyIntegrationRateLimit(
+        ctx,
+        dbUser.id,
+        tier,
+        "write",
+      );
+      if (blocked) return blocked;
 
       const gate = checkIntegrationTierGate(params.integrationId, tier);
       if (!gate.allowed) {

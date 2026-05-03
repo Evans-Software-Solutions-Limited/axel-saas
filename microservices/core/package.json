@@ -13,6 +13,7 @@
     "build": "tsc --noEmit"
   },
   "dependencies": {
+    "@aws-sdk/client-dynamodb": "3.1041.0",
     "@aws-sdk/client-secrets-manager": "3.1024.0",
     "@axel-saas/api-utils": "workspace:*",
     "@axel-saas/db": "workspace:*",

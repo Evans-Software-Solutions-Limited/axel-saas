@@ -79,6 +79,26 @@ vi.mock("../../usage/tokenUsageService", () => {
   };
 });
 
+// Mock the rate-limit service. Allow by default; tests that need the
+// 429 path override `mockRateLimitDecision` to `{ allowed: false }`.
+// `vi.hoisted` lets the mock factory (which Vitest hoists to the top
+// of the file) reference this fn without TDZ errors.
+const { mockRateLimitDecision } = vi.hoisted(() => ({
+  mockRateLimitDecision: vi.fn().mockResolvedValue({
+    allowed: true,
+    limit: 30,
+    remaining: 29,
+    resetAt: 1_777_809_660,
+    retryAfter: 30,
+  }),
+}));
+vi.mock("../../rate-limiting/rateLimitService", () => {
+  class MockRateLimitService {
+    checkAndConsume = mockRateLimitDecision;
+  }
+  return { RateLimitService: MockRateLimitService };
+});
+
 const mockActiveSubscription = {
   id: "sub-123",
   userId: "db-user-123",
@@ -108,6 +128,14 @@ function resetAuthMocks() {
   // 429 path override `mockCheckCap` directly.
   mockCheckCap.mockReset().mockResolvedValue({ allowed: true });
   mockRecordUsage.mockReset().mockResolvedValue(undefined);
+  // Default: rate limit allows. Tests can override to exercise 429.
+  mockRateLimitDecision.mockReset().mockResolvedValue({
+    allowed: true,
+    limit: 30,
+    remaining: 29,
+    resetAt: 1_777_809_660,
+    retryAfter: 30,
+  });
 }
 
 // Mock fetch for gateway calls

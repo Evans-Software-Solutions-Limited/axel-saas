@@ -7,6 +7,7 @@ import {
   googleOauthClientSecret,
   slackOauthClientSecret,
 } from "./secrets";
+import { rateLimitsTable } from "./storage";
 
 export const coreAPI = new sst.aws.ApiGatewayV2("api-core", {
   domain:
@@ -35,6 +36,10 @@ export const coreAPI = new sst.aws.ApiGatewayV2("api-core", {
 });
 
 coreAPI.route("$default", {
+  // Linking the table grants the Lambda role `dynamodb:GetItem`,
+  // `dynamodb:UpdateItem`, etc. on this table only — least-privilege by
+  // default with no extra IAM wiring.
+  link: [rateLimitsTable],
   handler: "microservices/core/src/api.handler",
   environment: {
     DATABASE_URL: supabaseDatabaseUrl.value,
@@ -62,5 +67,9 @@ coreAPI.route("$default", {
     GOOGLE_OAUTH_CLIENT_SECRET: googleOauthClientSecret.value,
     SLACK_OAUTH_CLIENT_ID: process.env.SLACK_OAUTH_CLIENT_ID || "",
     SLACK_OAUTH_CLIENT_SECRET: slackOauthClientSecret.value,
+    // DynamoDB table backing the per-user rate limiter. Bound here so
+    // the rate-limit client doesn't have to re-derive it from sst
+    // resource bindings at runtime.
+    RATE_LIMITS_TABLE: rateLimitsTable.name,
   },
 });
