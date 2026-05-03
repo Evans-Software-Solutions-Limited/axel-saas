@@ -149,6 +149,7 @@ function validateGatewayUrl(urlString: string): string | null {
 async function getDemoChatResponse(
   userId: string,
   message: string,
+  estimatedInputTokens: number,
 ): Promise<ChatMessageResponse> {
   const onboardingAnswers = await userRepository.getOnboardingAnswers(userId);
   const userName = (onboardingAnswers?.name as string | null) || null;
@@ -158,14 +159,36 @@ async function getDemoChatResponse(
     (onboardingAnswers?.proactiveAreas as string | null) ||
     null;
 
+  const responseText = generateContextualResponse(
+    userName,
+    userRole,
+    userGoals,
+    message,
+  );
+
+  // Record usage even in dev — the cap check already ran upstream, so
+  // without this side-effect a developer can never reach the
+  // cap-reached flow locally without inserting rows by hand. Mirrors
+  // the gateway path's `estimateMessageTokens(responseText)` fallback
+  // when the source doesn't report token counts. `model: "demo"`
+  // distinguishes these rows from real gateway calls in the audit log.
+  // Errors are non-fatal — a usage-record failure must not block a
+  // successful chat response.
+  try {
+    await tokenUsageService.recordUsage({
+      userId,
+      inputTokens: estimatedInputTokens,
+      outputTokens: estimateMessageTokens(responseText),
+      model: "demo",
+      source: "chat",
+    });
+  } catch (err) {
+    console.error("Token usage record failed (non-fatal):", err);
+  }
+
   return {
     success: true,
-    response: generateContextualResponse(
-      userName,
-      userRole,
-      userGoals,
-      message,
-    ),
+    response: responseText,
   };
 }
 
@@ -366,7 +389,7 @@ export const chatHandler = new Elysia({ name: "ChatHandler" })
 
         if (!container.gatewayUrl) {
           if (process.env.NODE_ENV !== "production") {
-            return getDemoChatResponse(dbUser.id, body.message);
+            return getDemoChatResponse(dbUser.id, body.message, estimatedInput);
           }
 
           set.status = 503;
@@ -509,7 +532,7 @@ export const chatHandler = new Elysia({ name: "ChatHandler" })
 
           // For development/demo, return a contextual response using onboarding data
           if (process.env.NODE_ENV !== "production") {
-            return getDemoChatResponse(dbUser.id, body.message);
+            return getDemoChatResponse(dbUser.id, body.message, estimatedInput);
           }
 
           set.status = 502;

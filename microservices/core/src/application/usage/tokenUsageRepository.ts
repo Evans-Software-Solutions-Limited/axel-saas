@@ -12,15 +12,6 @@ export interface UsageTotals {
   outputTokens: number;
 }
 
-/**
- * Aggregated usage broken down by model — used by the BYOM-aware UI
- * (deferred for MVP) and by per-model cost attribution.
- */
-export interface UsageByModel extends UsageTotals {
-  model: string;
-  source: string;
-}
-
 /** Returns YYYY-MM-DD in UTC. Used as the row's `usage_date` so daily
  *  aggregation is timezone-agnostic. */
 export function utcDateString(date: Date): string {
