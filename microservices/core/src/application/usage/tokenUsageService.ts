@@ -20,7 +20,12 @@ import {
   utcDateString,
   type UsageTotals,
 } from "./tokenUsageRepository";
-import { estimateTokens, getBudget, type TokenBudget } from "./tokenBudgets";
+import {
+  estimateTokens,
+  getBudget,
+  projectOutputTokens,
+  type TokenBudget,
+} from "./tokenBudgets";
 import type { SubscriptionTier } from "../integrations/tierGate";
 
 export type CapCheckResult =
@@ -235,4 +240,18 @@ export class TokenUsageService {
  */
 export function estimateMessageTokens(text: string): number {
   return estimateTokens(text);
+}
+
+/**
+ * Conservative output projection used at cap-check time. The chat
+ * handler doesn't know the response length up front; we project
+ * `5 × estimatedInput` (with a 200-token floor) so a tiny prompt
+ * that produces a long response can't slip past the cap.
+ *
+ * Re-exported here so the chat handler imports a single module.
+ */
+export function projectMessageOutputTokens(
+  estimatedInputTokens: number,
+): number {
+  return projectOutputTokens(estimatedInputTokens);
 }

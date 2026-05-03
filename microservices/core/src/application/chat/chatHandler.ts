@@ -11,6 +11,7 @@ import { TaskRepository } from "../tasks/taskRepository";
 import {
   TokenUsageService,
   estimateMessageTokens,
+  projectMessageOutputTokens,
 } from "../usage/tokenUsageService";
 import type { SubscriptionTier } from "../integrations/tierGate";
 
@@ -315,15 +316,19 @@ export const chatHandler = new Elysia({ name: "ChatHandler" })
         }
 
         // Token cap check — enforced before dispatching to the gateway
-        // so a user already at the cap doesn't trigger a paid model call.
-        // Estimator uses the brief's `messageLength / 4` placeholder until
-        // the gateway returns real per-call usage; we cover both input and
-        // a conservative output projection (same value, since output can
-        // be roughly the same size as input for typical chat). Free tier
-        // is enforced daily, Premium monthly, Enterprise unlimited.
+        // so a user already at the cap doesn't trigger a paid model
+        // call. The estimator uses the brief's `messageLength / 4`
+        // placeholder for the input until the gateway returns real
+        // per-call usage. The output projection multiplies the input
+        // estimate (and applies a floor) because assistant responses
+        // are typically several times longer than the user prompt; a
+        // 1:1 projection lets a short prompt produce a long response
+        // and overshoot the daily output cap before the recorded
+        // usage catches up. Free tier is enforced daily, Premium
+        // monthly, Enterprise unlimited.
         const tier = (subscription.tier ?? null) as SubscriptionTier | null;
         const estimatedInput = estimateMessageTokens(body.message);
-        const estimatedOutput = estimatedInput;
+        const estimatedOutput = projectMessageOutputTokens(estimatedInput);
         const cap = await tokenUsageService.checkCap(dbUser.id, tier, {
           inputTokens: estimatedInput,
           outputTokens: estimatedOutput,

@@ -72,6 +72,10 @@ vi.mock("../../usage/tokenUsageService", () => {
   return {
     TokenUsageService: MockTokenUsageService,
     estimateMessageTokens: (text: string) => Math.ceil(text.length / 4),
+    // Mirror the production projection (5x with a 200-token floor) so
+    // the chat handler's cap-check call shape is realistic.
+    projectMessageOutputTokens: (input: number) =>
+      Math.max(200, Math.max(0, input) * 5),
   };
 });
 

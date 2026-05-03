@@ -1,5 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { TOKEN_BUDGETS, estimateTokens, getBudget } from "../tokenBudgets";
+import {
+  OUTPUT_PROJECTION_FLOOR_TOKENS,
+  OUTPUT_PROJECTION_MULTIPLIER,
+  TOKEN_BUDGETS,
+  estimateTokens,
+  getBudget,
+  projectOutputTokens,
+} from "../tokenBudgets";
 
 describe("TOKEN_BUDGETS", () => {
   it("free tier enforces a daily cap, no monthly cap", () => {
@@ -57,5 +64,43 @@ describe("estimateTokens", () => {
   it("scales linearly with text length (~chars/4)", () => {
     expect(estimateTokens("a".repeat(40))).toBe(10);
     expect(estimateTokens("a".repeat(41))).toBe(11);
+  });
+});
+
+describe("projectOutputTokens", () => {
+  it("uses the multiplier when input * multiplier is above the floor", () => {
+    // input × 5 = 500, well above the 200-token floor.
+    expect(projectOutputTokens(100)).toBe(100 * OUTPUT_PROJECTION_MULTIPLIER);
+  });
+
+  it("falls back to the floor for tiny inputs", () => {
+    // A 5-token prompt would project to 25 tokens by the multiplier
+    // alone — well under the floor — but a "summarise the last 24h"
+    // prompt can produce a 500-token response. Floor catches this.
+    expect(projectOutputTokens(5)).toBe(OUTPUT_PROJECTION_FLOOR_TOKENS);
+  });
+
+  it("returns the floor for zero input", () => {
+    expect(projectOutputTokens(0)).toBe(OUTPUT_PROJECTION_FLOOR_TOKENS);
+  });
+
+  it("treats negative input as zero", () => {
+    expect(projectOutputTokens(-10)).toBe(OUTPUT_PROJECTION_FLOOR_TOKENS);
+  });
+
+  it("never under-projects relative to the input estimate", () => {
+    // Sanity check on the assumption baked into the multiplier:
+    // projected output should always be >= projected input. That's
+    // the whole point — assistant responses are typically several
+    // times longer than the user prompt.
+    for (const input of [1, 10, 100, 1_000, 10_000]) {
+      expect(projectOutputTokens(input)).toBeGreaterThanOrEqual(input);
+    }
+  });
+});
+
+describe("OUTPUT_PROJECTION_MULTIPLIER", () => {
+  it("is at least 2x so the projection meaningfully exceeds the input", () => {
+    expect(OUTPUT_PROJECTION_MULTIPLIER).toBeGreaterThanOrEqual(2);
   });
 });

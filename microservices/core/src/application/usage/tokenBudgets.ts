@@ -74,3 +74,37 @@ export function estimateTokens(text: string): number {
   if (!text) return 0;
   return Math.ceil(text.length / 4);
 }
+
+/**
+ * Multiplier applied to the input token estimate when projecting how
+ * many output tokens a chat call is likely to produce. Assistant
+ * responses are typically several times longer than the user prompt
+ * — a "summarize this" or "draft an email" prompt can be 20 tokens
+ * but produce a 500-token response. Treating projected output as
+ * `estimatedInput * 1` (which is what the first cut did) was
+ * optimistic and let Free users overshoot the 25k daily output cap
+ * by a meaningful margin before the recorded usage caught up.
+ */
+export const OUTPUT_PROJECTION_MULTIPLIER = 5;
+
+/**
+ * Even very short prompts ("summarise the last 24h", "give me 3
+ * ideas") can produce long responses. The floor ensures the cap
+ * check reserves a defensible minimum so a tiny prompt at 99% usage
+ * doesn't sneak through and produce a 500-token response.
+ */
+export const OUTPUT_PROJECTION_FLOOR_TOKENS = 200;
+
+/**
+ * Project the likely output tokens for a chat call from the input
+ * token estimate. Used at cap-check time to err conservatively;
+ * actual usage is recorded post-call from the real response text
+ * (or, when wired, the gateway-reported count).
+ */
+export function projectOutputTokens(estimatedInput: number): number {
+  if (estimatedInput < 0) estimatedInput = 0;
+  return Math.max(
+    OUTPUT_PROJECTION_FLOOR_TOKENS,
+    estimatedInput * OUTPUT_PROJECTION_MULTIPLIER,
+  );
+}
