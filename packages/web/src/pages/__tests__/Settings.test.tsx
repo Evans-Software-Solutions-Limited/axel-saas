@@ -420,9 +420,7 @@ describe("Settings", () => {
       );
       render(<Settings />);
       await waitFor(() => {
-        expect(
-          screen.getByText(/usage endpoint unavailable/i),
-        ).toBeDefined();
+        expect(screen.getByText(/usage endpoint unavailable/i)).toBeDefined();
       });
       // Billing still renders normally.
       expect(screen.getByText("Free")).toBeDefined();

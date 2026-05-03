@@ -18,11 +18,7 @@ export class TokenCapReachedError extends Error {
   readonly scope: "daily" | "monthly";
   readonly resetAt: string;
 
-  constructor(
-    scope: "daily" | "monthly",
-    resetAt: string,
-    message?: string,
-  ) {
+  constructor(scope: "daily" | "monthly", resetAt: string, message?: string) {
     super(message ?? `Token cap reached (${scope})`);
     this.name = "TokenCapReachedError";
     this.scope = scope;
