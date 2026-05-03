@@ -8,8 +8,14 @@ import { getDb } from "@axel-saas/db";
 import { UserRepository } from "../repositories/userRepository";
 import { TokenUsageService } from "./tokenUsageService";
 import type { SubscriptionTier } from "../integrations/tierGate";
+import { RateLimitService } from "../rate-limiting/rateLimitService";
+import {
+  applyRateLimitHeaders,
+  buildRateLimitedBody,
+} from "../rate-limiting/rateLimitHeaders";
 
 const tokenUsageService = new TokenUsageService();
+const rateLimitService = new RateLimitService();
 
 export const usageHandler = new Elysia({ name: "UsageHandler" })
   .derive(async ({ headers }) => ({
@@ -35,6 +41,23 @@ export const usageHandler = new Elysia({ name: "UsageHandler" })
 
       const tier = (dbUser.subscription?.tier ??
         null) as SubscriptionTier | null;
+
+      // Per-user read rate limit (Free 60/min, Premium/Enterprise
+      // 120/min). Settings polls this on mount, so the limit is
+      // generous enough that normal navigation never trips it.
+      const decision = await rateLimitService.checkAndConsume({
+        userId: dbUser.id,
+        category: "read",
+        tier,
+      });
+      applyRateLimitHeaders(ctx, decision);
+      if (!decision.allowed) {
+        set.status = 429;
+        return buildRateLimitedBody(
+          decision,
+          "You're refreshing usage too quickly — please wait a moment.",
+        );
+      }
 
       const summary = await tokenUsageService.getSummary(dbUser.id, tier);
       return { success: true, usage: summary };
