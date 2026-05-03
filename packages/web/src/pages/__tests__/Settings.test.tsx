@@ -72,6 +72,19 @@ describe("Settings", () => {
     expect(screen.getByRole("button", { name: /off/i })).toBeDefined();
   });
 
+  it("accepts typed updates to the Profile name and email fields (UI-only stub)", () => {
+    // Profile section is still a UI-only stub pending PUT /users/me. The
+    // Input onChange handlers were silently uncovered — this exercises
+    // them so the controlled-input path doesn't drift into a regression.
+    render(<Settings />);
+    const name = screen.getByLabelText(/name/i) as HTMLInputElement;
+    const email = screen.getByLabelText(/email/i) as HTMLInputElement;
+    fireEvent.change(name, { target: { value: "Ada Lovelace" } });
+    fireEvent.change(email, { target: { value: "ada@example.com" } });
+    expect(name.value).toBe("Ada Lovelace");
+    expect(email.value).toBe("ada@example.com");
+  });
+
   describe("billing", () => {
     it("shows a loading state before the subscription resolves", () => {
       vi.mocked(fetchSubscriptionStatus).mockImplementation(
@@ -431,6 +444,96 @@ describe("Settings", () => {
       render(<Settings />);
       await waitFor(() => {
         expect(screen.getByText(/no usage recorded yet/i)).toBeDefined();
+      });
+    });
+
+    describe("loading-state decoupling", () => {
+      it("billing finishes loading even while the usage fetch is still pending", async () => {
+        // A hanging /users/me/usage must not pin the billing card in
+        // "Loading…". Subscription + invoices resolve, billing should
+        // unblank; usage card stays in its own "Loading usage…" state.
+        vi.mocked(fetchUsageSummary).mockImplementation(
+          () => new Promise(() => {}),
+        );
+        render(<Settings />);
+        await waitFor(() => {
+          expect(screen.getByText("Free")).toBeDefined();
+        });
+        // Bare "Loading…" (the billing card's marker) must be gone.
+        expect(screen.queryByText(/^Loading…$/)).toBeNull();
+        // Usage card is still loading independently.
+        expect(screen.getByText(/loading usage/i)).toBeDefined();
+      });
+
+      it("usage finishes loading even while the billing fetches are still pending", async () => {
+        // A hanging /subscriptions/status must not pin the usage card.
+        vi.mocked(fetchSubscriptionStatus).mockImplementation(
+          () => new Promise(() => {}),
+        );
+        vi.mocked(fetchInvoices).mockImplementation(
+          () => new Promise(() => {}),
+        );
+        vi.mocked(fetchUsageSummary).mockResolvedValue({
+          tier: "free",
+          daily: {
+            inputTokens: 1_000,
+            outputTokens: 500,
+            limits: { inputTokens: 50_000, outputTokens: 25_000 },
+          },
+          monthly: { inputTokens: 0, outputTokens: 0, limits: null },
+          percentUsed: 0.02,
+          warningThreshold: 0.8,
+        });
+        render(<Settings />);
+        // Usage card unblanks (daily-allowance copy appears).
+        await waitFor(() => {
+          expect(screen.getByText(/daily allowance/i)).toBeDefined();
+        });
+        // Billing card still in its own loading state.
+        expect(screen.getByText(/^Loading…$/)).toBeDefined();
+      });
+
+      it("falls back to a generic message when the usage rejection is not an Error", async () => {
+        // Covers the `reason instanceof Error ? reason.message : "…"`
+        // fallback in the usage decoupling. Eden treaty reasons are
+        // sometimes plain strings (or response value bags) rather than
+        // Error instances, so the fallback path is real, not theoretical.
+        vi.mocked(fetchUsageSummary).mockRejectedValue("network glitch");
+        render(<Settings />);
+        await waitFor(() => {
+          expect(screen.getByText(/could not load your usage/i)).toBeDefined();
+        });
+      });
+
+      it("ignores fetch results that resolve after unmount (no setState-on-unmounted warnings)", async () => {
+        // Covers the `if (!cancelled)` guards in both the billing and
+        // usage paths. Without the guards a slow fetch that resolves
+        // after the user has navigated away would call setState on an
+        // unmounted component — defensive code that needs a test.
+        let resolveSub: (v: unknown) => void = () => {};
+        let resolveUsage: (v: unknown) => void = () => {};
+        vi.mocked(fetchSubscriptionStatus).mockImplementation(
+          () => new Promise((r) => (resolveSub = r as (v: unknown) => void)),
+        );
+        vi.mocked(fetchUsageSummary).mockImplementation(
+          () => new Promise((r) => (resolveUsage = r as (v: unknown) => void)),
+        );
+
+        const { unmount } = render(<Settings />);
+        unmount();
+        // Resolve the promises after unmount — the cancelled flag should
+        // suppress the setState calls. The assertion is just that nothing
+        // throws and React doesn't log an "act" warning.
+        resolveSub({
+          tier: "free",
+          status: "active",
+          currentPeriodEnd: null,
+          cancelAtPeriodEnd: false,
+        });
+        resolveUsage(null);
+        // Microtask flush so the .then/.finally chains run.
+        await Promise.resolve();
+        await Promise.resolve();
       });
     });
   });

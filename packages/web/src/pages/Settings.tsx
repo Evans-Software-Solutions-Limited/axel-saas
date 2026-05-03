@@ -83,46 +83,56 @@ export function Settings() {
 
   useEffect(() => {
     let cancelled = false;
-    // Promise.allSettled keeps the three fetches independent. Subscription
-    // hits our DB; invoices hit Stripe; usage hits our DB but a different
-    // table — they have different failure modes and the page must not
-    // couple them.
-    void Promise.allSettled([
-      fetchSubscriptionStatus(),
-      fetchInvoices(),
-      fetchUsageSummary(),
-    ]).then(([subResult, invResult, usageResult]) => {
-      if (cancelled) return;
-      if (subResult.status === "fulfilled") {
-        setSubscription(subResult.value);
-      } else {
-        setBillingError(
-          subResult.reason instanceof Error
-            ? subResult.reason.message
-            : "Could not load your billing information",
-        );
-      }
-      if (invResult.status === "fulfilled") {
-        setInvoices(invResult.value);
-      } else {
-        setInvoicesError(
-          invResult.reason instanceof Error
-            ? invResult.reason.message
-            : "Could not load your invoices",
-        );
-      }
-      if (usageResult.status === "fulfilled") {
-        setUsage(usageResult.value);
-      } else {
-        setUsageError(
-          usageResult.reason instanceof Error
-            ? usageResult.reason.message
-            : "Could not load your usage",
-        );
-      }
-      setBillingLoading(false);
-      setUsageLoading(false);
-    });
+
+    // Billing (subscription + invoices) is rendered as one block by
+    // BillingPanel — invoices errors render inline within it, but the
+    // panel waits for the subscription tier before unblanking. Same
+    // Promise.allSettled as before for that pair.
+    void Promise.allSettled([fetchSubscriptionStatus(), fetchInvoices()]).then(
+      ([subResult, invResult]) => {
+        if (cancelled) return;
+        if (subResult.status === "fulfilled") {
+          setSubscription(subResult.value);
+        } else {
+          setBillingError(
+            subResult.reason instanceof Error
+              ? subResult.reason.message
+              : "Could not load your billing information",
+          );
+        }
+        if (invResult.status === "fulfilled") {
+          setInvoices(invResult.value);
+        } else {
+          setInvoicesError(
+            invResult.reason instanceof Error
+              ? invResult.reason.message
+              : "Could not load your invoices",
+          );
+        }
+        setBillingLoading(false);
+      },
+    );
+
+    // Usage runs on its own — a slow /users/me/usage must not pin the
+    // billing card in "Loading…", and a slow billing call must not
+    // delay the usage card. Each settles its own loading state.
+    fetchUsageSummary()
+      .then((value) => {
+        if (!cancelled) setUsage(value);
+      })
+      .catch((reason: unknown) => {
+        if (!cancelled) {
+          setUsageError(
+            reason instanceof Error
+              ? reason.message
+              : "Could not load your usage",
+          );
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setUsageLoading(false);
+      });
+
     return () => {
       cancelled = true;
     };

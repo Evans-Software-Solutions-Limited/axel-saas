@@ -6,7 +6,6 @@ import {
 } from "@axel-saas/api-utils/auth/supabaseAuth";
 import { getDb } from "@axel-saas/db";
 import { UserRepository } from "../repositories/userRepository";
-import { SubscriptionRepository } from "../repositories/subscriptionRepository";
 import { TokenUsageService } from "./tokenUsageService";
 import type { SubscriptionTier } from "../integrations/tierGate";
 
@@ -25,15 +24,17 @@ export const usageHandler = new Elysia({ name: "UsageHandler" })
 
       const db = getDb();
       const userRepo = new UserRepository(db);
+      // findBySupabaseId already loads the user's subscription as part of
+      // the UserWithRelations projection, so reading dbUser.subscription
+      // avoids a redundant SELECT on subscriptions for every usage query.
       const dbUser = await userRepo.findBySupabaseId(supabaseUserId);
       if (!dbUser) {
         set.status = 404;
         return { success: false, error: "User not found" };
       }
 
-      const subRepo = new SubscriptionRepository(db);
-      const subscription = await subRepo.findByUserId(dbUser.id);
-      const tier = (subscription?.tier ?? null) as SubscriptionTier | null;
+      const tier = (dbUser.subscription?.tier ??
+        null) as SubscriptionTier | null;
 
       const summary = await tokenUsageService.getSummary(dbUser.id, tier);
       return { success: true, usage: summary };
