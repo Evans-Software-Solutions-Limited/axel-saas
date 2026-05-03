@@ -1,5 +1,8 @@
 import {
   boolean,
+  date,
+  integer,
+  numeric,
   pgEnum,
   pgTable,
   text,
@@ -415,6 +418,61 @@ export const oauthState = pgTable(
 
 export type OauthState = typeof oauthState.$inferSelect;
 export type NewOauthState = typeof oauthState.$inferInsert;
+
+// ─── Token Usage ───────────────────────────────────────────────────────────────
+
+// Per-user, per-day token usage rolled up by (model, source). Free tier has
+// a daily token cap; Premium has a monthly cap. Aggregating on insert via
+// the unique (user, date, model, source) index keeps the table compact —
+// without it, every chat message would write a new row.
+//
+// `model` is recorded so future BYOM accounting and per-model cost
+// attribution work without a backfill. `source` separates chat from
+// scheduled tasks. Both are `text` rather than enums so new providers /
+// surfaces don't need a migration.
+//
+// `estimatedCostUsd` is nullable because MVP doesn't have a per-token
+// price table yet — the column is here so it can be backfilled later
+// without touching the schema.
+export const tokenUsage = pgTable(
+  "token_usage",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id").notNull(),
+    usageDate: date("usage_date").notNull(),
+    model: text("model").notNull().default("unknown"),
+    source: text("source").notNull().default("chat"),
+    inputTokens: integer("input_tokens").notNull().default(0),
+    outputTokens: integer("output_tokens").notNull().default(0),
+    estimatedCostUsd: numeric("estimated_cost_usd", {
+      precision: 10,
+      scale: 6,
+    }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => ({
+    userDateModelSourceIdx: uniqueIndex(
+      "token_usage_user_date_model_source_idx",
+    ).on(table.userId, table.usageDate, table.model, table.source),
+    userDateIdx: index("token_usage_user_date_idx").on(
+      table.userId,
+      table.usageDate,
+    ),
+    tokenUsageUserFk: foreignKey({
+      columns: [table.userId],
+      foreignColumns: [users.id],
+      name: "token_usage_user_id_fkey",
+    }).onDelete("cascade"),
+  }),
+);
+
+export type TokenUsage = typeof tokenUsage.$inferSelect;
+export type NewTokenUsage = typeof tokenUsage.$inferInsert;
 
 // ─── Waitlist ──────────────────────────────────────────────────────────────────
 

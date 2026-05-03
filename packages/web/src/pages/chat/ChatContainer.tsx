@@ -9,9 +9,11 @@ import {
   type OnboardingMessage,
 } from "./onboardingApi";
 import {
+  formatCapReachedMessage,
   getAgentStatus,
   postChatMessage,
   SubscriptionRequiredError,
+  TokenCapReachedError,
   type AgentStatus,
   type ChatMessage,
 } from "./chatApi";
@@ -487,6 +489,14 @@ export function ChatContainer() {
         // Live mode is only reachable after onboarding; send to the dedicated
         // subscribe page rather than surfacing plan cards inside chat.
         navigate("/subscribe");
+        return;
+      }
+      if (sendError instanceof TokenCapReachedError) {
+        // Cap reached — keep the user's optimistic message visible (so
+        // they can copy/edit it), surface a clear inline message with the
+        // reset time, and route the upgrade CTA logic via the existing
+        // error banner in ChatPresenter.
+        setError(formatCapReachedMessage(sendError));
         return;
       }
       const message =

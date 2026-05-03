@@ -6,12 +6,16 @@ const {
   mockRequireAuth,
   mockGetUser,
   mockFindSubscriptionByUserId,
+  mockCheckCap,
+  mockRecordUsage,
 } = vi.hoisted(() => ({
   mockGetContainerByUserId: vi.fn(),
   mockGetAuthUser: vi.fn(),
   mockRequireAuth: vi.fn(),
   mockGetUser: vi.fn(),
   mockFindSubscriptionByUserId: vi.fn(),
+  mockCheckCap: vi.fn(),
+  mockRecordUsage: vi.fn(),
 }));
 
 // Mock db before imports
@@ -56,6 +60,25 @@ vi.mock("@axel-saas/api-utils/auth/supabaseAuth", () => ({
   getUser: mockGetUser,
 }));
 
+// Mock the token usage service. Existing tests aren't aware of token caps —
+// stub `checkCap` to allow by default and stub `recordUsage` to no-op so
+// the chat handler's new pre/post-dispatch hooks don't fail. Tests that
+// need to exercise the 429 path can override `mockCheckCap` directly.
+vi.mock("../../usage/tokenUsageService", () => {
+  class MockTokenUsageService {
+    checkCap = mockCheckCap;
+    recordUsage = mockRecordUsage;
+  }
+  return {
+    TokenUsageService: MockTokenUsageService,
+    estimateMessageTokens: (text: string) => Math.ceil(text.length / 4),
+    // Mirror the production projection (5x with a 200-token floor) so
+    // the chat handler's cap-check call shape is realistic.
+    projectMessageOutputTokens: (input: number) =>
+      Math.max(200, Math.max(0, input) * 5),
+  };
+});
+
 const mockActiveSubscription = {
   id: "sub-123",
   userId: "db-user-123",
@@ -81,6 +104,10 @@ function resetAuthMocks() {
   mockFindSubscriptionByUserId
     .mockReset()
     .mockResolvedValue(mockActiveSubscription);
+  // Default: cap allows + usage record no-ops. Tests that exercise the
+  // 429 path override `mockCheckCap` directly.
+  mockCheckCap.mockReset().mockResolvedValue({ allowed: true });
+  mockRecordUsage.mockReset().mockResolvedValue(undefined);
 }
 
 // Mock fetch for gateway calls

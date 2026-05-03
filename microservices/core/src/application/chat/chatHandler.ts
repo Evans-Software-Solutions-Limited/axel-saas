@@ -8,10 +8,17 @@ import { userRepository } from "../repositories/userRepository";
 import { ProvisioningRepository } from "../repositories/provisioningRepository";
 import { SubscriptionRepository } from "../repositories/subscriptionRepository";
 import { TaskRepository } from "../tasks/taskRepository";
+import {
+  TokenUsageService,
+  estimateMessageTokens,
+  projectMessageOutputTokens,
+} from "../usage/tokenUsageService";
+import type { SubscriptionTier } from "../integrations/tierGate";
 
 // Create instance for use in handler
 const provisioningRepo = new ProvisioningRepository();
 const taskRepo = new TaskRepository();
+const tokenUsageService = new TokenUsageService();
 
 // Types for API responses
 export interface ChatMessageRequest {
@@ -142,6 +149,7 @@ function validateGatewayUrl(urlString: string): string | null {
 async function getDemoChatResponse(
   userId: string,
   message: string,
+  estimatedInputTokens: number,
 ): Promise<ChatMessageResponse> {
   const onboardingAnswers = await userRepository.getOnboardingAnswers(userId);
   const userName = (onboardingAnswers?.name as string | null) || null;
@@ -151,14 +159,36 @@ async function getDemoChatResponse(
     (onboardingAnswers?.proactiveAreas as string | null) ||
     null;
 
+  const responseText = generateContextualResponse(
+    userName,
+    userRole,
+    userGoals,
+    message,
+  );
+
+  // Record usage even in dev — the cap check already ran upstream, so
+  // without this side-effect a developer can never reach the
+  // cap-reached flow locally without inserting rows by hand. Mirrors
+  // the gateway path's `estimateMessageTokens(responseText)` fallback
+  // when the source doesn't report token counts. `model: "demo"`
+  // distinguishes these rows from real gateway calls in the audit log.
+  // Errors are non-fatal — a usage-record failure must not block a
+  // successful chat response.
+  try {
+    await tokenUsageService.recordUsage({
+      userId,
+      inputTokens: estimatedInputTokens,
+      outputTokens: estimateMessageTokens(responseText),
+      model: "demo",
+      source: "chat",
+    });
+  } catch (err) {
+    console.error("Token usage record failed (non-fatal):", err);
+  }
+
   return {
     success: true,
-    response: generateContextualResponse(
-      userName,
-      userRole,
-      userGoals,
-      message,
-    ),
+    response: responseText,
   };
 }
 
@@ -308,6 +338,34 @@ export const chatHandler = new Elysia({ name: "ChatHandler" })
           };
         }
 
+        // Token cap check — enforced before dispatching to the gateway
+        // so a user already at the cap doesn't trigger a paid model
+        // call. The estimator uses the brief's `messageLength / 4`
+        // placeholder for the input until the gateway returns real
+        // per-call usage. The output projection multiplies the input
+        // estimate (and applies a floor) because assistant responses
+        // are typically several times longer than the user prompt; a
+        // 1:1 projection lets a short prompt produce a long response
+        // and overshoot the daily output cap before the recorded
+        // usage catches up. Free tier is enforced daily, Premium
+        // monthly, Enterprise unlimited.
+        const tier = (subscription.tier ?? null) as SubscriptionTier | null;
+        const estimatedInput = estimateMessageTokens(body.message);
+        const estimatedOutput = projectMessageOutputTokens(estimatedInput);
+        const cap = await tokenUsageService.checkCap(dbUser.id, tier, {
+          inputTokens: estimatedInput,
+          outputTokens: estimatedOutput,
+        });
+        if (!cap.allowed) {
+          set.status = 429;
+          return {
+            success: false,
+            error: cap.reason,
+            scope: cap.scope,
+            resetAt: cap.resetAt,
+          };
+        }
+
         // Get container info
         const container = await provisioningRepo.getContainerByUserId(
           dbUser.id,
@@ -331,7 +389,7 @@ export const chatHandler = new Elysia({ name: "ChatHandler" })
 
         if (!container.gatewayUrl) {
           if (process.env.NODE_ENV !== "production") {
-            return getDemoChatResponse(dbUser.id, body.message);
+            return getDemoChatResponse(dbUser.id, body.message, estimatedInput);
           }
 
           set.status = 503;
@@ -394,6 +452,11 @@ export const chatHandler = new Elysia({ name: "ChatHandler" })
             response?: string;
             message?: string;
             messageId?: string;
+            usage?: {
+              inputTokens?: number;
+              outputTokens?: number;
+              model?: string;
+            };
           };
 
           // Emit task.completed — awaited so the write completes before Lambda
@@ -411,10 +474,37 @@ export const chatHandler = new Elysia({ name: "ChatHandler" })
             }
           }
 
+          // Record usage. Prefer gateway-reported counts when present; fall
+          // back to the same `messageLength / 4` estimate the cap check
+          // used. Errors here are non-fatal — failing to record usage must
+          // not break a successful chat response. Today the gateway
+          // doesn't report usage; this branch is forward-compatible for
+          // when Ferenc's contract lands.
+          const responseText =
+            gatewayData.response || gatewayData.message || "";
+          const reportedInput =
+            typeof gatewayData.usage?.inputTokens === "number"
+              ? gatewayData.usage.inputTokens
+              : estimatedInput;
+          const reportedOutput =
+            typeof gatewayData.usage?.outputTokens === "number"
+              ? gatewayData.usage.outputTokens
+              : estimateMessageTokens(responseText);
+          try {
+            await tokenUsageService.recordUsage({
+              userId: dbUser.id,
+              inputTokens: reportedInput,
+              outputTokens: reportedOutput,
+              model: gatewayData.usage?.model ?? "unknown",
+              source: "chat",
+            });
+          } catch (err) {
+            console.error("Token usage record failed (non-fatal):", err);
+          }
+
           return {
             success: true,
-            response:
-              gatewayData.response || gatewayData.message || "No response",
+            response: responseText || "No response",
             messageId: gatewayData.messageId,
           };
         } catch (fetchError) {
@@ -442,7 +532,7 @@ export const chatHandler = new Elysia({ name: "ChatHandler" })
 
           // For development/demo, return a contextual response using onboarding data
           if (process.env.NODE_ENV !== "production") {
-            return getDemoChatResponse(dbUser.id, body.message);
+            return getDemoChatResponse(dbUser.id, body.message, estimatedInput);
           }
 
           set.status = 502;

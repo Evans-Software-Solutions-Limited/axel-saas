@@ -11,6 +11,8 @@ import {
   type InvoiceSummary,
   type SubscriptionInfo,
 } from "./settings/settingsApi";
+import { fetchUsageSummary, type UsageSummary } from "./usage/usageApi";
+import { UsagePanel } from "./usage/UsagePanel";
 
 const STATUS_LABELS: Record<SubscriptionInfo["status"], string> = {
   active: "Active",
@@ -63,6 +65,9 @@ export function Settings() {
     null,
   );
   const [invoices, setInvoices] = useState<InvoiceSummary[]>([]);
+  const [usage, setUsage] = useState<UsageSummary | null>(null);
+  const [usageError, setUsageError] = useState<string | null>(null);
+  const [usageLoading, setUsageLoading] = useState(true);
   const [billingLoading, setBillingLoading] = useState(true);
   // Subscription error fails the whole section — without a tier we can't
   // render the right CTAs. Invoices error is rendered inline within the
@@ -78,9 +83,11 @@ export function Settings() {
 
   useEffect(() => {
     let cancelled = false;
-    // Promise.allSettled keeps the two fetches independent. The subscription
-    // call hits our DB; the invoices call hits Stripe — they have different
-    // failure modes and the page must not couple them.
+
+    // Billing (subscription + invoices) is rendered as one block by
+    // BillingPanel — invoices errors render inline within it, but the
+    // panel waits for the subscription tier before unblanking. Same
+    // Promise.allSettled as before for that pair.
     void Promise.allSettled([fetchSubscriptionStatus(), fetchInvoices()]).then(
       ([subResult, invResult]) => {
         if (cancelled) return;
@@ -105,6 +112,27 @@ export function Settings() {
         setBillingLoading(false);
       },
     );
+
+    // Usage runs on its own — a slow /users/me/usage must not pin the
+    // billing card in "Loading…", and a slow billing call must not
+    // delay the usage card. Each settles its own loading state.
+    fetchUsageSummary()
+      .then((value) => {
+        if (!cancelled) setUsage(value);
+      })
+      .catch((reason: unknown) => {
+        if (!cancelled) {
+          setUsageError(
+            reason instanceof Error
+              ? reason.message
+              : "Could not load your usage",
+          );
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setUsageLoading(false);
+      });
+
     return () => {
       cancelled = true;
     };
@@ -235,6 +263,21 @@ export function Settings() {
                 onCancel={() => void handleOpenPortal("cancel")}
               />
             )}
+          </CardContent>
+        </Card>
+
+        {/* Usage Section — sibling to Billing so a Stripe outage doesn't
+            hide it, and so it loads / errors independently. */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-text font-display">Usage</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <UsagePanel
+              usage={usage}
+              loading={usageLoading}
+              error={usageError}
+            />
           </CardContent>
         </Card>
       </div>
