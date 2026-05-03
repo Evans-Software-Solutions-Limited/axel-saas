@@ -21,7 +21,15 @@ export interface RateLimitClient {
   incrementAndCheck(input: {
     bucketKey: string;
     limit: number;
-    ttlSeconds: number;
+    /**
+     * Absolute epoch-seconds timestamp at which the row should expire
+     * — **not a duration**. DynamoDB's TTL attribute is defined in
+     * epoch seconds (e.g. `1777845200`), so callers must compute
+     * `now + duration` themselves. Passing a small number like `90`
+     * here resolves to 1970-01-01 + 90s and DynamoDB will sweep the
+     * row almost immediately, silently breaking the limiter.
+     */
+    expiresAt: number;
   }): Promise<{ allowed: boolean; count: number }>;
 }
 
@@ -53,7 +61,8 @@ export class DynamoRateLimitClient implements RateLimitClient {
   async incrementAndCheck(input: {
     bucketKey: string;
     limit: number;
-    ttlSeconds: number;
+    /** See `RateLimitClient.incrementAndCheck` — absolute epoch seconds. */
+    expiresAt: number;
   }): Promise<{ allowed: boolean; count: number }> {
     const client = await this.getClient();
     const { UpdateItemCommand } = await import("@aws-sdk/client-dynamodb");
@@ -77,7 +86,7 @@ export class DynamoRateLimitClient implements RateLimitClient {
           ExpressionAttributeValues: {
             ":one": { N: "1" },
             ":limit": { N: String(input.limit) },
-            ":ttl": { N: String(input.ttlSeconds) },
+            ":ttl": { N: String(input.expiresAt) },
           },
           ReturnValues: "UPDATED_NEW",
         }),

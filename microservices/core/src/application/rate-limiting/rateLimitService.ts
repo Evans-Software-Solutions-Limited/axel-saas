@@ -57,12 +57,17 @@ export class RateLimitService {
     const windowEnd = windowStart + WINDOW_SECONDS;
 
     const bucketKey = `${input.userId}#${input.category}#${windowStart}`;
-    const ttlSeconds = windowStart + BUCKET_TTL_SECONDS;
+    // `expiresAt` is an absolute epoch-seconds timestamp (DynamoDB TTL
+    // semantics), not a duration. The bucket's window starts at
+    // `windowStart`; we expire the row `BUCKET_TTL_SECONDS` past that
+    // (90s past the start, i.e. 30s past the window's natural end —
+    // a margin to cover DDB's TTL eventual-consistency lag).
+    const expiresAt = windowStart + BUCKET_TTL_SECONDS;
 
     const result = await this.client.incrementAndCheck({
       bucketKey,
       limit,
-      ttlSeconds,
+      expiresAt,
     });
 
     const remaining = result.allowed ? Math.max(0, limit - result.count) : 0;

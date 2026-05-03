@@ -36,7 +36,7 @@ describe("DynamoRateLimitClient.incrementAndCheck", () => {
     const result = await client.incrementAndCheck({
       bucketKey: "user-1#chat#1234",
       limit: 10,
-      ttlSeconds: 9999,
+      expiresAt: 9999,
     });
 
     expect(result.allowed).toBe(true);
@@ -58,7 +58,7 @@ describe("DynamoRateLimitClient.incrementAndCheck", () => {
     const result = await client.incrementAndCheck({
       bucketKey: "user-1#chat#1234",
       limit: 10,
-      ttlSeconds: 9999,
+      expiresAt: 9999,
     });
 
     expect(result).toEqual({ allowed: false, count: 10 });
@@ -74,7 +74,7 @@ describe("DynamoRateLimitClient.incrementAndCheck", () => {
       client.incrementAndCheck({
         bucketKey: "user-1#chat#1234",
         limit: 10,
-        ttlSeconds: 9999,
+        expiresAt: 9999,
       }),
     ).rejects.toThrow("AWS down");
   });
@@ -86,7 +86,7 @@ describe("DynamoRateLimitClient.incrementAndCheck", () => {
     const result = await client.incrementAndCheck({
       bucketKey: "k",
       limit: 5,
-      ttlSeconds: 1,
+      expiresAt: 1,
     });
 
     expect(result).toEqual({ allowed: true, count: 1 });
@@ -101,7 +101,7 @@ describe("DynamoRateLimitClient.incrementAndCheck", () => {
       await client.incrementAndCheck({
         bucketKey: "k",
         limit: 1,
-        ttlSeconds: 1,
+        expiresAt: 1,
       });
       expect(sendMock.mock.calls[0]![0].input.TableName).toBe("from-env-table");
     } finally {

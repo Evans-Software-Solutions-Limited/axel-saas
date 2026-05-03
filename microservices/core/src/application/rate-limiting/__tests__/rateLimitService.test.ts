@@ -50,7 +50,7 @@ describe("RateLimitService.checkAndConsume", () => {
       bucketKey: `user-1#chat#${WINDOW_START}`,
       limit: 10,
       // TTL = window start + bucket ttl (90s).
-      ttlSeconds: WINDOW_START + 90,
+      expiresAt: WINDOW_START + 90,
     });
   });
 
