@@ -18,6 +18,7 @@ import {
   integrationHandler,
   integrationPublicHandler,
 } from "./application/integrations/integrationHandler";
+import { usageHandler } from "./application/usage/usageHandler";
 
 const getAllowedOrigins = (): string[] => {
   const origins: string[] = [];
@@ -68,7 +69,8 @@ const app = new Elysia()
   .use(subscriptionHandler)
   .use(provisioningHandler)
   .use(taskHandler)
-  .use(integrationHandler);
+  .use(integrationHandler)
+  .use(usageHandler);
 
 export type CoreApi = typeof app;
 

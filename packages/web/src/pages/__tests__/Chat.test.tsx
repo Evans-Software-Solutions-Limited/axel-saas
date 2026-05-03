@@ -70,6 +70,22 @@ vi.mock("../chat/chatApi", () => ({
       this.name = "SubscriptionRequiredError";
     }
   },
+  // ChatContainer imports these for the 429 cap-reached path. The mocks
+  // need them defined or the `instanceof` check inside the catch block
+  // throws and the existing error tests fail with "Right-hand side of
+  // 'instanceof' is not callable".
+  TokenCapReachedError: class TokenCapReachedError extends Error {
+    readonly scope: "daily" | "monthly";
+    readonly resetAt: string;
+    constructor(scope: "daily" | "monthly", resetAt: string, message?: string) {
+      super(message ?? `Token cap reached (${scope})`);
+      this.name = "TokenCapReachedError";
+      this.scope = scope;
+      this.resetAt = resetAt;
+    }
+  },
+  formatCapReachedMessage: (err: { message?: string }) =>
+    err.message ?? "Token cap reached",
 }));
 
 vi.mock("../subscribeApi", () => ({

@@ -11,6 +11,8 @@ import {
   type InvoiceSummary,
   type SubscriptionInfo,
 } from "./settings/settingsApi";
+import { fetchUsageSummary, type UsageSummary } from "./usage/usageApi";
+import { UsagePanel } from "./usage/UsagePanel";
 
 const STATUS_LABELS: Record<SubscriptionInfo["status"], string> = {
   active: "Active",
@@ -63,6 +65,9 @@ export function Settings() {
     null,
   );
   const [invoices, setInvoices] = useState<InvoiceSummary[]>([]);
+  const [usage, setUsage] = useState<UsageSummary | null>(null);
+  const [usageError, setUsageError] = useState<string | null>(null);
+  const [usageLoading, setUsageLoading] = useState(true);
   const [billingLoading, setBillingLoading] = useState(true);
   // Subscription error fails the whole section — without a tier we can't
   // render the right CTAs. Invoices error is rendered inline within the
@@ -78,33 +83,46 @@ export function Settings() {
 
   useEffect(() => {
     let cancelled = false;
-    // Promise.allSettled keeps the two fetches independent. The subscription
-    // call hits our DB; the invoices call hits Stripe — they have different
-    // failure modes and the page must not couple them.
-    void Promise.allSettled([fetchSubscriptionStatus(), fetchInvoices()]).then(
-      ([subResult, invResult]) => {
-        if (cancelled) return;
-        if (subResult.status === "fulfilled") {
-          setSubscription(subResult.value);
-        } else {
-          setBillingError(
-            subResult.reason instanceof Error
-              ? subResult.reason.message
-              : "Could not load your billing information",
-          );
-        }
-        if (invResult.status === "fulfilled") {
-          setInvoices(invResult.value);
-        } else {
-          setInvoicesError(
-            invResult.reason instanceof Error
-              ? invResult.reason.message
-              : "Could not load your invoices",
-          );
-        }
-        setBillingLoading(false);
-      },
-    );
+    // Promise.allSettled keeps the three fetches independent. Subscription
+    // hits our DB; invoices hit Stripe; usage hits our DB but a different
+    // table — they have different failure modes and the page must not
+    // couple them.
+    void Promise.allSettled([
+      fetchSubscriptionStatus(),
+      fetchInvoices(),
+      fetchUsageSummary(),
+    ]).then(([subResult, invResult, usageResult]) => {
+      if (cancelled) return;
+      if (subResult.status === "fulfilled") {
+        setSubscription(subResult.value);
+      } else {
+        setBillingError(
+          subResult.reason instanceof Error
+            ? subResult.reason.message
+            : "Could not load your billing information",
+        );
+      }
+      if (invResult.status === "fulfilled") {
+        setInvoices(invResult.value);
+      } else {
+        setInvoicesError(
+          invResult.reason instanceof Error
+            ? invResult.reason.message
+            : "Could not load your invoices",
+        );
+      }
+      if (usageResult.status === "fulfilled") {
+        setUsage(usageResult.value);
+      } else {
+        setUsageError(
+          usageResult.reason instanceof Error
+            ? usageResult.reason.message
+            : "Could not load your usage",
+        );
+      }
+      setBillingLoading(false);
+      setUsageLoading(false);
+    });
     return () => {
       cancelled = true;
     };
@@ -235,6 +253,21 @@ export function Settings() {
                 onCancel={() => void handleOpenPortal("cancel")}
               />
             )}
+          </CardContent>
+        </Card>
+
+        {/* Usage Section — sibling to Billing so a Stripe outage doesn't
+            hide it, and so it loads / errors independently. */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-text font-display">Usage</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <UsagePanel
+              usage={usage}
+              loading={usageLoading}
+              error={usageError}
+            />
           </CardContent>
         </Card>
       </div>

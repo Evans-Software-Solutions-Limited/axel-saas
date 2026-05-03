@@ -14,11 +14,16 @@ import {
   type SubscriptionInfo,
   type InvoiceSummary,
 } from "../settings/settingsApi";
+import { fetchUsageSummary } from "../usage/usageApi";
 
 vi.mock("../settings/settingsApi", () => ({
   fetchSubscriptionStatus: vi.fn(),
   fetchInvoices: vi.fn(),
   openCustomerPortal: vi.fn(),
+}));
+
+vi.mock("../usage/usageApi", () => ({
+  fetchUsageSummary: vi.fn(),
 }));
 
 const assignMock = vi.fn();
@@ -38,6 +43,9 @@ beforeEach(() => {
     cancelAtPeriodEnd: false,
   } satisfies SubscriptionInfo);
   vi.mocked(fetchInvoices).mockResolvedValue([]);
+  // Default: empty-state usage so the Usage card renders without
+  // affecting the rest of the assertions.
+  vi.mocked(fetchUsageSummary).mockResolvedValue(null);
 });
 
 afterEach(() => {
@@ -70,7 +78,10 @@ describe("Settings", () => {
         () => new Promise(() => {}),
       );
       render(<Settings />);
-      expect(screen.getByText(/loading/i)).toBeDefined();
+      // Match the billing-card loading text specifically. The Usage card
+      // also renders its own "Loading usage…" — the regex is anchored to
+      // the bare "Loading…" so the assertion stays unambiguous.
+      expect(screen.getByText(/^Loading…$/)).toBeDefined();
     });
 
     it("shows an error message when the subscription fetch fails", async () => {
@@ -375,6 +386,54 @@ describe("Settings", () => {
       ).toBeNull();
       expect(screen.queryByRole("button", { name: /cancel plan/i })).toBeNull();
       expect(screen.queryByText(/recent invoices/i)).toBeNull();
+    });
+  });
+
+  describe("usage section", () => {
+    it("renders the usage panel populated from fetchUsageSummary on success", async () => {
+      vi.mocked(fetchUsageSummary).mockResolvedValue({
+        tier: "free",
+        daily: {
+          inputTokens: 25_000,
+          outputTokens: 10_000,
+          limits: { inputTokens: 50_000, outputTokens: 25_000 },
+        },
+        monthly: { inputTokens: 0, outputTokens: 0, limits: null },
+        percentUsed: 0.5,
+        warningThreshold: 0.8,
+      });
+      render(<Settings />);
+      // Card heading appears regardless.
+      expect(screen.getByText(/^Usage$/)).toBeDefined();
+      // Daily-allowance copy + bar values are rendered once the fetch resolves.
+      await waitFor(() => {
+        expect(screen.getByText(/daily allowance/i)).toBeDefined();
+      });
+      expect(screen.getByText(/25\.0k \/ 50\.0k/)).toBeDefined();
+    });
+
+    it("renders the inline error when fetchUsageSummary rejects", async () => {
+      // A usage failure is independent of the billing fetches — both must
+      // still render, but the usage card surfaces its own error message.
+      vi.mocked(fetchUsageSummary).mockRejectedValue(
+        new Error("Usage endpoint unavailable"),
+      );
+      render(<Settings />);
+      await waitFor(() => {
+        expect(
+          screen.getByText(/usage endpoint unavailable/i),
+        ).toBeDefined();
+      });
+      // Billing still renders normally.
+      expect(screen.getByText("Free")).toBeDefined();
+    });
+
+    it("renders the empty-state copy when usage is null", async () => {
+      vi.mocked(fetchUsageSummary).mockResolvedValue(null);
+      render(<Settings />);
+      await waitFor(() => {
+        expect(screen.getByText(/no usage recorded yet/i)).toBeDefined();
+      });
     });
   });
 });

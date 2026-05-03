@@ -8,10 +8,16 @@ import { userRepository } from "../repositories/userRepository";
 import { ProvisioningRepository } from "../repositories/provisioningRepository";
 import { SubscriptionRepository } from "../repositories/subscriptionRepository";
 import { TaskRepository } from "../tasks/taskRepository";
+import {
+  TokenUsageService,
+  estimateMessageTokens,
+} from "../usage/tokenUsageService";
+import type { SubscriptionTier } from "../integrations/tierGate";
 
 // Create instance for use in handler
 const provisioningRepo = new ProvisioningRepository();
 const taskRepo = new TaskRepository();
+const tokenUsageService = new TokenUsageService();
 
 // Types for API responses
 export interface ChatMessageRequest {
@@ -308,6 +314,30 @@ export const chatHandler = new Elysia({ name: "ChatHandler" })
           };
         }
 
+        // Token cap check — enforced before dispatching to the gateway
+        // so a user already at the cap doesn't trigger a paid model call.
+        // Estimator uses the brief's `messageLength / 4` placeholder until
+        // the gateway returns real per-call usage; we cover both input and
+        // a conservative output projection (same value, since output can
+        // be roughly the same size as input for typical chat). Free tier
+        // is enforced daily, Premium monthly, Enterprise unlimited.
+        const tier = (subscription.tier ?? null) as SubscriptionTier | null;
+        const estimatedInput = estimateMessageTokens(body.message);
+        const estimatedOutput = estimatedInput;
+        const cap = await tokenUsageService.checkCap(dbUser.id, tier, {
+          inputTokens: estimatedInput,
+          outputTokens: estimatedOutput,
+        });
+        if (!cap.allowed) {
+          set.status = 429;
+          return {
+            success: false,
+            error: cap.reason,
+            scope: cap.scope,
+            resetAt: cap.resetAt,
+          };
+        }
+
         // Get container info
         const container = await provisioningRepo.getContainerByUserId(
           dbUser.id,
@@ -394,6 +424,11 @@ export const chatHandler = new Elysia({ name: "ChatHandler" })
             response?: string;
             message?: string;
             messageId?: string;
+            usage?: {
+              inputTokens?: number;
+              outputTokens?: number;
+              model?: string;
+            };
           };
 
           // Emit task.completed — awaited so the write completes before Lambda
@@ -411,10 +446,37 @@ export const chatHandler = new Elysia({ name: "ChatHandler" })
             }
           }
 
+          // Record usage. Prefer gateway-reported counts when present; fall
+          // back to the same `messageLength / 4` estimate the cap check
+          // used. Errors here are non-fatal — failing to record usage must
+          // not break a successful chat response. Today the gateway
+          // doesn't report usage; this branch is forward-compatible for
+          // when Ferenc's contract lands.
+          const responseText =
+            gatewayData.response || gatewayData.message || "";
+          const reportedInput =
+            typeof gatewayData.usage?.inputTokens === "number"
+              ? gatewayData.usage.inputTokens
+              : estimatedInput;
+          const reportedOutput =
+            typeof gatewayData.usage?.outputTokens === "number"
+              ? gatewayData.usage.outputTokens
+              : estimateMessageTokens(responseText);
+          try {
+            await tokenUsageService.recordUsage({
+              userId: dbUser.id,
+              inputTokens: reportedInput,
+              outputTokens: reportedOutput,
+              model: gatewayData.usage?.model ?? "unknown",
+              source: "chat",
+            });
+          } catch (err) {
+            console.error("Token usage record failed (non-fatal):", err);
+          }
+
           return {
             success: true,
-            response:
-              gatewayData.response || gatewayData.message || "No response",
+            response: responseText || "No response",
             messageId: gatewayData.messageId,
           };
         } catch (fetchError) {

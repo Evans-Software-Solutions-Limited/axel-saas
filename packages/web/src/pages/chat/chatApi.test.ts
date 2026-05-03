@@ -1,5 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { getAgentStatus, postChatMessage } from "./chatApi";
+import {
+  formatCapReachedMessage,
+  getAgentStatus,
+  postChatMessage,
+  TokenCapReachedError,
+} from "./chatApi";
 
 const { api: mockApi } = vi.hoisted(() => ({
   api: {
@@ -217,6 +222,119 @@ describe("chatApi", () => {
       await expect(postChatMessage("Hello")).rejects.toThrow(
         "Failed to send chat message",
       );
+    });
+
+    describe("TokenCapReachedError on 429", () => {
+      it("throws TokenCapReachedError with daily scope + resetAt", async () => {
+        mockApi.core.users.chat.message.post.mockResolvedValue({
+          data: null,
+          error: {
+            status: 429,
+            value: {
+              error: "Daily token limit reached",
+              scope: "daily",
+              resetAt: "2026-05-04T00:00:00.000Z",
+            },
+          },
+        } as never);
+
+        await expect(postChatMessage("Hello")).rejects.toBeInstanceOf(
+          TokenCapReachedError,
+        );
+        try {
+          await postChatMessage("Hello");
+        } catch (err) {
+          expect(err).toBeInstanceOf(TokenCapReachedError);
+          if (err instanceof TokenCapReachedError) {
+            expect(err.scope).toBe("daily");
+            expect(err.resetAt).toBe("2026-05-04T00:00:00.000Z");
+            expect(err.message).toContain("Daily token limit reached");
+          }
+        }
+      });
+
+      it("preserves monthly scope", async () => {
+        mockApi.core.users.chat.message.post.mockResolvedValue({
+          data: null,
+          error: {
+            status: 429,
+            value: {
+              scope: "monthly",
+              resetAt: "2026-06-01T00:00:00.000Z",
+            },
+          },
+        } as never);
+
+        try {
+          await postChatMessage("Hello");
+        } catch (err) {
+          expect(err).toBeInstanceOf(TokenCapReachedError);
+          if (err instanceof TokenCapReachedError) {
+            expect(err.scope).toBe("monthly");
+          }
+        }
+      });
+
+      it("defaults to daily scope when the body is missing", async () => {
+        mockApi.core.users.chat.message.post.mockResolvedValue({
+          data: null,
+          error: { status: 429, value: null },
+        } as never);
+
+        try {
+          await postChatMessage("Hello");
+        } catch (err) {
+          expect(err).toBeInstanceOf(TokenCapReachedError);
+          if (err instanceof TokenCapReachedError) {
+            expect(err.scope).toBe("daily");
+            expect(err.resetAt).toBe("");
+          }
+        }
+      });
+    });
+  });
+
+  describe("formatCapReachedMessage", () => {
+    it("includes the reset time and an upgrade nudge for daily caps", () => {
+      const err = new TokenCapReachedError(
+        "daily",
+        "2026-05-04T00:00:00.000Z",
+        "Daily token limit reached",
+      );
+      const msg = formatCapReachedMessage(err);
+      expect(msg).toContain("Daily token limit reached");
+      expect(msg).toContain("Resets");
+      expect(msg).toContain("Upgrade to Premium");
+    });
+
+    it("omits the upgrade nudge for monthly caps (Premium users)", () => {
+      const err = new TokenCapReachedError(
+        "monthly",
+        "2026-06-01T00:00:00.000Z",
+        "Monthly token limit reached",
+      );
+      const msg = formatCapReachedMessage(err);
+      expect(msg).toContain("Monthly token limit reached");
+      expect(msg).not.toContain("Upgrade to Premium");
+    });
+
+    it("falls back to a default base when message is missing", () => {
+      const err = new TokenCapReachedError("daily", "");
+      // Default constructor message is `Token cap reached (daily)`.
+      const msg = formatCapReachedMessage(err);
+      expect(msg.toLowerCase()).toContain("token cap reached");
+      // No resetAt — no Resets clause.
+      expect(msg).not.toContain("Resets");
+    });
+
+    it("ignores an unparseable resetAt", () => {
+      const err = new TokenCapReachedError(
+        "daily",
+        "not-a-date",
+        "Daily token limit reached",
+      );
+      const msg = formatCapReachedMessage(err);
+      expect(msg).not.toContain("Resets");
     });
   });
 });
