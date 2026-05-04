@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   TIMEOUT_CHAT_MS,
   TIMEOUT_HEALTH_MS,
@@ -19,12 +19,12 @@ beforeEach(() => {
   );
 });
 
-afterEachReset();
-
-function afterEachReset() {
-  // Tests don't share state but be explicit.
+// Restore NODE_ENV after every test so a test that sets it to
+// "production" doesn't leak the value into the next test (or worse,
+// into a sibling test file run in the same vitest worker).
+afterEach(() => {
   process.env.NODE_ENV = ORIGINAL_NODE_ENV;
-}
+});
 
 function makeFetcher(
   impl: (url: string, init: RequestInit) => Response | Promise<Response>,
@@ -241,6 +241,67 @@ describe("postChat", () => {
       timeoutMs: 1,
     });
     expect(result).toEqual({ kind: "timeout" });
+  });
+
+  it("maps an abort during body-read to {kind: 'timeout'} (drip-fed body protection)", async () => {
+    // Regression for the bug where the timeout cleared as soon as
+    // headers landed: a gateway that sent `200 OK` immediately but
+    // then drip-fed the body could pin the Lambda indefinitely. The
+    // signal must remain active through `response.json()`.
+    const stallingResponse: Response = {
+      status: 200,
+      ok: true,
+      headers: new Headers({ "Content-Type": "application/json" }),
+      json: () =>
+        new Promise<unknown>((_resolve, reject) => {
+          // Simulate fetch's body reader: rejects with AbortError when
+          // the request signal aborts mid-read. Modern fetch does this
+          // natively; here we wire it explicitly.
+          setTimeout(() => {
+            const err = new Error("aborted");
+            err.name = "AbortError";
+            reject(err);
+          }, 5);
+        }),
+    } as unknown as Response;
+
+    const fetcher: GatewayFetcher = {
+      fetch: (() =>
+        Promise.resolve(stallingResponse)) as unknown as typeof fetch,
+    };
+    const result = await postChat({
+      rawGatewayUrl: "http://localhost:18789",
+      message: "hi",
+      userId: "u",
+      fetcher,
+      timeoutMs: 1,
+    });
+    expect(result).toEqual({ kind: "timeout" });
+  });
+
+  it("treats malformed JSON (non-abort body error) as ok with empty body", async () => {
+    // The body-read phase distinguishes AbortError (timeout) from
+    // other failures (malformed JSON, network reset). A 200 with junk
+    // body should still fall through to the status-based success
+    // branch with body={}, not surface as a timeout.
+    const malformedResponse: Response = {
+      status: 200,
+      ok: true,
+      headers: new Headers({ "Content-Type": "application/json" }),
+      json: () => Promise.reject(new SyntaxError("Unexpected token")),
+    } as unknown as Response;
+
+    const fetcher: GatewayFetcher = {
+      fetch: (() =>
+        Promise.resolve(malformedResponse)) as unknown as typeof fetch,
+    };
+    const result = await postChat({
+      rawGatewayUrl: "http://localhost:18789",
+      message: "hi",
+      userId: "u",
+      fetcher,
+    });
+    expect(result).toEqual({ kind: "ok", body: {} });
   });
 
   it("uses the chat-spec 60s default timeout when none is passed", () => {

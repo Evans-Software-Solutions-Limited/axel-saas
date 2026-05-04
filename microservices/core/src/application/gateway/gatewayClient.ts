@@ -128,6 +128,7 @@ async function performGatewayCall<T>(
       signal: controller.signal,
     });
   } catch (err: unknown) {
+    clearTimeout(timeoutTimer);
     if (err instanceof Error && err.name === "AbortError") {
       return { kind: "timeout" };
     }
@@ -135,19 +136,31 @@ async function performGatewayCall<T>(
       kind: "network_error",
       message: err instanceof Error ? err.message : String(err),
     };
-  } finally {
-    clearTimeout(timeoutTimer);
   }
 
-  // Slack-of-OpenClaw — read the body once, regardless of status, so
-  // an error response with a JSON `{error, retryAfter}` body still
-  // surfaces those fields to the caller.
+  // Body-read phase. The original timeout was only in scope until the
+  // headers landed — a gateway that sent headers promptly but
+  // drip-fed the body could still pin the Lambda indefinitely. Keep
+  // the AbortSignal active across `response.json()` so the same
+  // 60s/5s/10s budget covers the entire wall-clock cost of the call.
+  // Distinguish three terminal states for the body phase:
+  //   - AbortError: timeout fired mid-body; surface as kind: "timeout".
+  //   - Other errors (malformed JSON, network reset mid-body): the
+  //     headers/status are still valid, so fall through with body=null
+  //     and let the status-based branches below decide. This preserves
+  //     the existing behaviour where a 500 with no JSON body still
+  //     returns kind: "error".
   let body: unknown = null;
   try {
     body = await response.json();
-  } catch {
+  } catch (err: unknown) {
+    if (err instanceof Error && err.name === "AbortError") {
+      clearTimeout(timeoutTimer);
+      return { kind: "timeout" };
+    }
     body = null;
   }
+  clearTimeout(timeoutTimer);
 
   if (response.status === 429) {
     const ra = readRetryAfter(response, body);
