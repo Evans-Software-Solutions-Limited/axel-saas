@@ -191,6 +191,66 @@ describe("postChat", () => {
     }
   });
 
+  it("does not surface body.error as message (machine codes are not human-readable)", async () => {
+    // Regression for the bug where `readBodyMessage` fell back to
+    // `body.error`, leaking the raw `"rate_limited"` code to chat
+    // users. Callers expect `message` to be friendly copy or
+    // undefined — the chatHandler then chooses the friendly fallback
+    // via `gatewayResult.message ?? "Slow down — Axel needs a moment"`.
+    const fetcher = makeFetcher(() =>
+      jsonResponse({ error: "rate_limited" }, { status: 429 }),
+    );
+    const result = await postChat({
+      rawGatewayUrl: "http://localhost:18789",
+      message: "hi",
+      userId: "u",
+      fetcher,
+    });
+    expect(result.kind).toBe("rate_limited");
+    if (result.kind === "rate_limited") {
+      expect(result.message).toBeUndefined();
+    }
+  });
+
+  it("uses body.message verbatim when the gateway provides it", async () => {
+    // The gateway-contract spec's 500 shape is
+    // `{ error: "agent_error", message: "Failed to process message" }`.
+    // The friendly `message` is what we surface; the machine `error`
+    // is for our logs.
+    const fetcher = makeFetcher(() =>
+      jsonResponse(
+        { error: "agent_error", message: "The agent crashed mid-tool-call." },
+        { status: 500 },
+      ),
+    );
+    const result = await postChat({
+      rawGatewayUrl: "http://localhost:18789",
+      message: "hi",
+      userId: "u",
+      fetcher,
+    });
+    expect(result.kind).toBe("error");
+    if (result.kind === "error") {
+      expect(result.message).toBe("The agent crashed mid-tool-call.");
+    }
+  });
+
+  it("ignores an empty body.message and falls through to undefined", async () => {
+    const fetcher = makeFetcher(() =>
+      jsonResponse({ error: "agent_error", message: "" }, { status: 500 }),
+    );
+    const result = await postChat({
+      rawGatewayUrl: "http://localhost:18789",
+      message: "hi",
+      userId: "u",
+      fetcher,
+    });
+    expect(result.kind).toBe("error");
+    if (result.kind === "error") {
+      expect(result.message).toBeUndefined();
+    }
+  });
+
   it("maps a 500 to {kind: 'error', status: 500} with the body message", async () => {
     const fetcher = makeFetcher(() =>
       jsonResponse({ error: "agent_error", message: "boom" }, { status: 500 }),

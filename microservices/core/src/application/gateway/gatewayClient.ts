@@ -198,10 +198,19 @@ function readRetryAfter(response: Response, body: unknown): number {
 }
 
 function readBodyMessage(body: unknown): string | undefined {
+  // Only read the `message` field — that's the human-readable
+  // explanation per the gateway-contract spec (§3 chat 500 shape:
+  // `{ error: "agent_error", message: "Failed to process message" }`).
+  // The `error` field is a machine-readable code (`rate_limited`,
+  // `agent_error`, `invalid_code`, ...) — surfacing it as a "message"
+  // leaks raw codes through to the user. Callers that need the code
+  // can read the body themselves; this helper is for the friendly
+  // copy that ends up in 429/5xx responses.
   if (body && typeof body === "object") {
-    const obj = body as { message?: unknown; error?: unknown };
-    if (typeof obj.message === "string") return obj.message;
-    if (typeof obj.error === "string") return obj.error;
+    const obj = body as { message?: unknown };
+    if (typeof obj.message === "string" && obj.message.length > 0) {
+      return obj.message;
+    }
   }
   return undefined;
 }
