@@ -19,6 +19,8 @@ import {
   applyRateLimitHeaders,
   buildRateLimitedBody,
 } from "../rate-limiting/rateLimitHeaders";
+import { postChat } from "../gateway/gatewayClient";
+import { validateGatewayUrl } from "../gateway/gatewayUrl";
 
 // Create instance for use in handler
 const provisioningRepo = new ProvisioningRepository();
@@ -114,43 +116,8 @@ export function generateContextualResponse(
   return `Hey ${name}, thanks for reaching out! I'm here to help you with ${goals}. What would you like to work on?`;
 }
 
-/**
- * Validate gateway URL to prevent auth token leakage to untrusted endpoints.
- * Returns the validated URL or null if invalid.
- */
-function validateGatewayUrl(urlString: string): string | null {
-  try {
-    const url = new URL(urlString);
-
-    // Only allow HTTPS in production, allow HTTP for development
-    if (process.env.NODE_ENV === "production" && url.protocol !== "https:") {
-      console.error("Gateway URL must use HTTPS in production");
-      return null;
-    }
-
-    // Block private/localhost addresses in production
-    if (process.env.NODE_ENV === "production") {
-      const hostname = url.hostname;
-      const privateRanges = [
-        /^localhost$/i,
-        /^127\./,
-        /^192\.168\./,
-        /^10\./,
-        /^172\.(1[6-9]|2[0-9]|3[01])\./,
-      ];
-
-      if (privateRanges.some((range) => range.test(hostname))) {
-        console.error("Gateway URL cannot be a private IP address");
-        return null;
-      }
-    }
-
-    return url.toString();
-  } catch (err) {
-    console.error("Invalid gateway URL:", err);
-    return null;
-  }
-}
+// Gateway URL validation, postChat, checkHealth, triggerReload all live
+// in `../gateway/`. See `specs/gateway-contract/design.md`.
 
 async function getDemoChatResponse(
   userId: string,
@@ -458,37 +425,20 @@ export const chatHandler = new Elysia({ name: "ChatHandler" })
           console.error("Task start event failed (non-fatal):", taskStartErr);
         }
 
-        try {
-          const gatewayResponse = await fetch(`${gatewayUrl}/api/chat`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              // Forward the authorization header for gateway auth
-              Authorization: ctx.headers.authorization || "",
-            },
-            body: JSON.stringify({
-              message: body.message,
-              userId: dbUser.id,
-            }),
-          });
+        // Dispatch to the gateway through the typed client. The client
+        // applies the spec-mandated 60s timeout, injects X-Request-Id
+        // for tracing, validates the URL inline, and returns a
+        // discriminated union — no `try/catch` around `fetch` here.
+        const gatewayResult = await postChat({
+          rawGatewayUrl: gatewayUrl,
+          message: body.message,
+          userId: dbUser.id,
+          authorization: ctx.headers.authorization || undefined,
+        });
 
-          if (!gatewayResponse.ok) {
-            throw new Error(`Gateway error: ${gatewayResponse.status}`);
-          }
-
-          const gatewayData = (await gatewayResponse.json()) as {
-            response?: string;
-            message?: string;
-            messageId?: string;
-            usage?: {
-              inputTokens?: number;
-              outputTokens?: number;
-              model?: string;
-            };
-          };
-
-          // Emit task.completed — awaited so the write completes before Lambda
-          // returns; non-fatal if it fails.
+        if (gatewayResult.kind === "ok") {
+          // Emit task.completed — awaited so the write completes before
+          // Lambda returns; non-fatal if it fails.
           if (taskId) {
             try {
               await taskRepo.appendEvent({
@@ -502,28 +452,26 @@ export const chatHandler = new Elysia({ name: "ChatHandler" })
             }
           }
 
-          // Record usage. Prefer gateway-reported counts when present; fall
-          // back to the same `messageLength / 4` estimate the cap check
-          // used. Errors here are non-fatal — failing to record usage must
-          // not break a successful chat response. Today the gateway
-          // doesn't report usage; this branch is forward-compatible for
-          // when Ferenc's contract lands.
+          // Record usage. Prefer gateway-reported counts when present;
+          // fall back to the same `messageLength / 4` estimate the cap
+          // check used. Errors here are non-fatal — failing to record
+          // usage must not break a successful chat response.
           const responseText =
-            gatewayData.response || gatewayData.message || "";
+            gatewayResult.body.response || gatewayResult.body.message || "";
           const reportedInput =
-            typeof gatewayData.usage?.inputTokens === "number"
-              ? gatewayData.usage.inputTokens
+            typeof gatewayResult.body.usage?.inputTokens === "number"
+              ? gatewayResult.body.usage.inputTokens
               : estimatedInput;
           const reportedOutput =
-            typeof gatewayData.usage?.outputTokens === "number"
-              ? gatewayData.usage.outputTokens
+            typeof gatewayResult.body.usage?.outputTokens === "number"
+              ? gatewayResult.body.usage.outputTokens
               : estimateMessageTokens(responseText);
           try {
             await tokenUsageService.recordUsage({
               userId: dbUser.id,
               inputTokens: reportedInput,
               outputTokens: reportedOutput,
-              model: gatewayData.usage?.model ?? "unknown",
+              model: gatewayResult.body.usage?.model ?? "unknown",
               source: "chat",
             });
           } catch (err) {
@@ -533,42 +481,73 @@ export const chatHandler = new Elysia({ name: "ChatHandler" })
           return {
             success: true,
             response: responseText || "No response",
-            messageId: gatewayData.messageId,
-          };
-        } catch (fetchError) {
-          console.error("Gateway fetch error:", fetchError);
-
-          // Emit task.failed — awaited so the write completes before Lambda
-          // returns; non-fatal if it fails.
-          if (taskId) {
-            try {
-              await taskRepo.appendEvent({
-                taskId,
-                eventType: "task.failed",
-                source: "chat",
-                payload: {
-                  error:
-                    fetchError instanceof Error
-                      ? fetchError.message
-                      : String(fetchError),
-                },
-              });
-            } catch (err) {
-              console.error("Task failed event failed (non-fatal):", err);
-            }
-          }
-
-          // For development/demo, return a contextual response using onboarding data
-          if (process.env.NODE_ENV !== "production") {
-            return getDemoChatResponse(dbUser.id, body.message, estimatedInput);
-          }
-
-          set.status = 502;
-          return {
-            success: false,
-            error: "Failed to reach agent. Please try again.",
+            messageId: gatewayResult.body.messageId,
           };
         }
+
+        // Failure path. Emit task.failed and decide between dev demo
+        // fallback vs production-grade structured error mapping.
+        if (taskId) {
+          try {
+            await taskRepo.appendEvent({
+              taskId,
+              eventType: "task.failed",
+              source: "chat",
+              payload: {
+                kind: gatewayResult.kind,
+                ...(gatewayResult.kind === "error"
+                  ? { status: gatewayResult.status }
+                  : {}),
+                ...("message" in gatewayResult && gatewayResult.message
+                  ? { error: gatewayResult.message }
+                  : {}),
+              },
+            });
+          } catch (err) {
+            console.error("Task failed event failed (non-fatal):", err);
+          }
+        }
+
+        console.error("Gateway call failed:", gatewayResult);
+
+        if (process.env.NODE_ENV !== "production") {
+          // Dev demo fallback so local development isn't blocked by an
+          // unreachable gateway.
+          return getDemoChatResponse(dbUser.id, body.message, estimatedInput);
+        }
+
+        // Production: structured error mapping per spec §"Error
+        // Handling & Resilience". Gateway 429 → user 429 with
+        // Retry-After. Gateway 5xx → user 502. Network/timeout/invalid
+        // URL → user 503 (the agent is temporarily unreachable).
+        if (gatewayResult.kind === "rate_limited") {
+          set.status = 429;
+          // Mutate the headers bag in place — Elysia's HTTPHeaders type
+          // is branded and resists spread assignment. Same pattern as
+          // `applyRateLimitHeaders` in the rate-limit module.
+          if (!set.headers) set.headers = {};
+          (set.headers as Record<string, string>)["Retry-After"] = String(
+            gatewayResult.retryAfter,
+          );
+          return {
+            success: false,
+            error:
+              gatewayResult.message ??
+              "Agent is processing another request. Please wait.",
+          };
+        }
+        if (gatewayResult.kind === "error") {
+          set.status = 502;
+          return { success: false, error: "Agent returned an error." };
+        }
+        // timeout / network_error / invalid_url all collapse to 503 —
+        // the user-facing distinction isn't useful, and the structured
+        // logs above carry the detail for ops.
+        set.status = 503;
+        return {
+          success: false,
+          error: "Failed to reach agent. Please try again.",
+        };
       } catch (error) {
         console.error("Chat message error:", error);
         set.status = 500;
