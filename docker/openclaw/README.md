@@ -17,6 +17,14 @@ The original `docker/user-container/` is **left untouched** — both directories
 From the repo root:
 
 ```bash
+# Required — no sane default; we refuse to ship `dev-token-change-me` style
+# fallbacks. For local-only smoke testing without auth, set OPENCLAW_DEV_MODE=1
+# and skip this.
+export OPENCLAW_GATEWAY_TOKEN=$(uuidgen)
+
+# Optional — defaults to `free`. One of: free, premium, enterprise.
+export AXEL_TIER=free
+
 docker compose -f docker/openclaw/docker-compose.yml up --build
 ```
 
@@ -34,13 +42,13 @@ docker compose -f docker/openclaw/docker-compose.yml down -v
 
 ## Files
 
-| File | Purpose |
-| --- | --- |
-| `Dockerfile` | Pinned-version image build. Requires `OPENCLAW_VERSION` build arg. |
-| `versions.json` | Single source of truth for the pinned OpenClaw release tag. |
-| `docker-compose.yml` | Local-only — reads `versions.json` default, named volume, TCP healthcheck. |
-| `docker-entrypoint.sh` | Seeds workspace from templates on first boot, applies tier rules. |
-| `workspace-templates/` | Per-tier `openclaw.json` configs and seed markdown files (`SOUL.md`, etc.). |
+| File                   | Purpose                                                                                                                                                 |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Dockerfile`           | Pinned-version image build. Requires `OPENCLAW_VERSION` build arg.                                                                                      |
+| `versions.json`        | Single source of truth for the pinned OpenClaw release tag.                                                                                             |
+| `docker-compose.yml`   | Local-only — reads `versions.json` default, named volume, TCP healthcheck.                                                                              |
+| `docker-entrypoint.sh` | Seeds workspace from templates on first boot, applies tier rules, validates `OPENCLAW_GATEWAY_TOKEN`.                                                   |
+| `workspace-templates/` | Per-tier `openclaw.json` configs (`openclaw-free.json`, `openclaw-premium.json`, `openclaw-enterprise.json`) and seed markdown files (`SOUL.md`, etc.). |
 
 ## Bumping the pinned version
 
@@ -52,7 +60,17 @@ docker compose -f docker/openclaw/docker-compose.yml down -v
 
 ## Tier vocabulary
 
-OpenClaw's internal tier names (`starter` / `pro` / `business` / `developer`) are not the same as Axel's commercial subscription tiers (`Free` / `Premium` / `Enterprise`). The mapping between them is the responsibility of the core API in **Phase 5** of the spec — not this image. This image only knows about the OpenClaw vocabulary.
+The per-tier `openclaw-*.json` files in `workspace-templates/` are **our** authored templates — they are not provided by upstream OpenClaw. We name them after Axel's commercial tiers (`free` / `premium` / `enterprise`, set via `AXEL_TIER`) so the entrypoint can pick the right one without a separate mapping layer.
+
+Current shape (model-only differentiation; concurrency / wall-clock caps live in Phase 5/6):
+
+| `AXEL_TIER`  | Default model      | Capabilities (per `SOUL.md` / `AGENTS.md`)                            |
+| ------------ | ------------------ | --------------------------------------------------------------------- |
+| `free`       | `anthropic/haiku`  | No code execution, no sub-agents, web tools only                      |
+| `premium`    | `anthropic/sonnet` | Sub-agents, browser/canvas/nodes automation, no direct code execution |
+| `enterprise` | `anthropic/sonnet` | Full capabilities — code execution, sub-agents, all tools             |
+
+The legacy `TIER` env var (`starter` / `pro` / `business` / `developer`) is no longer accepted; the docker entrypoint will refuse to boot if it sees an unknown tier value. Phase 5 ECS task overrides supply `AXEL_TIER` directly from the user's subscription.
 
 ## What this image does NOT do
 

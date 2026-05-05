@@ -11,21 +11,24 @@ services:
     ports:
       - "18789:18789"
     environment:
-      AXEL_TIER: ${AXEL_TIER:-starter}
+      AXEL_TIER: ${AXEL_TIER:-free}
       AXEL_USER_ID: ${AXEL_USER_ID:-local-user}
       AXEL_SESSION_ID: ${AXEL_SESSION_ID:-local-session}
       AXEL_SESSION_NAME: ${AXEL_SESSION_NAME:-local}
-      OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN:-dev-token-change-me}
+      # No default. Compose defaults like `dev-token-change-me` have a habit
+      # of shipping to prod. Set this in your shell (`export
+      # OPENCLAW_GATEWAY_TOKEN=$(uuidgen)`) before running. The entrypoint
+      # validates that it is set; phase 5 ECS task overrides supply it from
+      # secrets.
+      OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN:-}
     volumes:
       # Named volume so workspace state survives `docker compose down`.
       # Use `docker compose down -v` to wipe.
       - openclaw-workspace:/data/workspace
-    healthcheck:
-      test: ["CMD-SHELL", "(echo > /dev/tcp/127.0.0.1/18789) >/dev/null 2>&1"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 20s
+    # Healthcheck is defined in the Dockerfile (start_period=90s, bash-wrapped
+    # so /dev/tcp works). Do NOT override here without keeping the `bash -c`
+    # wrapper — `/bin/sh` in Debian slim is `dash`, which doesn't support
+    # bash's /dev/tcp builtin and will make every probe exit 2.
 
 volumes:
   openclaw-workspace:

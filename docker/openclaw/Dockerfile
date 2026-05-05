@@ -35,7 +35,9 @@ WORKDIR /data/workspace
 EXPOSE 18789
 
 # TCP probe via bash builtin /dev/tcp — no extra deps.
-HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+# start-period accommodates first-boot plugin install (~5–10s) plus gateway
+# startup (~8s). 20s was too tight in the #98 spike; 90s gives generous headroom.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=90s --retries=3 \
   CMD bash -c '(echo > /dev/tcp/127.0.0.1/18789) >/dev/null 2>&1' || exit 1
 
 ENTRYPOINT ["tini", "--", "docker-entrypoint.sh"]
