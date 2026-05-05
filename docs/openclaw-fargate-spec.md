@@ -4,6 +4,16 @@ Per-user, dockerised OpenClaw runtime on AWS ECS/Fargate, deployed by a GitHub A
 
 ---
 
+## Note (added 2026-05-04 post-#98 spike)
+
+A spike against `openclaw@v2026.4.26` (carried out as part of PR #98 — typed gateway client) confirmed that the OpenClaw runtime does **not** expose our gateway-contract REST endpoints (`/api/chat`, `/api/health`, `/api/reload`, `/api/usage`) directly. Chat is WebSocket-based; the HTTP surface is `/healthz` plus the Control-UI SPA at `/`.
+
+This generalises §7.1's existing call-out that "HTTP `/health` exposure is unverified upstream" to the whole gateway contract — closing the chat loop therefore requires a REST→WS sidecar in `docker/openclaw/` that translates our REST contract to OpenClaw's WS protocol. Tracked as the post-#98 next-big-PR (`feat/openclaw-sidecar-shim`).
+
+The rest of this spec (Phases 2–6) is unaffected and remains the canonical infra plan.
+
+---
+
 ## 1. Goals & Non-Goals
 
 ### Goals
@@ -64,7 +74,7 @@ Each phase is **a single PR (or two at most)**, branchable in isolation, mergeab
 - `apps/openclaw/sst.config.ts` (SST app name `openclaw`, region `eu-west-2`, default VPC).
 - `apps/openclaw/infra/{ecr,efs,cluster,alb,iam,taskDefinition}.ts`. No `dns.ts` and no `reaper.ts` yet.
 - Task definitions registered for all three tiers (Free / Premium / Enterprise) with placeholder image (`ECR_REPO_URI:bootstrap`).
-- SSM parameters under `/axel/<stage>/openclaw/`* written by the SST app at deploy time (cluster ARN, task definition ARNs, subnet IDs, security group ID, EFS file system ID, ALB listener ARN).
+- SSM parameters under `/axel/<stage>/openclaw/`\* written by the SST app at deploy time (cluster ARN, task definition ARNs, subnet IDs, security group ID, EFS file system ID, ALB listener ARN).
 - Push a single `bootstrap` image to ECR by hand to validate the pipeline.
 
 **Exit criteria:**
@@ -182,14 +192,12 @@ Each phase is **a single PR (or two at most)**, branchable in isolation, mergeab
 
 **Trigger model is hybrid (locked decision):**
 
-
 | Concern                                                                         | Owner                                                   |
 | ------------------------------------------------------------------------------- | ------------------------------------------------------- |
 | Build image, push to ECR, deploy SST stack (cluster, ALB, EFS, task definition) | GitHub Actions workflow, dispatched via GitHub REST API |
 | Per-user session start: RunTask, register ALB target, create Route53 record     | Elysia core API, AWS SDK                                |
 | Per-user session stop: StopTask, deregister target, delete Route53 record       | Elysia core API, AWS SDK                                |
 | Hard backstop: kill tasks > 8h wall-clock                                       | Scheduled EventBridge → Lambda (in this SST app)        |
-
 
 ---
 
@@ -287,7 +295,6 @@ The default VPC in the target account/region is used directly — no networking 
 
 ### 4.2 Resources
 
-
 | Resource              | Notes                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **VPC**               | **None provisioned.** Use the AWS default VPC in `eu-west-2`. Tasks launch into the default public subnets with public IPs assigned, locked down by a security group (ingress only from the ALB SG). Saves ~$65/month NAT idle cost — see §14.                                                                                                                                                                                                 |
@@ -303,13 +310,11 @@ The default VPC in the target account/region is used directly — no networking 
 | **Reaper Lambda**     | Scheduled every 15 min by EventBridge. Lists running tasks in the cluster tagged `App=openclaw`; calls `StopTask` on any whose `startedAt` exceeds its tier's wall-clock cap (§7.5). Cost backstop, see §10.                                                                                                                                                                                                                                   |
 | **CloudWatch alarms** | (a) Tasks running > 6h; (b) Active tasks count > 90 (ALB rule cap warning, see §11); (c) Reaper Lambda errors.                                                                                                                                                                                                                                                                                                                                 |
 
-
 ### 4.3 Cross-stack contract (no SST output coupling)
 
 The core API needs to know, at runtime: cluster ARN, task definition ARN, subnets, security group, EFS file system ID, ALB listener ARN, hosted zone ID, and the API caller role ARN.
 
 **Contract:** the deploy workflow writes these values to **AWS SSM Parameter Store** under `/axel/<stage>/openclaw/...` after a successful `sst deploy`. The core API reads them at boot. This avoids importing SST stack outputs across apps (per the refactor roadmap, Phase G).
-
 
 | SSM key                                       | Source                                               |
 | --------------------------------------------- | ---------------------------------------------------- |
@@ -321,7 +326,6 @@ The core API needs to know, at runtime: cluster ARN, task definition ARN, subnet
 | `/axel/<stage>/openclaw/alb-listener-arn`     | `alb.listener.arn`                                   |
 | `/axel/<stage>/openclaw/hosted-zone-id`       | `dns.zoneId`                                         |
 | `/axel/<stage>/openclaw/api-caller-role-arn`  | `iam.apiCallerRole.arn`                              |
-
 
 The API caller role is assumed by the core API Lambda via STS — the core API's existing execution role only needs `sts:AssumeRole` on this single ARN, no IAM blast radius.
 
@@ -381,14 +385,12 @@ CMD ["openclaw", "gateway", "run"]
 
 The container reads the following environment variables (set by ECS task overrides per session):
 
-
 | Env                       | Purpose                                                                             |
 | ------------------------- | ----------------------------------------------------------------------------------- |
 | `AXEL_USER_ID`            | Stable user ID — used for log correlation and (optionally) workspace seeding.       |
 | `AXEL_SESSION_ID`         | Unique per RunTask call. Used for the subdomain / target group naming.              |
 | `AXEL_TIER`               | Subscription tier (`free`, `premium`, `enterprise`). Drives `openclaw.json` config. |
 | `OPENCLAW_WORKSPACE_PATH` | Mount path for the user's EFS access point. Defaults to `/data/workspace`.          |
-
 
 The entrypoint:
 
@@ -406,13 +408,11 @@ The entrypoint:
 
 **Inputs:**
 
-
 | Input              | Required | Description                                                                                         |
 | ------------------ | -------- | --------------------------------------------------------------------------------------------------- |
 | `stage`            | yes      | `preprod` or `production`.                                                                          |
 | `openclaw_version` | no       | Override `versions.json` (e.g. for hotfix testing). Must match an existing OpenClaw GitHub release. |
 | `dry_run`          | no       | If `true`, runs `sst diff` only, skips deploy and image push.                                       |
-
 
 **Pipeline:**
 
@@ -433,13 +433,15 @@ The entrypoint:
 Two supported callers:
 
 1. **Internal admin tooling.** A fine-grained GitHub PAT scoped to `actions:write` on this repo. Example:
-  ```bash
-   gh api -X POST \
-     /repos/Evans-Software-Solutions-Limited/axel-saas/actions/workflows/openclaw-deploy.yml/dispatches \
-     -f ref=main \
-     -f 'inputs[stage]=preprod' \
-     -f 'inputs[openclaw_version]=v1.4.2'
-  ```
+
+```bash
+ gh api -X POST \
+   /repos/Evans-Software-Solutions-Limited/axel-saas/actions/workflows/openclaw-deploy.yml/dispatches \
+   -f ref=main \
+   -f 'inputs[stage]=preprod' \
+   -f 'inputs[openclaw_version]=v1.4.2'
+```
+
 2. **Backend admin endpoint** (optional, future): `POST /admin/openclaw/deploy` on the core API. Uses a GitHub App installation token (preferred over PAT) to call `POST /repos/{owner}/{repo}/actions/workflows/{id}/dispatches`. Gated by `requireAuth` + an admin role check.
 
 **Important:** this workflow is for **infra and image deploys**, not for per-user session start. Per-user RunTask is too latency-sensitive (target < 5s) to go through GitHub Actions (typical workflow cold start: 30–90s).
@@ -462,17 +464,15 @@ The `name` is supplied by the caller and becomes the subdomain (`<name>.openclaw
 
 **Validation rules for `name`:**
 
-
 | Rule                           | Value                                                                                                                                                                                             |
 | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Charset                        | `[a-z0-9-]` only                                                                                                                                                                                  |
 | Length                         | 3–63 characters (DNS subdomain limit)                                                                                                                                                             |
 | Edges                          | No leading or trailing `-`                                                                                                                                                                        |
 | Uniqueness                     | Globally unique within the stage (one user can't take a name another already holds)                                                                                                               |
-| Reserved blocklist             | `admin`, `api`, `auth`, `www`, `app`, `mail`, `health`, plus anything matching `axel-`*                                                                                                           |
+| Reserved blocklist             | `admin`, `api`, `auth`, `www`, `app`, `mail`, `health`, plus anything matching `axel-`\*                                                                                                          |
 | Idempotency                    | If the same authenticated user re-submits a `name` they already own and a session is **running**, return that session (200, not 409). If the session is **stopped**, restart it on the same name. |
 | Conflicts (other user owns it) | `409 Conflict`                                                                                                                                                                                    |
-
 
 **Behaviour:**
 
@@ -485,15 +485,16 @@ The `name` is supplied by the caller and becomes the subdomain (`<name>.openclaw
 7. `ecs:RunTask` with overrides: `AXEL_USER_ID`, `AXEL_SESSION_ID`, `AXEL_SESSION_NAME`, `AXEL_TIER`, EFS volume access point ID. CPU/memory per tier (§7.5). Network config: private subnets, task SG, no public IP.
 8. Poll `DescribeTasks` until ENI is attached, register the private IP with the target group.
 9. Return:
-  ```json
-   {
-     "sessionId": "...",
-     "name": "my-workspace",
-     "url": "https://my-workspace.openclaw.meetaxel.ai",
-     "taskArn": "arn:aws:ecs:...",
-     "expiresAt": "<startedAt + tier wall-clock cap>"
-   }
-  ```
+
+```json
+{
+  "sessionId": "...",
+  "name": "my-workspace",
+  "url": "https://my-workspace.openclaw.meetaxel.ai",
+  "taskArn": "arn:aws:ecs:...",
+  "expiresAt": "<startedAt + tier wall-clock cap>"
+}
+```
 
 ### 7.2 `DELETE /openclaw/sessions/:sessionId`
 
@@ -503,7 +504,6 @@ The `name` is supplied by the caller and becomes the subdomain (`<name>.openclaw
 4. Persist `stoppedAt` in DB. Return `204`.
 
 ### 7.3 Persistence (new DB table)
-
 
 | Column                | Type                                                     | Notes                  |
 | --------------------- | -------------------------------------------------------- | ---------------------- |
@@ -518,7 +518,6 @@ The `name` is supplied by the caller and becomes the subdomain (`<name>.openclaw
 | `stopped_at`          | timestamp, nullable                                      |                        |
 | `stopped_reason`      | enum: `user`, `reaper`, `error`, `tier_change`, nullable |                        |
 
-
 Add a unique index on `name` (case-insensitive). Migration goes through `packages/db` per existing rules.
 
 ### 7.4 Auth model
@@ -530,13 +529,11 @@ Add a unique index on `name` (case-insensitive). Migration goes through `package
 
 Centralised in a single config module `microservices/core/src/application/openclaw/tierPolicy.ts`. Defaults:
 
-
 | Tier       | Max concurrent sessions per user                 | vCPU      | Memory | Wall-clock hard cap |
 | ---------- | ------------------------------------------------ | --------- | ------ | ------------------- |
 | Free       | 1                                                | 0.5 (512) | 1 GB   | 1 h                 |
 | Premium    | 2                                                | 1 (1024)  | 2 GB   | 8 h                 |
 | Enterprise | 10 (or per-contract override on the user record) | 2 (2048)  | 4 GB   | 24 h                |
-
 
 These values are read from the policy module — not hardcoded in the SST app. The task definition in §4.2 is registered as a **family** with one revision per tier (or a single revision and CPU/memory passed via task override; whichever Fargate supports cleanly — Fargate accepts CPU/memory overrides only between supported (vCPU, memory) pairs, so we'll register one revision per tier to keep this safe).
 
@@ -546,10 +543,10 @@ The reaper (§10) reads the same tier policy and kills tasks that exceed their t
 
 There are two tier vocabularies in the codebase and they don't match:
 
-| Vocabulary | Where it lives | Values |
-| --- | --- | --- |
-| Commercial / SaaS | `specs/README.md` ("Tier Model") | `Free`, `Premium`, `Enterprise` |
-| OpenClaw runtime | `docker/openclaw/workspace-templates/openclaw-{starter,pro,business,developer}.json` | `starter`, `pro`, `business`, `developer` |
+| Vocabulary        | Where it lives                                                                       | Values                                    |
+| ----------------- | ------------------------------------------------------------------------------------ | ----------------------------------------- |
+| Commercial / SaaS | `specs/README.md` ("Tier Model")                                                     | `Free`, `Premium`, `Enterprise`           |
+| OpenClaw runtime  | `docker/openclaw/workspace-templates/openclaw-{starter,pro,business,developer}.json` | `starter`, `pro`, `business`, `developer` |
 
 The Phase 5 API must own a single mapping function (`commercial → openclaw`) and pass the OpenClaw value to the container via `AXEL_TIER`. Until that mapping is locked, this spec uses the **commercial** vocabulary in this section (Free/Premium/Enterprise) and the **OpenClaw** vocabulary in `docker/openclaw/` (starter/pro/business/developer). Phase 5 PR is responsible for resolving this — not Phase 1 or Phase 2.
 
@@ -563,9 +560,11 @@ Suggested default mapping (subject to product confirmation): `Free → starter`,
 
 1. PR edits `docker/openclaw/versions.json` and adds a row to a `CHANGELOG` entry referencing the OpenClaw release notes.
 2. CI (PR check) verifies:
-  - The version is a valid semver-style tag.
-  - `gh release view <tag>` against the OpenClaw repo succeeds (the tag exists).
-  - Image builds locally with the new arg.
+
+- The version is a valid semver-style tag.
+- `gh release view <tag>` against the OpenClaw repo succeeds (the tag exists).
+- Image builds locally with the new arg.
+
 3. Merge to `main`.
 4. Operator dispatches `openclaw-deploy.yml` with `stage=preprod`. Smoke test.
 5. Dispatch with `stage=production`.
@@ -582,13 +581,11 @@ If the version is only an input, the source of truth becomes "whatever the last 
 
 Aligned with the existing convention in `infra/domains/index.ts` (production owns `meetaxel.ai`, preprod owns `staging.meetaxel.ai`).
 
-
 | Stage                   | OpenClaw zone (parent) | Wildcard                          | Example session URL                                  |
 | ----------------------- | ---------------------- | --------------------------------- | ---------------------------------------------------- |
 | `production`            | `meetaxel.ai`          | `*.openclaw.meetaxel.ai`          | `my-workspace.openclaw.meetaxel.ai`                  |
 | `preprod`               | `staging.meetaxel.ai`  | `*.openclaw.staging.meetaxel.ai`  | `my-workspace.openclaw.staging.meetaxel.ai`          |
 | `dev` / personal stages | none                   | none — ALB DNS name used directly | `<alb-dns>/?host=<name>` (no TLS, internal use only) |
-
 
 ### 9.2 Network topology
 
@@ -612,9 +609,11 @@ Aligned with the existing convention in `infra/domains/index.ts` (production own
 1. **Hard wall-clock backstop.** Reaper Lambda kills any task whose `startedAt` is older than its **tier's wall-clock cap** (§7.5). Ships in this SST app, not optional.
 2. **Per-user concurrency cap.** Tier-driven (§7.5). Enforced server-side in the API.
 3. **CloudWatch alarms.**
-  - Active tasks > 90 → page on-call (ALB rule cap is ~100 per listener, see §11).
-  - Tasks running > 6h → warn on-call (precursor to reaper kill).
-  - Reaper Lambda errors → page.
+
+- Active tasks > 90 → page on-call (ALB rule cap is ~100 per listener, see §11).
+- Tasks running > 6h → warn on-call (precursor to reaper kill).
+- Reaper Lambda errors → page.
+
 4. **Stop on subscription cancel.** Existing Stripe webhook handler triggers `DELETE /openclaw/sessions/:id` for all active sessions belonging to the cancelled user.
 5. **Daily cost report** via existing Cost Explorer setup (out of scope here but called out as a follow-up).
 
@@ -622,14 +621,12 @@ Aligned with the existing convention in `infra/domains/index.ts` (production own
 
 ## 11. Known Limits & Future Work
 
-
 | Limit                     | Today                              | Mitigation path                                                                                                                                               |
 | ------------------------- | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | ALB listener rules per LB | ~100 host-based rules              | Sharded ALBs (rule count < 100 each) keyed by `hash(sessionId) % N`, or a custom routing proxy in front of internal Cloud Map. Revisit at 80 active sessions. |
 | EFS standard throughput   | Burst on small workloads           | Provisioned throughput per stage if needed.                                                                                                                   |
 | ECS RunTask cold start    | 30–90s for Fargate cold image pull | Smaller image; warm pool of pre-warmed tasks (post-MVP).                                                                                                      |
 | Workflow dispatch latency | 30–90s                             | Acceptable for infra deploys only. **Not** used per-session.                                                                                                  |
-
 
 ---
 
@@ -642,7 +639,7 @@ Aligned with the existing convention in `infra/domains/index.ts` (production own
 - `DELETE /openclaw/sessions/:id` stops the task, deregisters the target, removes the listener rule, and the subdomain returns 404 within 30s.
 - Reaper Lambda kills a task whose `startedAt` is > 8h.
 - CloudWatch alarms exist for: active tasks > 90, tasks > 6h, reaper errors.
-- SSM parameters under `/axel/<stage>/openclaw/`* are populated after deploy.
+- SSM parameters under `/axel/<stage>/openclaw/`\* are populated after deploy.
 - Tier gating: free-tier user is blocked from `POST /openclaw/sessions` (or capped per tier policy).
 - Stripe cancellation webhook tears down active sessions for the cancelled user.
 - Coverage on new code in `microservices/core` ≥ 90% (per repo rule).
@@ -651,7 +648,6 @@ Aligned with the existing convention in `infra/domains/index.ts` (production own
 ---
 
 ## 13. Locked Decisions
-
 
 | #   | Topic                                              | Decision                                                                                                                                                         |
 | --- | -------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -665,7 +661,6 @@ Aligned with the existing convention in `infra/domains/index.ts` (production own
 | 8   | Idempotency on session start                       | Re-submitting the same `name` for the same owner returns the running session (200) or restarts it on the same name; cross-user collision returns 409.            |
 | 9   | Domain layout per stage                            | Production: `*.openclaw.meetaxel.ai`. Preprod: `*.openclaw.staging.meetaxel.ai`. Dev: ALB DNS direct. (Aligns with `infra/domains/index.ts`.)                    |
 
-
 No blockers remain for scaffolding the SST app, the Dockerfile, the workflow, and the new core API endpoints.
 
 ---
@@ -677,7 +672,6 @@ All figures are eu-west-2 on-demand list prices, rounded for clarity. **Treat as
 ### 14.1 Fixed monthly cost ("idle bill" — what you pay before any user starts a session)
 
 The §13 decision to use the default VPC removes the largest fixed cost. With the spec as locked:
-
 
 | Item                                         | Quantity               | ~Monthly cost  |
 | -------------------------------------------- | ---------------------- | -------------- |
@@ -693,20 +687,17 @@ The §13 decision to use the default VPC removes the largest fixed cost. With th
 | **Subtotal idle, one stage**                 |                        | **~$23/month** |
 | × 2 stages (preprod + production)            |                        | **~$46/month** |
 
-
 **Compare to the dedicated-VPC option** that we rejected: a 2-AZ NAT gateway adds ~$65/month/stage in NAT idle plus per-GB data processing — roughly **+$130/month for the two stages combined**, before any user traffic. Skipping it is the single biggest cost win in the spec.
 
 ### 14.2 Variable cost per session (Fargate per second)
 
 eu-west-2 Fargate Linux/x86 on-demand: ~$0.04048 per vCPU-hour + ~$0.004445 per GB-hour.
 
-
 | Tier       | Config          | Per-hour | Cost at tier wall-clock cap (worst case) |
 | ---------- | --------------- | -------- | ---------------------------------------- |
 | Free       | 0.5 vCPU / 1 GB | $0.0247  | $0.025 (1h cap)                          |
 | Premium    | 1 vCPU / 2 GB   | $0.0494  | $0.395 (8h cap)                          |
 | Enterprise | 2 vCPU / 4 GB   | $0.0987  | $2.37 (24h cap)                          |
-
 
 ### 14.3 Illustrative monthly variable cost
 
@@ -722,13 +713,11 @@ These are model-the-business numbers, not commitments. Adjust the assumptions an
 
 ### 14.4 Total run-rate at the illustrative load
 
-
 |                                         | Preprod  | Production | Total           |
 | --------------------------------------- | -------- | ---------- | --------------- |
 | Idle                                    | ~$23     | ~$23       | ~$46            |
 | Variable (assume preprod is 5% of prod) | ~$7      | ~$144      | ~$151           |
 | **Total**                               | **~$30** | **~$167**  | **~$197/month** |
-
 
 Per Premium user (£49/mo) at ~$2 of Fargate cost per month, gross margin on infrastructure alone is ~95%. Healthy.
 
@@ -748,7 +737,7 @@ Estimated saving at the §14.3 load: **40–70% of variable cost**, i.e. ~$60–
 
 #### 3. CloudWatch Logs retention = 7 days
 
-`/aws/ecs/openclaw/`* log groups should default to 7-day retention, not infinite. Without this, OpenClaw's per-session debug output accumulates forever at $0.03/GB/month and grows unbounded.
+`/aws/ecs/openclaw/`\* log groups should default to 7-day retention, not infinite. Without this, OpenClaw's per-session debug output accumulates forever at $0.03/GB/month and grows unbounded.
 
 Saving: ~$1–10/month at our scale; large at scale.
 
@@ -758,7 +747,7 @@ Free tier sessions are short (1h cap), low-revenue, and tolerable to terminate o
 
 Saving: ~$2–5/month today, but it's also a moat: at 1000 free users it's the difference between viable and not.
 
-Caveat: Spot is *not* appropriate for paid tiers (Premium, Enterprise) — random kills wreck UX.
+Caveat: Spot is _not_ appropriate for paid tiers (Premium, Enterprise) — random kills wreck UX.
 
 #### 5. EFS lifecycle to Infrequent Access (IA) after 30 days
 
@@ -791,6 +780,5 @@ Currently one ALB per stage (~$16/month each). Could share one ALB across prepro
 - Default VPC + no NAT is the locked, optimal choice for v0 and saves ~$130/month vs the dedicated-VPC alternative.
 - Idle bill is **~$46/month across both stages**.
 - Variable bill scales linearly with active sessions; per-user infra margin is ~95% of subscription revenue.
-- The single biggest *future* cost lever is **idle-traffic auto-stop**, currently rejected by spec. Revisit when telemetry justifies.
+- The single biggest _future_ cost lever is **idle-traffic auto-stop**, currently rejected by spec. Revisit when telemetry justifies.
 - Don't buy Savings Plans, don't add VPC endpoints, until there are 3+ months of stable load to model against.
-
