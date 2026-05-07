@@ -72,7 +72,9 @@ export function makeHealthRouteHandler(
         status: isLive ? "healthy" : "unhealthy",
         agentReady: isLive,
         uptime: Math.floor((Date.now() - startedAtMs) / 1000),
-        ...(isLive ? {} : { reason: `unexpected /healthz body: ${JSON.stringify(body)}` }),
+        ...(isLive
+          ? {}
+          : { reason: `unexpected /healthz body: ${JSON.stringify(body)}` }),
       });
     } catch (err: unknown) {
       const aborted = err instanceof Error && err.name === "AbortError";

@@ -13,8 +13,8 @@
       },
       "defaultModel": {
         "type": "string",
-        "description": "Model id passed to /v1/chat/completions when the request body omits one. Falls back to the gateway's configured agent default if absent on both sides.",
-        "default": "anthropic/haiku"
+        "description": "Routing key passed as `model` to OpenClaw's /v1/chat/completions endpoint. Must be either `openclaw` (route to the workspace's default agent) or `openclaw/<agentId>` (route to a specific named agent). The agent's actual model — anthropic/haiku, anthropic/sonnet, … — is configured in `agents.defaults.model.primary` in the workspace template; the API caller does not override it via this field.",
+        "default": "openclaw"
       }
     }
   }

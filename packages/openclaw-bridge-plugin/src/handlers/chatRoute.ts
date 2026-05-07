@@ -60,8 +60,7 @@ export function makeChatRouteHandler(
   deps: ChatRouteDeps = {},
 ) {
   const callImpl = deps.callChatCompletions ?? callChatCompletions;
-  const idGen =
-    deps.idGenerator ?? (() => globalThis.crypto.randomUUID());
+  const idGen = deps.idGenerator ?? (() => globalThis.crypto.randomUUID());
   const fetcher = deps.fetcher;
 
   return async function chatRouteHandler(

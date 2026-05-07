@@ -69,12 +69,12 @@ describe("parseBridgeChatRequest", () => {
   });
 
   it("rejects empty or non-string userId", () => {
-    expect(
-      parseBridgeChatRequest({ message: "hi", userId: "" }),
-    ).toMatchObject({
-      ok: false,
-      error: "userId must be a non-empty string",
-    });
+    expect(parseBridgeChatRequest({ message: "hi", userId: "" })).toMatchObject(
+      {
+        ok: false,
+        error: "userId must be a non-empty string",
+      },
+    );
     expect(
       parseBridgeChatRequest({ message: "hi", userId: null }),
     ).toMatchObject({

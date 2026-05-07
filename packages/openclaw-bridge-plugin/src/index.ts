@@ -38,7 +38,13 @@ import { makeReloadRouteHandler } from "./handlers/reloadRoute";
 import { makeUsageRouteHandler } from "./handlers/usageRoute";
 
 const DEFAULT_CHAT_COMPLETIONS_BASE_URL = "http://127.0.0.1:18789";
-const DEFAULT_MODEL = "anthropic/haiku";
+// OpenClaw's `/v1/chat/completions` endpoint only accepts the routing
+// keys `openclaw` and `openclaw/<agentId>`. The agent's actual model
+// (anthropic/haiku, anthropic/sonnet, …) is configured on the agent
+// side via `agents.defaults.model.primary` in the workspace template
+// — the API caller doesn't get to override it. Using `openclaw` as
+// the default routes to whatever the active workspace agent has.
+const DEFAULT_MODEL = "openclaw";
 
 interface PluginConfig {
   chatCompletionsBaseUrl?: string;
@@ -59,8 +65,7 @@ export default definePluginEntry({
   register(api) {
     const pluginConfig = (api.pluginConfig ?? {}) as PluginConfig;
     const chatCompletionsBaseUrl =
-      pluginConfig.chatCompletionsBaseUrl ??
-      DEFAULT_CHAT_COMPLETIONS_BASE_URL;
+      pluginConfig.chatCompletionsBaseUrl ?? DEFAULT_CHAT_COMPLETIONS_BASE_URL;
     const defaultModel = pluginConfig.defaultModel ?? DEFAULT_MODEL;
 
     api.registerHttpRoute({

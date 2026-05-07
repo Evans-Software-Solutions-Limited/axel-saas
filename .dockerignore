@@ -1,0 +1,60 @@
+# Keep `docker/openclaw/` Docker-build uploads small. The Dockerfile's
+# build context is the repo root (so it can COPY both `docker/openclaw/`
+# and `packages/openclaw-bridge-plugin/`), but most of the repo isn't
+# relevant to the image — exclude aggressively.
+
+# Dependencies
+**/node_modules
+**/bun.lock
+**/package-lock.json
+**/pnpm-lock.yaml
+**/yarn.lock
+
+# SST + Pulumi state
+.sst
+**/.sst
+
+# Build outputs (we only want packages/openclaw-bridge-plugin/dist/ —
+# everything else is irrelevant to the OpenClaw container)
+**/.turbo
+**/.next
+**/.open-next
+**/coverage
+microservices/**/dist
+packages/web/dist
+packages/api-utils/dist
+packages/db/dist
+packages/ui/dist
+packages/eslint-config/dist
+packages/typescript-config/dist
+
+# Git
+.git
+.gitignore
+
+# Editor / OS
+.DS_Store
+.vscode
+.idea
+.cursor
+.claude
+.zed
+
+# Tests + tooling that doesn't belong in the image
+**/__tests__
+**/*.test.ts
+**/*.test.tsx
+**/*.spec.ts
+**/vitest.config.ts
+**/eslint.config.js
+**/.eslintrc*
+
+# Env files (never bake secrets into the image)
+**/.env
+**/.env.*
+!**/.env.example
+
+# Temporary / scratch
+.#*
+docs/handoff
+.claude/worktrees

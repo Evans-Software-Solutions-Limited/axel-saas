@@ -25,13 +25,30 @@ export OPENCLAW_GATEWAY_TOKEN=$(uuidgen)
 # Optional — defaults to `free`. One of: free, premium, enterprise.
 export AXEL_TIER=free
 
+# Build the in-process bridge plugin first — the Dockerfile copies its
+# `dist/` into the image. Skip this and `docker compose build` will
+# error because `packages/openclaw-bridge-plugin/dist/` doesn't exist.
+bun run --filter @axel-saas/openclaw-bridge-plugin build
+
 docker compose -f docker/openclaw/docker-compose.yml up --build
 ```
 
-OpenClaw's gateway listens on `http://localhost:18789`. To verify:
+OpenClaw's gateway listens on `http://localhost:18789`. The Axel-side
+gateway-contract REST surface (served by the bridge plugin) lives on
+the same port:
 
 ```bash
-nc -z localhost 18789 && echo "gateway up"
+# OpenClaw's own liveness probe (always-on, unauthenticated)
+curl http://localhost:18789/healthz
+
+# Axel-side gateway-contract endpoints (require the gateway token)
+curl -H "Authorization: Bearer $OPENCLAW_GATEWAY_TOKEN" \
+  http://localhost:18789/api/health
+
+curl -H "Authorization: Bearer $OPENCLAW_GATEWAY_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"message":"hello","userId":"local-test"}' \
+  http://localhost:18789/api/chat
 ```
 
 To wipe the workspace volume and start fresh:
@@ -42,13 +59,15 @@ docker compose -f docker/openclaw/docker-compose.yml down -v
 
 ## Files
 
-| File                   | Purpose                                                                                                                                                 |
-| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Dockerfile`           | Pinned-version image build. Requires `OPENCLAW_VERSION` build arg.                                                                                      |
-| `versions.json`        | Single source of truth for the pinned OpenClaw release tag.                                                                                             |
-| `docker-compose.yml`   | Local-only — reads `versions.json` default, named volume, TCP healthcheck.                                                                              |
-| `docker-entrypoint.sh` | Seeds workspace from templates on first boot, applies tier rules, validates `OPENCLAW_GATEWAY_TOKEN`.                                                   |
-| `workspace-templates/` | Per-tier `openclaw.json` configs (`openclaw-free.json`, `openclaw-premium.json`, `openclaw-enterprise.json`) and seed markdown files (`SOUL.md`, etc.). |
+| File                   | Purpose                                                                                                                                                                                                          |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Dockerfile`           | Pinned-version image build. Requires `OPENCLAW_VERSION` build arg.                                                                                                                                               |
+| `versions.json`        | Single source of truth for the pinned OpenClaw release tag.                                                                                                                                                      |
+| `docker-compose.yml`   | Local-only — reads `versions.json` default, named volume, TCP healthcheck. Build context is the repo root so the Dockerfile can COPY the bridge plugin.                                                          |
+| `docker-entrypoint.sh` | Seeds workspace from templates on first boot, applies tier rules, validates `OPENCLAW_GATEWAY_TOKEN`.                                                                                                            |
+| `workspace-templates/` | Per-tier `openclaw.json` configs (`openclaw-free.json`, `openclaw-premium.json`, `openclaw-enterprise.json`) — enable `chatCompletions` + the `axel-bridge` plugin — plus seed markdown files (`SOUL.md`, etc.). |
+
+The Axel-side REST endpoints (`/api/chat`, `/api/health`, `/api/reload`, `/api/usage`) are not implemented in this directory — they live in the **`@axel-saas/openclaw-bridge-plugin`** package (`packages/openclaw-bridge-plugin/`), which the Dockerfile installs into the image at build time via `openclaw plugins install --link`. The plugin runs in-process inside the OpenClaw gateway and handles the translation between Axel's gateway-contract shape and OpenClaw's first-party `/v1/chat/completions` endpoint. See that package's README for the architecture rationale.
 
 ## Bumping the pinned version
 
