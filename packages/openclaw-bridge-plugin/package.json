@@ -1,0 +1,36 @@
+{
+  "name": "@axel-saas/openclaw-bridge-plugin",
+  "version": "0.0.0",
+  "description": "OpenClaw plugin that exposes Axel's gateway-contract REST surface (POST /api/chat, GET /api/health, POST /api/reload, GET /api/usage). Translates between the gateway-contract shape (specs/gateway-contract/design.md) and OpenClaw's first-party /v1/chat/completions endpoint. Loaded into the per-user OpenClaw container via `openclaw plugins install --link` at image build time.",
+  "type": "module",
+  "main": "./src/index.ts",
+  "openclaw": {
+    "extensions": ["./src/index.ts"],
+    "compat": {
+      "pluginApi": ">=2026.4.26",
+      "minGatewayVersion": "2026.4.26"
+    },
+    "build": {
+      "openclawVersion": "2026.4.26",
+      "pluginSdkVersion": "2026.4.26"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "test": "vitest",
+    "test:unit": "vitest run --coverage"
+  },
+  "peerDependencies": {
+    "openclaw": "2026.4.26"
+  },
+  "devDependencies": {
+    "@axel-saas/eslint-config": "workspace:*",
+    "@axel-saas/typescript-config": "workspace:*",
+    "@types/node": "^22",
+    "@vitest/coverage-v8": "^4.0.18",
+    "eslint": "^9.39.1",
+    "openclaw": "2026.4.26",
+    "vitest": "^4.0.18"
+  }
+}
