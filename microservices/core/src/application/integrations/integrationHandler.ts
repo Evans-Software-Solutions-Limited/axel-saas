@@ -58,18 +58,21 @@ const oauthService = new OauthService({
 const rateLimitService = new RateLimitService();
 
 /**
- * Workspace sync — fire-and-forget at the call site so a slow EFS
- * write or stalled reload signal can't make the user's
- * "Connect" / "Revoke" click feel broken. The handler returns its
- * normal success body to the user; reload-side issues are visible in
- * `[workspace-sync]` logs.
+ * Workspace sync. We DO await this — but that's fast now:
+ * `WorkspaceConfigService.updateFiles` blocks only for the file
+ * write (~tens of ms typical) and dispatches the reload signal
+ * detached. The reload's up-to-10s HTTP timeout therefore can't
+ * pin latency on the user's `Connect` / `Revoke` HTTP response.
  *
- * `WorkspaceConfigService.updateFiles` already swallows reload
- * failures internally and only throws on EFS write errors. We catch
- * those here too rather than failing the whole HTTP response — the
- * integration *did* land in DB + secrets, and the workspace will
- * pick up changes on the container's next heartbeat as the spec
- * fallback documents.
+ * Two failure modes worth keeping straight:
+ *   - **File write failure** — propagated as a thrown error here.
+ *     We catch + log so the integration mutation (already
+ *     persisted to DB + Secrets Manager) still reports success;
+ *     the workspace will pick up the change on the container's
+ *     next heartbeat per the spec's fallback.
+ *   - **Reload failure / timeout** — already logged and swallowed
+ *     inside the service's detached promise. Nothing surfaces
+ *     here.
  */
 async function safelySyncWorkspace(
   userId: string,

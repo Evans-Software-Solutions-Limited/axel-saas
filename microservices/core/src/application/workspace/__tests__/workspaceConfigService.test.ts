@@ -93,6 +93,9 @@ describe("WorkspaceConfigService.updateFiles", () => {
       ],
       "integration_changed",
     );
+    // Reload is detached (per the fire-and-forget contract); drain
+    // before assertions over reload behaviour.
+    await svc.drainPendingReloads();
 
     expect(fs.mkdir).toHaveBeenCalledWith("/efs/u-1/workspace", {
       recursive: true,
@@ -115,6 +118,40 @@ describe("WorkspaceConfigService.updateFiles", () => {
     expect(reloadArgs.reason).toBe("integration_changed");
     expect(reloadArgs.files).toEqual(["TOOLS.md", "openclaw.json"]);
     expect(reloadArgs.authorization).toBe("Bearer test-token");
+  });
+
+  it("does NOT block on the reload signal — file write returns even if reload is hung", async () => {
+    // Pin reload at "in flight forever" via a never-resolving promise.
+    // If the implementation awaited the reload, this test would hang
+    // (and fail by timeout); since updateFiles dispatches reload as
+    // detached, it must resolve as soon as the file write completes.
+    const fs = makeFakeFs();
+    const triggerReload = vi.fn().mockReturnValue(new Promise(() => {}));
+
+    const svc = new WorkspaceConfigService({
+      provisioningRepo: makeFakeProvisioningRepo(
+        ACTIVE_CONTAINER,
+      ) as ProvisioningRepository,
+      triggerReload,
+      resolveWorkspacePath: () => "/efs/u-1/workspace",
+      fs,
+    });
+
+    const start = Date.now();
+    await svc.updateFiles(
+      "u-1",
+      [{ filename: "TOOLS.md", content: "x" }],
+      "integration_changed",
+    );
+    const elapsed = Date.now() - start;
+    // No real reload latency should be visible to the caller. The
+    // mocked triggerReload is a never-resolving promise, so awaiting
+    // it would hang the test (vitest times out at 5s). 1s is a safe
+    // bound that confirms detachment without flaking on slow CI.
+    expect(elapsed).toBeLessThan(1000);
+    // Reload was dispatched (the call happened) but is still
+    // pending — we don't drain here, the test exit cleans it up.
+    expect(triggerReload).toHaveBeenCalledOnce();
   });
 
   it("no-ops cleanly on an empty update set", async () => {
@@ -188,6 +225,7 @@ describe("WorkspaceConfigService.updateFiles", () => {
       [{ filename: "TOOLS.md", content: "x" }],
       "integration_changed",
     );
+    await svc.drainPendingReloads();
 
     expect(fs.writeFile).toHaveBeenCalledOnce();
     expect(triggerReload).not.toHaveBeenCalled();
@@ -216,6 +254,7 @@ describe("WorkspaceConfigService.updateFiles", () => {
       [{ filename: "TOOLS.md", content: "x" }],
       "integration_changed",
     );
+    await svc.drainPendingReloads();
 
     expect(triggerReload).not.toHaveBeenCalled();
   });
@@ -239,6 +278,7 @@ describe("WorkspaceConfigService.updateFiles", () => {
       [{ filename: "TOOLS.md", content: "x" }],
       "integration_changed",
     );
+    await svc.drainPendingReloads();
 
     expect(triggerReload).not.toHaveBeenCalled();
   });
@@ -274,6 +314,7 @@ describe("WorkspaceConfigService.updateFiles", () => {
           "integration_changed",
         ),
       ).resolves.toBeUndefined();
+      await svc.drainPendingReloads();
 
       expect(triggerReload).toHaveBeenCalledOnce();
       // Either warn or info gets called (ok would be info; everything
@@ -308,6 +349,7 @@ describe("WorkspaceConfigService.updateFiles", () => {
         "integration_changed",
       ),
     ).resolves.toBeUndefined();
+    await svc.drainPendingReloads();
 
     expect(logger.error).toHaveBeenCalledWith(
       "workspace-config: reload signal threw",
@@ -334,6 +376,7 @@ describe("WorkspaceConfigService.updateFiles", () => {
       [{ filename: "TOOLS.md", content: "x" }],
       "integration_changed",
     );
+    await svc.drainPendingReloads();
 
     expect(triggerReload.mock.calls[0]![0].authorization).toBeNull();
   });
@@ -385,9 +428,22 @@ describe("WorkspaceConfigService.updateFiles", () => {
       [{ filename: "TOOLS.md", content: "x" }],
       "integration_changed",
     );
+    await svc.drainPendingReloads();
 
     expect(triggerReload.mock.calls[0]![0].authorization).toBe(
       "Bearer per-user-token",
     );
+  });
+
+  it("drainPendingReloads is a no-op when there are no pending reloads", async () => {
+    const svc = new WorkspaceConfigService({
+      provisioningRepo: makeFakeProvisioningRepo(
+        ACTIVE_CONTAINER,
+      ) as ProvisioningRepository,
+      triggerReload: vi.fn(),
+      resolveWorkspacePath: () => "/efs/u-x/workspace",
+      fs: makeFakeFs(),
+    });
+    await expect(svc.drainPendingReloads()).resolves.toBeUndefined();
   });
 });

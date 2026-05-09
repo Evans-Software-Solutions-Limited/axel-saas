@@ -113,6 +113,19 @@ export class WorkspaceConfigService {
   private readonly fs: WorkspaceConfigFs;
   private readonly logger: WorkspaceConfigLogger;
 
+  /**
+   * In-flight reload signals (truly fire-and-forget per spec — the
+   * reload's up-to-10s HTTP timeout would otherwise block the user's
+   * `Connect` / `Revoke` response, which was the original CR
+   * complaint). Tracked here so:
+   *   - tests can `await drainPendingReloads()` before assertions
+   *   - a future graceful-shutdown hook can wait for reloads to
+   *     finish before terminating the process
+   * Production handlers don't touch this set — they call
+   * `updateFiles` and let the reload run detached.
+   */
+  private readonly pendingReloads = new Set<Promise<void>>();
+
   constructor(deps: WorkspaceConfigServiceDeps) {
     this.provisioningRepo = deps.provisioningRepo;
     this.triggerReload = deps.triggerReload ?? defaultTriggerReload;
@@ -125,12 +138,18 @@ export class WorkspaceConfigService {
   }
 
   /**
-   * Write `updates` to the user's workspace and trigger a reload on
-   * the running container.
+   * Write `updates` to the user's workspace and dispatch a reload
+   * signal to the running container.
    *
-   * Resolves on success of the *write* (the reload is fire-and-forget
-   * — see class doc). Throws if the write fails so callers can
-   * surface "we couldn't save this" to the user where it matters.
+   * Resolves once the *file write* has completed (or thrown). The
+   * reload is intentionally **detached** — it can take up to
+   * `RELOAD_TIMEOUT_MS` (10s) to time out, and we never want that
+   * latency pinned to a user-facing HTTP response. Code paths that
+   * legitimately need to wait for the reload to settle (tests,
+   * graceful shutdown) call `drainPendingReloads()`.
+   *
+   * Throws iff the file write fails so callers can surface
+   * "we couldn't save this" to the user where it matters.
    */
   async updateFiles(
     userId: string,
@@ -172,16 +191,41 @@ export class WorkspaceConfigService {
       filenames: updates.map((u) => u.filename),
     });
 
-    // Reload signal — fire-and-forget. Look up the container, skip
-    // when it isn't reachable (logs `skipped` so traces still tell
-    // the story), otherwise call and log the result.
-    await this.signalReload(userId, updates, reason).catch((err: unknown) => {
-      this.logger.error("workspace-config: reload signal threw", {
-        userId,
-        reason,
-        error: errorMessage(err),
+    // Detached reload. The promise is tracked in `pendingReloads`
+    // so test code and a future graceful-shutdown hook can drain
+    // it; production handlers discard it implicitly by not
+    // awaiting it. `.catch` swallows the errors after logging
+    // them; `.finally` removes the tracking entry on settle.
+    const reloadPromise: Promise<void> = this.signalReload(
+      userId,
+      updates,
+      reason,
+    )
+      .catch((err: unknown) => {
+        this.logger.error("workspace-config: reload signal threw", {
+          userId,
+          reason,
+          error: errorMessage(err),
+        });
+      })
+      .finally(() => {
+        this.pendingReloads.delete(reloadPromise);
       });
-    });
+    this.pendingReloads.add(reloadPromise);
+  }
+
+  /**
+   * Wait for every in-flight reload signal started by `updateFiles`
+   * to finish (success, error, or timeout). Useful in tests where
+   * assertions over reload behaviour would otherwise race the
+   * detached promise, and in graceful-shutdown hooks where a
+   * SIGTERM shouldn't cut a reload off mid-flight.
+   *
+   * Resolves immediately when there are no pending reloads.
+   */
+  async drainPendingReloads(): Promise<void> {
+    if (this.pendingReloads.size === 0) return;
+    await Promise.allSettled([...this.pendingReloads]);
   }
 
   private async signalReload(
