@@ -420,6 +420,36 @@ describe("checkHealth", () => {
   it("uses the spec's 5s default timeout", () => {
     expect(TIMEOUT_HEALTH_MS).toBe(5_000);
   });
+
+  it("forwards Authorization when provided (bridge plugin auth: 'gateway')", async () => {
+    const fetcher = makeFetcher(() => jsonResponse({ status: "healthy" }));
+    await checkHealth({
+      rawGatewayUrl: "http://localhost:18789",
+      authorization: "Bearer health-token",
+      fetcher,
+    });
+    const fetchMock = fetcher.fetch as unknown as ReturnType<typeof vi.fn>;
+    const headers = fetchMock.mock.calls[0]![1].headers as Record<
+      string,
+      string
+    >;
+    expect(headers.Authorization).toBe("Bearer health-token");
+  });
+
+  it("omits Authorization when null", async () => {
+    const fetcher = makeFetcher(() => jsonResponse({ status: "healthy" }));
+    await checkHealth({
+      rawGatewayUrl: "http://localhost:18789",
+      authorization: null,
+      fetcher,
+    });
+    const fetchMock = fetcher.fetch as unknown as ReturnType<typeof vi.fn>;
+    const headers = fetchMock.mock.calls[0]![1].headers as Record<
+      string,
+      string
+    >;
+    expect(headers.Authorization).toBeUndefined();
+  });
 });
 
 describe("triggerReload", () => {
@@ -463,5 +493,41 @@ describe("triggerReload", () => {
 
   it("uses the spec's 10s default timeout", () => {
     expect(TIMEOUT_RELOAD_MS).toBe(10_000);
+  });
+
+  it("forwards Authorization when provided", async () => {
+    const fetcher = makeFetcher(() =>
+      jsonResponse({ status: "reloaded", filesReloaded: ["TOOLS.md"] }),
+    );
+    await triggerReload({
+      rawGatewayUrl: "http://localhost:18789",
+      reason: "integration_changed",
+      files: ["TOOLS.md"],
+      authorization: "Bearer reload-token",
+      fetcher,
+    });
+    const fetchMock = fetcher.fetch as unknown as ReturnType<typeof vi.fn>;
+    const headers = fetchMock.mock.calls[0]![1].headers as Record<
+      string,
+      string
+    >;
+    expect(headers.Authorization).toBe("Bearer reload-token");
+  });
+
+  it("omits Authorization when null (call still proceeds; gateway can 401 it)", async () => {
+    const fetcher = makeFetcher(() => jsonResponse({ status: "reloaded" }));
+    await triggerReload({
+      rawGatewayUrl: "http://localhost:18789",
+      reason: "integration_changed",
+      files: [],
+      authorization: null,
+      fetcher,
+    });
+    const fetchMock = fetcher.fetch as unknown as ReturnType<typeof vi.fn>;
+    const headers = fetchMock.mock.calls[0]![1].headers as Record<
+      string,
+      string
+    >;
+    expect(headers.Authorization).toBeUndefined();
   });
 });

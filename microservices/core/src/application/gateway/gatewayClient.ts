@@ -249,6 +249,15 @@ export async function postChat(
 
 export async function checkHealth(input: {
   rawGatewayUrl: string;
+  /**
+   * Bearer header (`"Bearer <token>"`) to send as Authorization. The
+   * bridge plugin (PR #99) registers `/api/health` with `auth:
+   * "gateway"`, so OpenClaw enforces the gateway token before the
+   * route handler runs. If the backend has no token to send (e.g.
+   * during local dev with `OPENCLAW_DEV_MODE=1`), pass `null` —
+   * a 401 is then a normal fire-and-forget failure, not a crash.
+   */
+  authorization?: string | null;
   fetcher?: GatewayFetcher;
   timeoutMs?: number;
 }): Promise<GatewayResult<HealthResponseBody>> {
@@ -257,6 +266,7 @@ export async function checkHealth(input: {
     path: "/api/health",
     method: "GET",
     timeoutMs: input.timeoutMs ?? TIMEOUT_HEALTH_MS,
+    authorization: input.authorization ?? undefined,
     fetcher: input.fetcher,
   });
 }
@@ -265,6 +275,14 @@ export async function triggerReload(input: {
   rawGatewayUrl: string;
   reason: string;
   files: string[];
+  /**
+   * Bearer header (`"Bearer <token>"`) for the gateway's auth check.
+   * Same semantics as `checkHealth.authorization`. Reload calls are
+   * fire-and-forget (the spec says missed reloads fall back to
+   * heartbeat-driven re-reads), so a 401/auth failure is logged but
+   * does not propagate.
+   */
+  authorization?: string | null;
   fetcher?: GatewayFetcher;
   timeoutMs?: number;
 }): Promise<GatewayResult<ReloadResponseBody>> {
@@ -274,6 +292,7 @@ export async function triggerReload(input: {
     method: "POST",
     timeoutMs: input.timeoutMs ?? TIMEOUT_RELOAD_MS,
     body: { reason: input.reason, files: input.files },
+    authorization: input.authorization ?? undefined,
     fetcher: input.fetcher,
   });
 }
