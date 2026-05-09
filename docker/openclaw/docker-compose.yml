@@ -1,7 +1,13 @@
 services:
   openclaw:
     build:
-      context: .
+      # Repo root — the build needs to COPY both `docker/openclaw/`
+      # (Dockerfile, entrypoint, workspace templates) AND
+      # `packages/openclaw-bridge-plugin/dist/` (the in-process bridge
+      # plugin). A `.dockerignore` at the repo root keeps the upload
+      # small.
+      context: ../..
+      dockerfile: docker/openclaw/Dockerfile
       args:
         # Read from versions.json so the pinned version lives in exactly one place.
         # Override on the CLI for one-off local testing of a different tag, e.g.:

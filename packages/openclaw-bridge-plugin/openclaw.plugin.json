@@ -1,0 +1,21 @@
+{
+  "id": "axel-bridge",
+  "name": "Axel Gateway Bridge",
+  "description": "Exposes Axel SaaS's gateway-contract REST surface. Translates Axel's POST /api/chat (and matching health/reload/usage endpoints) to OpenClaw's first-party /v1/chat/completions and runtime APIs.",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "chatCompletionsBaseUrl": {
+        "type": "string",
+        "description": "Internal URL the bridge calls to reach OpenClaw's /v1/chat/completions endpoint. Defaults to http://127.0.0.1:18789 — the loopback address of the gateway hosting this plugin. Override only for unusual local-test setups.",
+        "default": "http://127.0.0.1:18789"
+      },
+      "defaultModel": {
+        "type": "string",
+        "description": "Routing key passed as `model` to OpenClaw's /v1/chat/completions endpoint. Must be either `openclaw` (route to the workspace's default agent) or `openclaw/<agentId>` (route to a specific named agent). The agent's actual model — anthropic/haiku, anthropic/sonnet, … — is configured in `agents.defaults.model.primary` in the workspace template; the API caller does not override it via this field.",
+        "default": "openclaw"
+      }
+    }
+  }
+}

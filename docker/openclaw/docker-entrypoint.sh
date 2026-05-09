@@ -116,5 +116,23 @@ mkdir -p "$WORKSPACE/memory" "$WORKSPACE/projects"
 mkdir -p /root/.openclaw
 ln -sf "$WORKSPACE/openclaw.json" /root/.openclaw/openclaw.json
 
+# Register the bundled axel-bridge plugin if its source is present in
+# the image. The install must happen here (after the symlink) rather
+# than at image build time, because `openclaw plugins install --link`
+# writes its registry entry into the active gateway config — which
+# the symlink above just rebound to the workspace volume. Doing it
+# now means the registry entry ends up on the workspace config (the
+# live target) and survives across container restarts.
+#
+# `--link` is idempotent: if the plugin is already linked at the same
+# path the install is a no-op + a warning. We swallow the warning to
+# keep the entrypoint quiet on container restarts.
+if [ -d /opt/axel-bridge/dist ] && [ -f /opt/axel-bridge/openclaw.plugin.json ]; then
+  echo "[openclaw-entrypoint] linking axel-bridge plugin"
+  openclaw plugins install /opt/axel-bridge --link 2>&1 \
+    | grep -v "already linked\|Restart the gateway" \
+    || true
+fi
+
 echo "[openclaw-entrypoint] workspace ready (tier=${TIER}); exec: $*"
 exec "$@"

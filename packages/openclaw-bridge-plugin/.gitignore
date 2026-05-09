@@ -1,0 +1,7 @@
+# Bun-bundled plugin entry. Built fresh by `bun run build` (called by
+# turbo and by the developer/CI before `docker compose build`). Not
+# checked in — the Docker image is the canonical artefact path.
+dist/
+
+# Vitest coverage report (already excluded globally but belt + braces).
+coverage/
