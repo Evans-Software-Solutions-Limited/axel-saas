@@ -422,6 +422,31 @@ describe("Settings", () => {
       });
     });
 
+    it("falls back to a hard redirect when signOut THROWS after a successful delete", async () => {
+      // Bugbot regression: a thrown error (vs. a `{ success: false }`
+      // return) used to bubble back into the dialog's combined try/catch,
+      // which set an "Account deletion failed" message on an already-
+      // closed dialog and never redirected. The user was stranded on a
+      // Settings page tied to a now-missing account, with a stale client
+      // session and an invisible (and misleading) error.
+      vi.mocked(deleteAccount).mockResolvedValue();
+      signOutMock.mockRejectedValue(new Error("network down"));
+      render(<Settings />);
+      const dialog = await openDeleteDialog();
+      const input = dialog.getByLabelText(
+        /type .* to confirm/i,
+      ) as HTMLInputElement;
+      fireEvent.change(input, { target: { value: "user@example.com" } });
+      fireEvent.click(dialog.getByRole("button", { name: /delete account/i }));
+
+      await waitFor(() => {
+        expect(assignMock).toHaveBeenCalledWith("/");
+      });
+      // No misleading "Account deletion failed" message — the deletion
+      // actually succeeded.
+      expect(screen.queryByText(/account deletion failed/i)).toBeNull();
+    });
+
     it("closes the modal and resets state when Cancel is clicked", async () => {
       render(<Settings />);
       const dialog = await openDeleteDialog();

@@ -52,14 +52,24 @@ export function DangerZonePanel({
     if (!matches || submitting) return;
     setSubmitting(true);
     setError(null);
+
+    // Two distinct phases: the server-side deletion, and the
+    // post-deletion handoff (sign-out + redirect). They have very
+    // different recovery semantics and MUST NOT share a try/catch.
+    //
+    // - If `deleteAccount` throws, the server still has the account.
+    //   We surface the error inside the (still-open) dialog so the
+    //   user can retry, and re-enable the confirm button.
+    // - If `deleteAccount` succeeds but `onDeleted` (sign-out) then
+    //   throws, the account is gone but the client session is stale.
+    //   The dialog is already closed, so an inline error would be
+    //   invisible. Fall back to a hard redirect to / — the stale
+    //   session can't keep driving the UI of an account that no
+    //   longer exists. A single combined try/catch would set an error
+    //   message on a closed dialog AND falsely claim "deletion
+    //   failed" when the deletion actually succeeded.
     try {
       await deleteAccount();
-      // Close the dialog before invoking the parent so the caller can
-      // navigate away cleanly without an open Radix overlay still in
-      // the DOM.
-      setOpen(false);
-      reset();
-      await onDeleted();
     } catch (err) {
       setError(
         err instanceof Error
@@ -67,6 +77,23 @@ export function DangerZonePanel({
           : "Account deletion failed. Please try again.",
       );
       setSubmitting(false);
+      return;
+    }
+
+    // Server-side deletion succeeded. Close the dialog before invoking
+    // the parent so the caller can navigate away cleanly without an
+    // open Radix overlay still in the DOM.
+    setOpen(false);
+    reset();
+
+    try {
+      await onDeleted();
+    } catch (err) {
+      // The deletion already succeeded — there's no recoverable state
+      // left on this page. Hard-redirect rather than leaving the user
+      // on a Settings page tied to a now-missing account.
+      console.error("[danger-zone] post-deletion handoff failed", err);
+      window.location.assign("/");
     }
   };
 

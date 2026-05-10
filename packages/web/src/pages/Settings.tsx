@@ -187,13 +187,20 @@ export function Settings() {
   };
 
   const handleAccountDeleted = async () => {
-    // Sign the user out via the auth context so the in-memory session
-    // is cleared and the auth listener fires consistently. signOut also
-    // navigates to / on success. If signOut fails (e.g. the auth row is
-    // already gone server-side), fall back to a hard redirect — the
-    // session was just invalidated anyway.
-    const result = await signOut();
-    if (!result.success) {
+    // Belt-and-braces: AuthProvider's `signOut` already wraps its own
+    // try/catch and returns `{ success: false }` on failure, but if
+    // that contract ever changes (or `navigate` itself throws), we
+    // still want a guaranteed redirect — the user's account is already
+    // gone server-side at this point, so any unhandled failure mode
+    // here would strand them on a Settings page tied to a missing
+    // account. The caller (`DangerZonePanel`) also has its own
+    // post-deletion fallback; this layer is the inner ring.
+    try {
+      const result = await signOut();
+      if (!result.success) {
+        window.location.assign("/");
+      }
+    } catch {
       window.location.assign("/");
     }
   };
