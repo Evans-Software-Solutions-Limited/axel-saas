@@ -188,29 +188,28 @@ export const userHandler = new Elysia({ name: "UserHandler" })
       const { set } = ctx;
       const supabaseUserId = getUser(ctx).sub;
 
+      // Don't 404 on a missing DB row here — the service is responsible
+      // for finishing partial-failure retries (DB cascade succeeded but
+      // the prior auth-admin call timed out). The orphan-cleanup branch
+      // inside `deleteAccount` still removes the auth.users row in that
+      // case. Without this delegation, the auth row would stay
+      // orphaned forever because the handler would short-circuit
+      // before reaching the service.
       try {
-        const dbUser = await userRepository.getUserBySupabaseId(supabaseUserId);
-        if (!dbUser) {
-          set.status = 404;
-          return { success: false, error: "User not found" };
-        }
-
         const db = getDb();
         const service = new AccountDeletionService({
           userRepo: new UserRepository(db),
           subscriptionRepo: new SubscriptionRepository(db),
         });
 
-        const result = await service.deleteAccount({
-          dbUserId: dbUser.id,
-          supabaseUserId,
-        });
+        const result = await service.deleteAccount({ supabaseUserId });
 
         if (!result.success) {
-          // Map internal reasons to HTTP status. Stripe failure is a 502
-          // (we treat the upstream provider as the failing dependency)
-          // so a generic retry is meaningful. Auth/DB failures surface
-          // as 500 — the caller can retry, the service is idempotent.
+          // Map internal reasons to HTTP status. Stripe failure is a
+          // 502 (we treat the upstream provider as the failing
+          // dependency) so a generic retry is meaningful. Auth/DB
+          // failures surface as 500 — the caller can retry, the service
+          // is idempotent.
           if (result.reason === "stripe_cancel_failed") set.status = 502;
           else set.status = 500;
           return {

@@ -339,21 +339,32 @@ describe("userHandler routes", () => {
       expect(result.status).toBe(200);
       const body = (await result.json()) as { success: boolean };
       expect(body.success).toBe(true);
+      // The handler delegates the user lookup to the service so the
+      // orphan-cleanup retry path is owned in one place.
       expect(accountDeletionMock.deleteAccount).toHaveBeenCalledWith({
-        dbUserId: "db-user-id",
         supabaseUserId: "test-user-id",
       });
     });
 
-    it("returns 404 when the user row is missing", async () => {
+    it("delegates to the service even when the DB row is already gone (orphan-cleanup retry)", async () => {
+      // Bugbot regression: the handler used to 404 on a missing DB row,
+      // which prevented the auth-admin cleanup from ever running on a
+      // partial-failure retry. Now the service decides what to do.
       userRepoMock.getUserBySupabaseId.mockResolvedValueOnce(null);
+      accountDeletionMock.deleteAccount.mockResolvedValueOnce({
+        success: true,
+        orphanCleanup: true,
+      });
       const result = await userHandler.handle(
         new Request(`${BASE}/users/me`, {
           method: "DELETE",
           headers: AUTHED_HEADERS,
         }),
       );
-      expect(result.status).toBe(404);
+      expect(result.status).toBe(200);
+      expect(accountDeletionMock.deleteAccount).toHaveBeenCalledWith({
+        supabaseUserId: "test-user-id",
+      });
     });
 
     it("maps Stripe failures to a 502", async () => {

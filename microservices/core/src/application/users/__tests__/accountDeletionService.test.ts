@@ -10,7 +10,10 @@ interface MockedSubscription {
 
 interface Deps {
   service: AccountDeletionService;
-  userRepo: { deleteById: ReturnType<typeof vi.fn> };
+  userRepo: {
+    getUserBySupabaseId: ReturnType<typeof vi.fn>;
+    deleteById: ReturnType<typeof vi.fn>;
+  };
   subscriptionRepo: { findByUserId: ReturnType<typeof vi.fn> };
   stripeCancel: ReturnType<typeof vi.fn>;
   deleteAuthUser: ReturnType<typeof vi.fn>;
@@ -20,6 +23,17 @@ interface Deps {
     error: ReturnType<typeof vi.fn>;
   };
 }
+
+const DEFAULT_DB_USER = {
+  id: "db-1",
+  supabaseUserId: "auth-1",
+  email: "user@example.com",
+  fullName: "Test User",
+  onboardingCompleted: true,
+  notificationPreferences: {},
+  createdAt: new Date("2024-01-01"),
+  updatedAt: new Date("2024-01-01"),
+};
 
 function makeService(
   options: {
@@ -34,9 +48,15 @@ function makeService(
     };
     deleteByIdError?: Error;
     omitStripe?: boolean;
+    /** When `null`, simulate the orphan-cleanup retry path (DB row
+     * already gone from a prior partial-failure attempt). */
+    dbUser?: typeof DEFAULT_DB_USER | null;
   } = {},
 ): Deps {
+  const dbUser =
+    options.dbUser === undefined ? DEFAULT_DB_USER : options.dbUser;
   const userRepo = {
+    getUserBySupabaseId: vi.fn().mockResolvedValue(dbUser),
     deleteById: vi.fn().mockResolvedValue(options.deleteResult ?? true),
   };
   if (options.deleteByIdError) {
@@ -94,7 +114,6 @@ describe("AccountDeletionService", () => {
     const deps = makeService();
 
     const result = await deps.service.deleteAccount({
-      dbUserId: "db-1",
       supabaseUserId: "auth-1",
     });
 
@@ -117,7 +136,6 @@ describe("AccountDeletionService", () => {
     const deps = makeService({ subscription: null });
 
     const result = await deps.service.deleteAccount({
-      dbUserId: "db-1",
       supabaseUserId: "auth-1",
     });
 
@@ -131,7 +149,6 @@ describe("AccountDeletionService", () => {
     });
 
     const result = await deps.service.deleteAccount({
-      dbUserId: "db-1",
       supabaseUserId: "auth-1",
     });
 
@@ -145,7 +162,6 @@ describe("AccountDeletionService", () => {
     });
 
     const result = await deps.service.deleteAccount({
-      dbUserId: "db-1",
       supabaseUserId: "auth-1",
     });
 
@@ -160,7 +176,6 @@ describe("AccountDeletionService", () => {
     });
 
     const result = await deps.service.deleteAccount({
-      dbUserId: "db-1",
       supabaseUserId: "auth-1",
     });
 
@@ -174,7 +189,6 @@ describe("AccountDeletionService", () => {
     const deps = makeService({ deleteByIdError: new Error("db down") });
 
     const result = await deps.service.deleteAccount({
-      dbUserId: "db-1",
       supabaseUserId: "auth-1",
     });
 
@@ -187,7 +201,6 @@ describe("AccountDeletionService", () => {
     const deps = makeService({ deleteResult: false });
 
     const result = await deps.service.deleteAccount({
-      dbUserId: "db-1",
       supabaseUserId: "auth-1",
     });
 
@@ -201,7 +214,6 @@ describe("AccountDeletionService", () => {
     });
 
     const result = await deps.service.deleteAccount({
-      dbUserId: "db-1",
       supabaseUserId: "auth-1",
     });
 
@@ -215,18 +227,55 @@ describe("AccountDeletionService", () => {
     });
 
     const result = await deps.service.deleteAccount({
-      dbUserId: "db-1",
       supabaseUserId: "auth-1",
     });
 
     expect(result.success).toBe(true);
   });
 
+  it("runs orphan-cleanup (auth-only) when the DB row is already gone", async () => {
+    // Bugbot regression: a prior partial-failure (Stripe + DB cascade
+    // succeeded, the auth-admin call timed out) leaves the auth.users
+    // row orphaned. A retry of DELETE /users/me must NOT short-circuit
+    // on the missing DB row — it must still call deleteAuthUser to
+    // finish the cleanup.
+    const deps = makeService({ dbUser: null });
+
+    const result = await deps.service.deleteAccount({
+      supabaseUserId: "auth-1",
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.orphanCleanup).toBe(true);
+    // Stripe + DB are both skipped — the user row was already gone.
+    expect(deps.subscriptionRepo.findByUserId).not.toHaveBeenCalled();
+    expect(deps.stripeCancel).not.toHaveBeenCalled();
+    expect(deps.userRepo.deleteById).not.toHaveBeenCalled();
+    // Auth-admin is invoked so the orphan is finally removed.
+    expect(deps.deleteAuthUser).toHaveBeenCalledWith("auth-1");
+  });
+
+  it("returns orphanCleanup: true on auth-delete failure during the retry path", async () => {
+    // The orphan-cleanup branch must still surface auth_delete_failed
+    // so the caller knows the retry is unfinished.
+    const deps = makeService({
+      dbUser: null,
+      deleteAuthResult: { success: false, status: 500, error: "auth boom" },
+    });
+
+    const result = await deps.service.deleteAccount({
+      supabaseUserId: "auth-1",
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.reason).toBe("auth_delete_failed");
+    expect(result.orphanCleanup).toBe(true);
+  });
+
   it("logs and continues when no Stripe client is available and STRIPE_SECRET_KEY is unset", async () => {
     const deps = makeService({ omitStripe: true });
 
     const result = await deps.service.deleteAccount({
-      dbUserId: "db-1",
       supabaseUserId: "auth-1",
     });
 
