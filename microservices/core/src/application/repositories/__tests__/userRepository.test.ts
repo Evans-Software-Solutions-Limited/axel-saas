@@ -11,7 +11,11 @@ vi.mock("@axel-saas/db", async () => {
   };
 });
 
-import { UserRepository } from "../userRepository";
+import {
+  NOTIFICATION_DEFAULTS,
+  UserRepository,
+  withNotificationDefaults,
+} from "../userRepository";
 
 /**
  * Creates a fluent chain that:
@@ -57,6 +61,8 @@ const mockUserRow = {
   supabaseUserId: "supabase-123",
   email: "user@example.com",
   fullName: "Test User",
+  onboardingCompleted: false,
+  notificationPreferences: {},
   createdAt: NOW,
   updatedAt: NOW,
 };
@@ -69,7 +75,8 @@ describe("UserRepository", () => {
     mockDb = {
       insert: vi.fn(() => mockChain([mockUserRow])),
       select: vi.fn(() => mockChain([mockUserRow])),
-      update: vi.fn(() => mockChain([])),
+      update: vi.fn(() => mockChain([mockUserRow])),
+      delete: vi.fn(() => mockChain([{ id: "user-uuid-1" }])),
     } as unknown as Partial<Db>;
     repo = new UserRepository(mockDb as Db);
   });
@@ -171,6 +178,98 @@ describe("UserRepository", () => {
         email: "newemail@example.com",
       });
       expect(mockDb.update).toHaveBeenCalled();
+    });
+  });
+
+  describe("updateProfile", () => {
+    it("returns the updated row on success", async () => {
+      const next = await repo.updateProfile("user-uuid-1", {
+        fullName: "Ada Lovelace",
+      });
+      expect(mockDb.update).toHaveBeenCalledOnce();
+      expect(next?.id).toBe("user-uuid-1");
+    });
+
+    it("returns null when no row matches", async () => {
+      (mockDb.update as ReturnType<typeof vi.fn>).mockReturnValue(
+        mockChain([]),
+      );
+      const next = await repo.updateProfile("missing", {
+        fullName: "Ada Lovelace",
+      });
+      expect(next).toBeNull();
+    });
+  });
+
+  describe("updateNotificationPreferences", () => {
+    it("returns the updated preferences on success", async () => {
+      (mockDb.update as ReturnType<typeof vi.fn>).mockReturnValueOnce(
+        mockChain([
+          {
+            ...mockUserRow,
+            notificationPreferences: {
+              emailNotifications: false,
+              weeklyDigest: true,
+            },
+          },
+        ]),
+      );
+
+      const stored = await repo.updateNotificationPreferences("user-uuid-1", {
+        emailNotifications: false,
+        weeklyDigest: true,
+      });
+
+      expect(stored).toEqual({
+        emailNotifications: false,
+        weeklyDigest: true,
+      });
+    });
+
+    it("returns null when no row matches", async () => {
+      (mockDb.update as ReturnType<typeof vi.fn>).mockReturnValue(
+        mockChain([]),
+      );
+      const stored = await repo.updateNotificationPreferences("missing", {
+        emailNotifications: false,
+      });
+      expect(stored).toBeNull();
+    });
+  });
+
+  describe("deleteById", () => {
+    it("returns true when a row is deleted", async () => {
+      const ok = await repo.deleteById("user-uuid-1");
+      expect(mockDb.delete).toHaveBeenCalledOnce();
+      expect(ok).toBe(true);
+    });
+
+    it("returns false when no row matches", async () => {
+      (mockDb.delete as ReturnType<typeof vi.fn>).mockReturnValue(
+        mockChain([]),
+      );
+      const ok = await repo.deleteById("missing");
+      expect(ok).toBe(false);
+    });
+  });
+
+  describe("withNotificationDefaults", () => {
+    it("fills in defaults for missing keys", () => {
+      expect(withNotificationDefaults({})).toEqual(NOTIFICATION_DEFAULTS);
+    });
+
+    it("respects explicit values when set", () => {
+      const merged = withNotificationDefaults({
+        emailNotifications: false,
+      });
+      expect(merged.emailNotifications).toBe(false);
+      expect(merged.weeklyDigest).toBe(true);
+    });
+
+    it.each([null, undefined])("treats %s like an empty object", (input) => {
+      expect(withNotificationDefaults(input as null | undefined)).toEqual(
+        NOTIFICATION_DEFAULTS,
+      );
     });
   });
 

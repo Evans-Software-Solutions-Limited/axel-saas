@@ -1,5 +1,18 @@
 import { api } from "@/lib/eden";
 
+export interface UserProfile {
+  id: string;
+  email: string;
+  fullName: string | null;
+  onboardingCompleted: boolean;
+  notificationPreferences: NotificationPreferences;
+}
+
+export interface NotificationPreferences {
+  emailNotifications: boolean;
+  weeklyDigest: boolean;
+}
+
 export type SubscriptionTier = "free" | "premium" | "enterprise";
 export type SubscriptionStatus =
   | "active"
@@ -99,4 +112,127 @@ export async function openCustomerPortal(
     throw new Error("Billing portal response was missing a URL");
   }
   return { url: body.url };
+}
+
+const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = {
+  emailNotifications: true,
+  weeklyDigest: true,
+};
+
+interface UserMeResponseUser {
+  id: string;
+  email: string;
+  fullName: string | null;
+  onboardingCompleted: boolean;
+  notificationPreferences?: Partial<NotificationPreferences>;
+}
+
+function normaliseProfile(user: UserMeResponseUser): UserProfile {
+  return {
+    id: user.id,
+    email: user.email,
+    fullName: user.fullName,
+    onboardingCompleted: user.onboardingCompleted,
+    notificationPreferences: {
+      ...DEFAULT_NOTIFICATION_PREFERENCES,
+      ...(user.notificationPreferences ?? {}),
+    },
+  };
+}
+
+/**
+ * Fetch the current user's profile. The Settings page uses this to seed
+ * the editable Profile fields and the Notifications toggles. Throws on
+ * transport errors and 404 (a missing user row would imply auth/DB
+ * skew that the Settings page can't recover from on its own).
+ */
+export async function fetchUserProfile(): Promise<UserProfile> {
+  const response = await api.core.users.me.get();
+  if (response.error) {
+    throw new Error(`Failed to fetch profile (${response.error.status})`);
+  }
+  const body = response.data as {
+    success: boolean;
+    user?: UserMeResponseUser;
+  } | null;
+  if (!body?.success || !body.user) {
+    throw new Error("Profile response was not successful");
+  }
+  return normaliseProfile(body.user);
+}
+
+/**
+ * Persist a name change. The handler trims and validates length on its
+ * side, but we trim here too so a quick client-side check can disable
+ * the Save button without a round-trip.
+ */
+export async function updateProfileName(name: string): Promise<UserProfile> {
+  const response = await api.core.users.me.put({ name });
+  if (response.error) {
+    throw new Error(`Failed to save profile (${response.error.status})`);
+  }
+  const body = response.data as {
+    success: boolean;
+    user?: UserMeResponseUser;
+  } | null;
+  if (!body?.success || !body.user) {
+    throw new Error("Profile update response was not successful");
+  }
+  return normaliseProfile(body.user);
+}
+
+/**
+ * Update one or more notification preference toggles. The body is a
+ * partial — a missing key on the wire keeps the existing value rather
+ * than resetting it to the canonical default. The handler is the source
+ * of truth for the merged response.
+ */
+export async function updateNotificationPreferences(
+  prefs: Partial<NotificationPreferences>,
+): Promise<NotificationPreferences> {
+  const response = await api.core.users.me.notifications.put(prefs);
+  if (response.error) {
+    throw new Error(
+      `Failed to update notification preferences (${response.error.status})`,
+    );
+  }
+  const body = response.data as {
+    success: boolean;
+    notificationPreferences?: Partial<NotificationPreferences>;
+  } | null;
+  if (!body?.success) {
+    throw new Error("Notification preferences response was not successful");
+  }
+  return {
+    ...DEFAULT_NOTIFICATION_PREFERENCES,
+    ...(body.notificationPreferences ?? {}),
+  };
+}
+
+/**
+ * Permanently delete the current user's account. The caller is
+ * responsible for signing the user out and redirecting — this function
+ * only triggers the server-side cascade. Throws on error so the
+ * Danger-Zone modal can render a friendly retry message.
+ */
+export async function deleteAccount(): Promise<void> {
+  const response = await api.core.users.me.delete();
+  if (response.error) {
+    const status = response.error.status;
+    // The handler maps Stripe failures to 502 — communicate that as
+    // distinct from a generic 500 so the user knows a retry is likely
+    // to succeed (vs. needing to contact support).
+    if (status === 502) {
+      throw new Error(
+        "We couldn't cancel your subscription with our payment provider. Please try again in a moment.",
+      );
+    }
+    throw new Error(
+      `We couldn't delete your account right now (${status}). Please try again or contact support.`,
+    );
+  }
+  const body = response.data as { success: boolean } | null;
+  if (!body?.success) {
+    throw new Error("Account deletion response was not successful");
+  }
 }

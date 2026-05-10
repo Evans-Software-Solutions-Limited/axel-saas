@@ -404,6 +404,7 @@ describe("ChatHandler", () => {
         email: "test@example.com",
         fullName: "Test User",
         onboardingCompleted: false,
+        notificationPreferences: {},
         createdAt: new Date(),
         updatedAt: new Date(),
       };
@@ -421,6 +422,7 @@ describe("ChatHandler", () => {
         email: "test@example.com",
         fullName: "Test User",
         onboardingCompleted: true,
+        notificationPreferences: {},
         createdAt: new Date(),
         updatedAt: new Date(),
       };
@@ -449,6 +451,7 @@ describe("ChatHandler", () => {
         email: "test@example.com",
         fullName: "Test User",
         onboardingCompleted: true,
+        notificationPreferences: {},
         createdAt: new Date(),
         updatedAt: new Date(),
       };
@@ -476,6 +479,7 @@ describe("ChatHandler", () => {
         email: "test@example.com",
         fullName: "Test User",
         onboardingCompleted: true,
+        notificationPreferences: {},
         createdAt: new Date(),
         updatedAt: new Date(),
       };
@@ -496,6 +500,7 @@ describe("ChatHandler", () => {
         email: "test@example.com",
         fullName: "Test User",
         onboardingCompleted: true,
+        notificationPreferences: {},
         createdAt: new Date(),
         updatedAt: new Date(),
       };
@@ -540,6 +545,7 @@ describe("ChatHandler", () => {
         email: "test@example.com",
         fullName: "Test User",
         onboardingCompleted: true,
+        notificationPreferences: {},
         createdAt: new Date(),
         updatedAt: new Date(),
       };
@@ -583,6 +589,7 @@ describe("ChatHandler", () => {
         email: "test@example.com",
         fullName: "Test User",
         onboardingCompleted: true,
+        notificationPreferences: {},
         createdAt: new Date(),
         updatedAt: new Date(),
       };
@@ -626,6 +633,7 @@ describe("ChatHandler", () => {
         email: "test@example.com",
         fullName: "Test User",
         onboardingCompleted: true,
+        notificationPreferences: {},
         createdAt: new Date(),
         updatedAt: new Date(),
       };
@@ -663,6 +671,7 @@ describe("ChatHandler", () => {
         email: "test@example.com",
         fullName: "Test User",
         onboardingCompleted: true,
+        notificationPreferences: {},
         createdAt: new Date(),
         updatedAt: new Date(),
       };
@@ -698,6 +707,7 @@ describe("ChatHandler", () => {
         email: "test@example.com",
         fullName: "Test User",
         onboardingCompleted: true,
+        notificationPreferences: {},
         createdAt: new Date(),
         updatedAt: new Date(),
       };
@@ -732,6 +742,7 @@ describe("ChatHandler", () => {
         email: "test@example.com",
         fullName: "Test User",
         onboardingCompleted: false,
+        notificationPreferences: {},
         createdAt: new Date(),
         updatedAt: new Date(),
       };
@@ -749,6 +760,7 @@ describe("ChatHandler", () => {
         email: "test@example.com",
         fullName: "Test User",
         onboardingCompleted: true,
+        notificationPreferences: {},
         createdAt: new Date(),
         updatedAt: new Date(),
       };
@@ -769,6 +781,7 @@ describe("ChatHandler", () => {
         email: "test@example.com",
         fullName: "Test User",
         onboardingCompleted: true,
+        notificationPreferences: {},
         createdAt: new Date(),
         updatedAt: new Date(),
       };
@@ -801,6 +814,7 @@ describe("ChatHandler", () => {
           email: "test@example.com",
           fullName: "Test User",
           onboardingCompleted: true,
+          notificationPreferences: {},
           createdAt: new Date(),
           updatedAt: new Date(),
         };
@@ -855,6 +869,7 @@ describe("ChatHandler", () => {
           email: "test@example.com",
           fullName: "Test User",
           onboardingCompleted: true,
+          notificationPreferences: {},
           createdAt: new Date(),
           updatedAt: new Date(),
         };
@@ -967,6 +982,7 @@ describe("ChatHandler", () => {
           email: "test@example.com",
           fullName: "Test User",
           onboardingCompleted: true,
+          notificationPreferences: {},
           createdAt: new Date(),
           updatedAt: new Date(),
         };
@@ -1022,6 +1038,7 @@ describe("ChatHandler", () => {
       email: "test@example.com",
       fullName: "Test User",
       onboardingCompleted: true,
+      notificationPreferences: {},
       createdAt: new Date(),
       updatedAt: new Date(),
     };

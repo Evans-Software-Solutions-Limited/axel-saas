@@ -36,6 +36,7 @@ describe("UserHandler Logic Tests", () => {
         email: "user@example.com",
         fullName: "John Doe",
         onboardingCompleted: true,
+        notificationPreferences: {},
         createdAt: new Date(),
         updatedAt: new Date(),
       };
@@ -51,6 +52,7 @@ describe("UserHandler Logic Tests", () => {
         email: "user@example.com",
         fullName: "John Doe",
         onboardingCompleted: false,
+        notificationPreferences: {},
         createdAt: new Date(),
         updatedAt: new Date(),
       };
@@ -187,6 +189,7 @@ describe("UserHandler Logic Tests", () => {
         email: "test@example.com",
         fullName: "Test User",
         onboardingCompleted: false,
+        notificationPreferences: {},
         createdAt: new Date(),
         updatedAt: new Date(),
         supabaseUserId: "sub-123",

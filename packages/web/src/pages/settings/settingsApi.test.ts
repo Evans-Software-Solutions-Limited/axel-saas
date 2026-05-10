@@ -1,8 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
+  deleteAccount,
   fetchInvoices,
   fetchSubscriptionStatus,
+  fetchUserProfile,
   openCustomerPortal,
+  updateNotificationPreferences,
+  updateProfileName,
 } from "./settingsApi";
 
 const { mockApi } = vi.hoisted(() => ({
@@ -14,6 +18,12 @@ const { mockApi } = vi.hoisted(() => ({
       stripe: {
         invoices: { get: vi.fn() },
         "customer-portal": { post: vi.fn() },
+      },
+      users: {
+        me: Object.assign(
+          { get: vi.fn(), put: vi.fn(), delete: vi.fn() },
+          { notifications: { put: vi.fn() } },
+        ),
       },
     },
   },
@@ -208,6 +218,180 @@ describe("settingsApi", () => {
       });
 
       await expect(openCustomerPortal()).rejects.toThrow(/missing a url/i);
+    });
+  });
+
+  describe("fetchUserProfile", () => {
+    it("returns the profile with notification defaults filled in", async () => {
+      // Server responses can omit the prefs entirely (legacy rows where
+      // the column was just added with `{}`). The frontend has to fill
+      // the keys so the toggles render in a consistent state.
+      mockApi.core.users.me.get.mockResolvedValue({
+        data: {
+          success: true,
+          user: {
+            id: "u1",
+            email: "user@example.com",
+            fullName: "Ada",
+            onboardingCompleted: true,
+          },
+        },
+        error: null,
+      });
+
+      const profile = await fetchUserProfile();
+      expect(profile.fullName).toBe("Ada");
+      expect(profile.notificationPreferences).toEqual({
+        emailNotifications: true,
+        weeklyDigest: true,
+      });
+    });
+
+    it("respects explicit values from the server", async () => {
+      mockApi.core.users.me.get.mockResolvedValue({
+        data: {
+          success: true,
+          user: {
+            id: "u1",
+            email: "user@example.com",
+            fullName: null,
+            onboardingCompleted: false,
+            notificationPreferences: { emailNotifications: false },
+          },
+        },
+        error: null,
+      });
+
+      const profile = await fetchUserProfile();
+      expect(profile.notificationPreferences).toEqual({
+        emailNotifications: false,
+        weeklyDigest: true,
+      });
+    });
+
+    it("throws on transport errors", async () => {
+      mockApi.core.users.me.get.mockResolvedValue({
+        data: null,
+        error: { status: 500, value: { error: "boom" } },
+      });
+      await expect(fetchUserProfile()).rejects.toThrow(/500/);
+    });
+
+    it("throws when the body says success: false", async () => {
+      mockApi.core.users.me.get.mockResolvedValue({
+        data: { success: false },
+        error: null,
+      });
+      await expect(fetchUserProfile()).rejects.toThrow(/not successful/i);
+    });
+  });
+
+  describe("updateProfileName", () => {
+    it("forwards the trimmed name and returns the updated profile", async () => {
+      mockApi.core.users.me.put.mockResolvedValue({
+        data: {
+          success: true,
+          user: {
+            id: "u1",
+            email: "user@example.com",
+            fullName: "Ada Lovelace",
+            onboardingCompleted: true,
+            notificationPreferences: {},
+          },
+        },
+        error: null,
+      });
+
+      const profile = await updateProfileName("Ada Lovelace");
+      expect(profile.fullName).toBe("Ada Lovelace");
+      expect(mockApi.core.users.me.put).toHaveBeenCalledWith({
+        name: "Ada Lovelace",
+      });
+    });
+
+    it("throws on transport errors", async () => {
+      mockApi.core.users.me.put.mockResolvedValue({
+        data: null,
+        error: { status: 400, value: { error: "bad name" } },
+      });
+      await expect(updateProfileName("x")).rejects.toThrow(/400/);
+    });
+
+    it("throws when the body says success: false", async () => {
+      mockApi.core.users.me.put.mockResolvedValue({
+        data: { success: false },
+        error: null,
+      });
+      await expect(updateProfileName("x")).rejects.toThrow(/not successful/i);
+    });
+  });
+
+  describe("updateNotificationPreferences", () => {
+    it("forwards a partial body and merges defaults into the response", async () => {
+      mockApi.core.users.me.notifications.put.mockResolvedValue({
+        data: {
+          success: true,
+          notificationPreferences: { emailNotifications: false },
+        },
+        error: null,
+      });
+
+      const next = await updateNotificationPreferences({
+        emailNotifications: false,
+      });
+      expect(next).toEqual({
+        emailNotifications: false,
+        weeklyDigest: true,
+      });
+      expect(mockApi.core.users.me.notifications.put).toHaveBeenCalledWith({
+        emailNotifications: false,
+      });
+    });
+
+    it("throws on transport errors", async () => {
+      mockApi.core.users.me.notifications.put.mockResolvedValue({
+        data: null,
+        error: { status: 500, value: { error: "boom" } },
+      });
+      await expect(
+        updateNotificationPreferences({ emailNotifications: false }),
+      ).rejects.toThrow(/500/);
+    });
+  });
+
+  describe("deleteAccount", () => {
+    it("resolves on success", async () => {
+      mockApi.core.users.me.delete.mockResolvedValue({
+        data: { success: true },
+        error: null,
+      });
+      await expect(deleteAccount()).resolves.toBeUndefined();
+    });
+
+    it("surfaces a friendly message on a 502 (Stripe failure)", async () => {
+      mockApi.core.users.me.delete.mockResolvedValue({
+        data: null,
+        error: { status: 502, value: { error: "stripe boom" } },
+      });
+      await expect(deleteAccount()).rejects.toThrow(/payment provider/i);
+    });
+
+    it("surfaces a generic message on a 500", async () => {
+      mockApi.core.users.me.delete.mockResolvedValue({
+        data: null,
+        error: { status: 500, value: { error: "boom" } },
+      });
+      await expect(deleteAccount()).rejects.toThrow(
+        /try again or contact support/i,
+      );
+    });
+
+    it("throws when the body says success: false", async () => {
+      mockApi.core.users.me.delete.mockResolvedValue({
+        data: { success: false },
+        error: null,
+      });
+      await expect(deleteAccount()).rejects.toThrow(/not successful/i);
     });
   });
 });

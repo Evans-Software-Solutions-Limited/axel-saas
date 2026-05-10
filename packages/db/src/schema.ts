@@ -40,6 +40,14 @@ export const provisioningStatusEnum = pgEnum("provisioning_status", [
 
 // ─── Users ────────────────────────────────────────────────────────────────────
 
+// Notification preference keys. New categories can be added without a
+// schema change — read access goes through `withNotificationDefaults` in
+// the user repository so absent keys fall back to `true`.
+export type NotificationPreferences = {
+  emailNotifications?: boolean;
+  weeklyDigest?: boolean;
+};
+
 export const users = pgTable(
   "users",
   {
@@ -50,6 +58,10 @@ export const users = pgTable(
     onboardingCompleted: boolean("onboarding_completed")
       .notNull()
       .default(false),
+    notificationPreferences: jsonb("notification_preferences")
+      .$type<NotificationPreferences>()
+      .notNull()
+      .default({}),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

@@ -1,18 +1,23 @@
 import { useEffect, useState } from "react";
 import { Button } from "@axel-saas/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@axel-saas/ui/card";
-import { Input } from "@axel-saas/ui/input";
-import { Label } from "@axel-saas/ui/label";
 import { Badge } from "@axel-saas/ui/badge";
 import {
   fetchInvoices,
   fetchSubscriptionStatus,
+  fetchUserProfile,
   openCustomerPortal,
   type InvoiceSummary,
+  type NotificationPreferences,
   type SubscriptionInfo,
+  type UserProfile,
 } from "./settings/settingsApi";
 import { fetchUsageSummary, type UsageSummary } from "./usage/usageApi";
 import { UsagePanel } from "./usage/UsagePanel";
+import { ProfilePanel } from "./settings/ProfilePanel";
+import { NotificationsPanel } from "./settings/NotificationsPanel";
+import { DangerZonePanel } from "./settings/DangerZonePanel";
+import { useAuth } from "@/hooks/useAuth";
 
 const STATUS_LABELS: Record<SubscriptionInfo["status"], string> = {
   active: "Active",
@@ -55,11 +60,11 @@ function formatInvoiceAmount(minorUnits: number, currency: string): string {
 }
 
 export function Settings() {
-  // Profile + notifications stay mocked for this PR — wired up in a
-  // follow-up alongside PUT /users/me and the preferences column.
-  const [email, setEmail] = useState("user@example.com");
-  const [name, setName] = useState("John Doe");
-  const [notifications, setNotifications] = useState(true);
+  const { signOut } = useAuth();
+
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [profileLoading, setProfileLoading] = useState(true);
+  const [profileError, setProfileError] = useState<string | null>(null);
 
   const [subscription, setSubscription] = useState<SubscriptionInfo | null>(
     null,
@@ -83,6 +88,26 @@ export function Settings() {
 
   useEffect(() => {
     let cancelled = false;
+
+    // Profile (Profile + Notifications + Danger Zone) loads in parallel
+    // with billing and usage. A slow /users/me must not pin the billing
+    // card in "Loading…" — same pattern as #91 / #96.
+    fetchUserProfile()
+      .then((value) => {
+        if (!cancelled) setProfile(value);
+      })
+      .catch((reason: unknown) => {
+        if (!cancelled) {
+          setProfileError(
+            reason instanceof Error
+              ? reason.message
+              : "Could not load your profile",
+          );
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setProfileLoading(false);
+      });
 
     // Billing (subscription + invoices) is rendered as one block by
     // BillingPanel — invoices errors render inline within it, but the
@@ -161,6 +186,28 @@ export function Settings() {
     window.location.assign("/subscribe");
   };
 
+  const handleAccountDeleted = async () => {
+    // Sign the user out via the auth context so the in-memory session
+    // is cleared and the auth listener fires consistently. signOut also
+    // navigates to / on success. If signOut fails (e.g. the auth row is
+    // already gone server-side), fall back to a hard redirect — the
+    // session was just invalidated anyway.
+    const result = await signOut();
+    if (!result.success) {
+      window.location.assign("/");
+    }
+  };
+
+  const handleProfileUpdated = (next: UserProfile) => {
+    setProfile(next);
+  };
+
+  const handleNotificationsUpdated = (next: NotificationPreferences) => {
+    setProfile((prev) =>
+      prev ? { ...prev, notificationPreferences: next } : prev,
+    );
+  };
+
   return (
     <div className="p-6 max-w-2xl space-y-6">
       <div>
@@ -171,69 +218,33 @@ export function Settings() {
       </div>
 
       <div className="space-y-6">
-        {/* Profile Section — UI-only stub, wiring lands in the next PR */}
         <Card>
           <CardHeader>
             <CardTitle className="text-text font-display">Profile</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="name" className="text-text-secondary text-sm">
-                Name
-              </Label>
-              <Input
-                id="name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="bg-surface-raised border-border text-text focus:border-accent focus:ring-accent-glow/30"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="email" className="text-text-secondary text-sm">
-                Email
-              </Label>
-              <Input
-                id="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="bg-surface-raised border-border text-text focus:border-accent focus:ring-accent-glow/30"
-              />
-            </div>
-            <Button>Save changes</Button>
+          <CardContent>
+            <ProfilePanel
+              profile={profile}
+              loading={profileLoading}
+              loadError={profileError}
+              onUpdated={handleProfileUpdated}
+            />
           </CardContent>
         </Card>
 
-        {/* Notifications Section — UI-only stub, wiring lands in the next PR */}
         <Card>
           <CardHeader>
             <CardTitle className="text-text font-display">
               Notifications
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-text font-medium">Email notifications</p>
-                <p className="text-sm text-text-secondary">
-                  Get notified of important updates
-                </p>
-              </div>
-              <button
-                type="button"
-                role="button"
-                onClick={() => setNotifications(!notifications)}
-                className={`relative w-11 h-6 rounded-full transition-all duration-300 ${
-                  notifications ? "bg-accent" : "bg-surface-elevated"
-                }`}
-              >
-                <span className="sr-only">{notifications ? "On" : "Off"}</span>
-                <span
-                  className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-sm transition-transform duration-300 ${
-                    notifications ? "translate-x-5" : "translate-x-0"
-                  }`}
-                />
-              </button>
-            </div>
+          <CardContent>
+            <NotificationsPanel
+              preferences={profile?.notificationPreferences ?? null}
+              loading={profileLoading}
+              loadError={profileError}
+              onUpdated={handleNotificationsUpdated}
+            />
           </CardContent>
         </Card>
 
@@ -278,6 +289,36 @@ export function Settings() {
               loading={usageLoading}
               error={usageError}
             />
+          </CardContent>
+        </Card>
+
+        <Card className="border-destructive/40">
+          <CardHeader>
+            <CardTitle className="text-destructive font-display">
+              Danger Zone
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {profileLoading ? (
+              <p className="text-sm text-text-secondary">Loading…</p>
+            ) : profileError !== null || profile === null ? (
+              <div className="space-y-3">
+                <div>
+                  <p className="text-text font-medium">Delete account</p>
+                  <p className="text-sm text-text-secondary">
+                    Permanently delete your account and all its data.
+                  </p>
+                </div>
+                <p className="text-sm text-destructive" role="alert">
+                  {profileError ?? "We couldn't load your account details."}
+                </p>
+              </div>
+            ) : (
+              <DangerZonePanel
+                email={profile.email}
+                onDeleted={handleAccountDeleted}
+              />
+            )}
           </CardContent>
         </Card>
       </div>

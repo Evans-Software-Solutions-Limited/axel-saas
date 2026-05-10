@@ -34,6 +34,9 @@ vi.mock("@axel-saas/api-utils/auth/supabaseAuth", () => {
 
 vi.mock("../../repositories/userRepository", () => {
   return {
+    UserRepository: vi.fn().mockImplementation(() => ({
+      deleteById: vi.fn(),
+    })),
     userRepository: {
       getUserBySupabaseId: vi.fn(async (supabaseId: string) => {
         if (supabaseId === "test-user-id") {
@@ -42,6 +45,7 @@ vi.mock("../../repositories/userRepository", () => {
             email: "test@example.com",
             fullName: "Test User",
             onboardingCompleted: false,
+            notificationPreferences: {},
             createdAt: new Date("2024-01-01"),
             updatedAt: new Date("2024-01-01"),
           };
@@ -51,9 +55,32 @@ vi.mock("../../repositories/userRepository", () => {
       updateUser: vi.fn(async () => {
         return { id: "db-user-id", onboardingCompleted: true };
       }),
+      updateProfile: vi.fn(),
+      updateNotificationPreferences: vi.fn(),
+      deleteById: vi.fn(),
     },
+    withNotificationDefaults: (
+      prefs: Record<string, boolean> | null | undefined,
+    ) => ({
+      emailNotifications: true,
+      weeklyDigest: true,
+      ...(prefs ?? {}),
+    }),
+    NOTIFICATION_DEFAULTS: { emailNotifications: true, weeklyDigest: true },
   };
 });
+
+vi.mock("../../repositories/subscriptionRepository", () => ({
+  SubscriptionRepository: vi.fn().mockImplementation(() => ({
+    findByUserId: vi.fn(),
+  })),
+}));
+
+vi.mock("../accountDeletionService", () => ({
+  AccountDeletionService: vi.fn().mockImplementation(() => ({
+    deleteAccount: vi.fn().mockResolvedValue({ success: true }),
+  })),
+}));
 
 describe("UserHandler", () => {
   beforeEach(() => {
@@ -152,6 +179,7 @@ describe("UserHandler", () => {
         email: "user@example.com",
         fullName: "User Name",
         onboardingCompleted: false,
+        notificationPreferences: {},
         createdAt: new Date("2024-01-01"),
         updatedAt: new Date("2024-01-01"),
       };
