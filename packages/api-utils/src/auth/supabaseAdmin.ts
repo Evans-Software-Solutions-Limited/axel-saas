@@ -40,6 +40,19 @@ function readConfig(): SupabaseAdminConfig | { error: string } {
 }
 
 /**
+ * Returns true when both `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`
+ * are set — i.e. when `deleteAuthUser` will be able to authenticate
+ * against the Supabase admin API. Callers should use this as a pre-flight
+ * check BEFORE running any destructive operations that depend on the
+ * admin call succeeding (e.g. the account-deletion cascade); a runtime
+ * "key is unset" failure AFTER irreversible damage cannot be recovered
+ * from by retry.
+ */
+export function isSupabaseAdminConfigured(): boolean {
+  return !("error" in readConfig());
+}
+
+/**
  * Delete a user from Supabase auth by their auth-user UUID.
  *
  * Idempotent: a 404 is reported as `alreadyRemoved: true` rather than an

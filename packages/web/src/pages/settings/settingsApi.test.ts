@@ -368,6 +368,18 @@ describe("settingsApi", () => {
       await expect(deleteAccount()).resolves.toBeUndefined();
     });
 
+    it("surfaces a 'contact support' message on a 503 (auth admin not configured)", async () => {
+      // Bugbot regression: distinct from the generic 500 / 502 because
+      // there's no point asking the user to retry until the operator
+      // sets SUPABASE_SERVICE_ROLE_KEY.
+      mockApi.core.users.me.delete.mockResolvedValue({
+        data: null,
+        error: { status: 503, value: { error: "not configured" } },
+      });
+      await expect(deleteAccount()).rejects.toThrow(/contact support/i);
+      await expect(deleteAccount()).rejects.not.toThrow(/please try again/i);
+    });
+
     it("surfaces a friendly message on a 502 (Stripe failure)", async () => {
       mockApi.core.users.me.delete.mockResolvedValue({
         data: null,

@@ -219,9 +219,16 @@ export async function deleteAccount(): Promise<void> {
   const response = await api.core.users.me.delete();
   if (response.error) {
     const status = response.error.status;
-    // The handler maps Stripe failures to 502 — communicate that as
-    // distinct from a generic 500 so the user knows a retry is likely
-    // to succeed (vs. needing to contact support).
+    // 503: the backend pre-flight aborted because Supabase admin isn't
+    // configured on this stage. No retry will help — the user needs
+    // operator intervention. (Also, crucially, the abort happens BEFORE
+    // any destructive op, so their account is still intact.)
+    if (status === 503) {
+      throw new Error(
+        "Account deletion isn't available right now. Please contact support.",
+      );
+    }
+    // 502: Stripe failed. A retry might succeed, so the copy invites one.
     if (status === 502) {
       throw new Error(
         "We couldn't cancel your subscription with our payment provider. Please try again in a moment.",

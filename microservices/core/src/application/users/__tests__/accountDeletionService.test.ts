@@ -51,6 +51,10 @@ function makeService(
     /** When `null`, simulate the orphan-cleanup retry path (DB row
      * already gone from a prior partial-failure attempt). */
     dbUser?: typeof DEFAULT_DB_USER | null;
+    /** Defaults to `true` — the pre-flight check passes by default so
+     * existing tests don't have to set env vars. Override to `false`
+     * to exercise the pre-flight-abort branch. */
+    isAuthAdminConfigured?: boolean;
   } = {},
 ): Deps {
   const dbUser =
@@ -85,6 +89,9 @@ function makeService(
     warn: vi.fn(),
     error: vi.fn(),
   };
+  const isAuthAdminConfigured = vi
+    .fn()
+    .mockReturnValue(options.isAuthAdminConfigured ?? true);
   const service = new AccountDeletionService({
     userRepo: userRepo as unknown as UserRepository,
     subscriptionRepo: subscriptionRepo as unknown as SubscriptionRepository,
@@ -92,6 +99,7 @@ function makeService(
       ? undefined
       : ({ subscriptions: { cancel: stripeCancel } } as never),
     deleteAuthUser,
+    isAuthAdminConfigured,
     logger,
   });
   return {
@@ -231,6 +239,31 @@ describe("AccountDeletionService", () => {
     });
 
     expect(result.success).toBe(true);
+  });
+
+  it("aborts BEFORE any destructive op when the auth admin is not configured", async () => {
+    // Bugbot regression: missing SUPABASE_SERVICE_ROLE_KEY used to surface
+    // only at step 3 (deleteAuthUser) — AFTER Stripe was cancelled and
+    // the DB cascade had destroyed every owned row. With the user's app
+    // data gone and the auth row orphaned, retries could never recover
+    // because the key was still missing. The pre-flight check now aborts
+    // up front so the user's account stays intact and ops can fix the
+    // stage config.
+    const deps = makeService({ isAuthAdminConfigured: false });
+
+    const result = await deps.service.deleteAccount({
+      supabaseUserId: "auth-1",
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.reason).toBe("auth_not_configured");
+    // CRITICAL: no destructive op may have fired. If any of these
+    // assertions fail, user data is at risk of irreversible loss.
+    expect(deps.userRepo.getUserBySupabaseId).not.toHaveBeenCalled();
+    expect(deps.subscriptionRepo.findByUserId).not.toHaveBeenCalled();
+    expect(deps.stripeCancel).not.toHaveBeenCalled();
+    expect(deps.userRepo.deleteById).not.toHaveBeenCalled();
+    expect(deps.deleteAuthUser).not.toHaveBeenCalled();
   });
 
   it("runs orphan-cleanup (auth-only) when the DB row is already gone", async () => {

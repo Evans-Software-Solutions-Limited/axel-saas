@@ -367,6 +367,28 @@ describe("userHandler routes", () => {
       });
     });
 
+    it("maps auth_not_configured pre-flight aborts to a 503 with bespoke copy", async () => {
+      // Bugbot regression: this status maps to the pre-flight abort that
+      // fires BEFORE any destructive op when the Supabase service-role
+      // key is unset. The user-facing copy is intentionally distinct
+      // from the generic 500 — there's no point asking the user to
+      // retry until ops sets the secret.
+      accountDeletionMock.deleteAccount.mockResolvedValueOnce({
+        success: false,
+        reason: "auth_not_configured",
+      });
+      const result = await userHandler.handle(
+        new Request(`${BASE}/users/me`, {
+          method: "DELETE",
+          headers: AUTHED_HEADERS,
+        }),
+      );
+      expect(result.status).toBe(503);
+      const body = (await result.json()) as { error: string };
+      expect(body.error).toMatch(/contact support/i);
+      expect(body.error).not.toMatch(/please try again/i);
+    });
+
     it("maps Stripe failures to a 502", async () => {
       accountDeletionMock.deleteAccount.mockResolvedValueOnce({
         success: false,

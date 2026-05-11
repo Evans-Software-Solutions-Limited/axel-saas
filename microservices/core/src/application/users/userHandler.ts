@@ -205,17 +205,23 @@ export const userHandler = new Elysia({ name: "UserHandler" })
         const result = await service.deleteAccount({ supabaseUserId });
 
         if (!result.success) {
-          // Map internal reasons to HTTP status. Stripe failure is a
-          // 502 (we treat the upstream provider as the failing
-          // dependency) so a generic retry is meaningful. Auth/DB
-          // failures surface as 500 — the caller can retry, the service
-          // is idempotent.
-          if (result.reason === "stripe_cancel_failed") set.status = 502;
+          // Map internal reasons to HTTP status:
+          //   - `auth_not_configured` → 503: pre-flight aborted before
+          //     ANY destructive op. The service-role key is missing on
+          //     this stage. No retry will help until ops set the secret.
+          //   - `stripe_cancel_failed` → 502: upstream provider failed,
+          //     retry is meaningful.
+          //   - DB / auth-delete → 500: the service is idempotent, the
+          //     caller can retry.
+          if (result.reason === "auth_not_configured") set.status = 503;
+          else if (result.reason === "stripe_cancel_failed") set.status = 502;
           else set.status = 500;
           return {
             success: false,
             error:
-              "Account deletion failed. Please try again or contact support.",
+              result.reason === "auth_not_configured"
+                ? "Account deletion isn't available right now. Please contact support."
+                : "Account deletion failed. Please try again or contact support.",
           };
         }
 

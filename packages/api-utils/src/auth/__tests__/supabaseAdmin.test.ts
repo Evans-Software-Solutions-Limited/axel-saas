@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { deleteAuthUser } from "../supabaseAdmin";
+import { deleteAuthUser, isSupabaseAdminConfigured } from "../supabaseAdmin";
 
 const ENV = {
   SUPABASE_URL: process.env.SUPABASE_URL,
@@ -123,5 +123,41 @@ describe("deleteAuthUser", () => {
     expect(url).toBe(
       "https://example.supabase.co/auth/v1/admin/users/user-123",
     );
+  });
+});
+
+describe("isSupabaseAdminConfigured", () => {
+  beforeEach(() => {
+    process.env.SUPABASE_URL = "https://example.supabase.co";
+    process.env.SUPABASE_SERVICE_ROLE_KEY = "test-service-role";
+  });
+
+  afterEach(() => {
+    process.env.SUPABASE_URL = ENV.SUPABASE_URL;
+    process.env.SUPABASE_SERVICE_ROLE_KEY = ENV.SUPABASE_SERVICE_ROLE_KEY;
+  });
+
+  it("returns true when both env vars are set", () => {
+    expect(isSupabaseAdminConfigured()).toBe(true);
+  });
+
+  it("returns false when SUPABASE_URL is missing", () => {
+    delete process.env.SUPABASE_URL;
+    expect(isSupabaseAdminConfigured()).toBe(false);
+  });
+
+  it("returns false when SUPABASE_SERVICE_ROLE_KEY is missing", () => {
+    delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+    expect(isSupabaseAdminConfigured()).toBe(false);
+  });
+
+  it("returns false when the service-role key is set to an empty string (SST placeholder default)", () => {
+    // The infra/secrets.ts placeholder is "" so previews can deploy
+    // without the key set. The pre-flight check has to treat "" as
+    // "not configured" — otherwise the destructive ops fire and then
+    // the admin REST call 401s, the exact failure mode this whole
+    // pre-flight exists to prevent.
+    process.env.SUPABASE_SERVICE_ROLE_KEY = "";
+    expect(isSupabaseAdminConfigured()).toBe(false);
   });
 });

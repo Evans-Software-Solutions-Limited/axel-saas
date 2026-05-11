@@ -23,6 +23,7 @@ import Stripe from "stripe";
 import {
   type DeleteAuthUserResult,
   deleteAuthUser as deleteAuthUserDefault,
+  isSupabaseAdminConfigured as isSupabaseAdminConfiguredDefault,
 } from "@axel-saas/api-utils/auth/supabaseAdmin";
 import type { UserRepository } from "../repositories/userRepository";
 import type { SubscriptionRepository } from "../repositories/subscriptionRepository";
@@ -35,6 +36,11 @@ export interface AccountDeletionDeps {
   stripe?: Pick<Stripe, "subscriptions">;
   /** Override for tests. Defaults to the real Supabase admin REST call. */
   deleteAuthUser?: (supabaseUserId: string) => Promise<DeleteAuthUserResult>;
+  /** Override for tests. Defaults to checking the real env vars. The
+   * production-default reads `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY`
+   * via `isSupabaseAdminConfigured`. Test suites that don't want to
+   * touch env between cases can stub this to a constant. */
+  isAuthAdminConfigured?: () => boolean;
   logger?: {
     info: (msg: string, ctx?: Record<string, unknown>) => void;
     warn: (msg: string, ctx?: Record<string, unknown>) => void;
@@ -46,7 +52,11 @@ export interface DeleteAccountResult {
   success: boolean;
   /** Reason a non-success result was returned. The handler maps these to
    * HTTP status codes; the caller never sees an internal error string. */
-  reason?: "stripe_cancel_failed" | "db_delete_failed" | "auth_delete_failed";
+  reason?:
+    | "auth_not_configured"
+    | "stripe_cancel_failed"
+    | "db_delete_failed"
+    | "auth_delete_failed";
   details?: string;
   /** True when the application DB row was already gone before this call
    * (the orphan-cleanup / idempotent retry path). The handler doesn't
@@ -80,6 +90,33 @@ export class AccountDeletionService {
   }): Promise<DeleteAccountResult> {
     const { supabaseUserId } = input;
     const { userRepo, subscriptionRepo } = this.deps;
+
+    // PRE-FLIGHT: confirm the Supabase admin API is configured BEFORE
+    // touching any user data. This is the single highest-risk failure
+    // mode for account deletion — if `SUPABASE_SERVICE_ROLE_KEY` (or
+    // `SUPABASE_URL`) is unset, the auth-admin call at step 3 fails
+    // AFTER Stripe is cancelled and the DB cascade has destroyed every
+    // owned row, leaving the user with: no app data, an orphaned
+    // auth.users row, and no recovery path (retries still fail because
+    // the key is still missing; the user can sign in but hits a
+    // perpetual 404 on /users/me).
+    //
+    // Aborting up front turns this into a clean "service unavailable"
+    // that operators can fix by setting the secret. The Settings UI
+    // surfaces this as a "contact support" message via the 503 mapping
+    // in the handler.
+    const isConfigured =
+      this.deps.isAuthAdminConfigured ?? isSupabaseAdminConfiguredDefault;
+    if (!isConfigured()) {
+      this.logger.error("auth_admin_not_configured", { supabaseUserId });
+      return {
+        success: false,
+        reason: "auth_not_configured",
+        details:
+          "Supabase admin API is not configured on this stage — set " +
+          "SUPABASE_SERVICE_ROLE_KEY via SST before retrying.",
+      };
+    }
 
     // Look up the application user by their Supabase auth id. A null
     // result is the orphan-cleanup case: the DB row was already removed
