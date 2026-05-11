@@ -313,6 +313,40 @@ describe("Settings", () => {
         });
       });
     });
+
+    it("disables BOTH toggles while a save is in flight (UI matches handleToggle's any-save guard)", async () => {
+      // Bugbot regression: each toggle's `disabled` used to match only
+      // its own key (`saving === "emailNotifications"`), but
+      // `handleToggle` early-returns on any in-flight save. The
+      // non-saving toggle looked clickable, accepted the click, and
+      // silently no-op'd. Now both toggles flip to disabled together.
+      let resolveSave: (value: NotificationPreferences) => void = () => {};
+      vi.mocked(updateNotificationPreferences).mockImplementation(
+        () =>
+          new Promise<NotificationPreferences>((r) => {
+            resolveSave = r;
+          }),
+      );
+
+      render(<Settings />);
+      const toggles = await screen.findAllByRole("switch");
+      const [emailToggle, weeklyDigestToggle] = toggles;
+      fireEvent.click(emailToggle!);
+
+      // While email is saving, both toggles should report disabled —
+      // the cursor / opacity must match the handler's behaviour.
+      await waitFor(() => {
+        expect(emailToggle).toHaveProperty("disabled", true);
+      });
+      expect(weeklyDigestToggle).toHaveProperty("disabled", true);
+
+      // Resolve the save — both come back enabled.
+      resolveSave({ emailNotifications: false, weeklyDigest: true });
+      await waitFor(() => {
+        expect(emailToggle).toHaveProperty("disabled", false);
+      });
+      expect(weeklyDigestToggle).toHaveProperty("disabled", false);
+    });
   });
 
   describe("danger zone", () => {

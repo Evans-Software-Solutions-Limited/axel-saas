@@ -107,6 +107,12 @@ export function NotificationsPanel({
     }
   };
 
+  // Both toggles disable while ANY save is in flight, not just the
+  // saving one. `handleToggle` early-returns on `if (saving)` so a
+  // click on the other toggle would otherwise silently no-op — the UI
+  // feedback (cursor, opacity) has to match the actual behaviour.
+  const anySaving = saving !== null;
+
   return (
     <div className="space-y-4">
       <Toggle
@@ -114,7 +120,7 @@ export function NotificationsPanel({
         label="Email notifications"
         description="Transactional emails (sign-in alerts, billing receipts)."
         checked={preferences.emailNotifications}
-        disabled={saving === "emailNotifications"}
+        disabled={anySaving}
         onChange={(next) => void handleToggle("emailNotifications", next)}
       />
       <Toggle
@@ -122,7 +128,7 @@ export function NotificationsPanel({
         label="Weekly digest"
         description="A short summary of what Axel did this week."
         checked={preferences.weeklyDigest}
-        disabled={saving === "weeklyDigest"}
+        disabled={anySaving}
         onChange={(next) => void handleToggle("weeklyDigest", next)}
       />
       {saveError && (
