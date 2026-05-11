@@ -1,6 +1,7 @@
 import { coreApiDomain, hostedZoneId, webOrigin } from "./domains";
 import {
   supabaseDatabaseUrl,
+  supabaseServiceRoleKey,
   stripeSecretKey,
   stripeWebhookSecret,
   resendApiKey,
@@ -44,6 +45,7 @@ coreAPI.route("$default", {
   environment: {
     DATABASE_URL: supabaseDatabaseUrl.value,
     SUPABASE_URL: process.env.SUPABASE_URL || "",
+    SUPABASE_SERVICE_ROLE_KEY: supabaseServiceRoleKey.value,
     STRIPE_SECRET_KEY: stripeSecretKey.value,
     STRIPE_WEBHOOK_SECRET: stripeWebhookSecret.value,
     STRIPE_PRICE_PREMIUM: process.env.STRIPE_PRICE_PREMIUM || "",

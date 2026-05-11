@@ -9,10 +9,30 @@ vi.mock("@axel-saas/db", () => ({
 const mockUserRepository = {
   getUserBySupabaseId: vi.fn(),
   updateUser: vi.fn(),
+  updateProfile: vi.fn(),
+  updateNotificationPreferences: vi.fn(),
+  deleteById: vi.fn(),
 };
 
 vi.mock("../../repositories/userRepository", () => ({
+  UserRepository: vi.fn().mockImplementation(() => mockUserRepository),
   userRepository: mockUserRepository,
+  withNotificationDefaults: (
+    prefs: Record<string, boolean> | null | undefined,
+  ) => ({ emailNotifications: true, weeklyDigest: true, ...(prefs ?? {}) }),
+  NOTIFICATION_DEFAULTS: { emailNotifications: true, weeklyDigest: true },
+}));
+
+vi.mock("../../repositories/subscriptionRepository", () => ({
+  SubscriptionRepository: vi.fn().mockImplementation(() => ({
+    findByUserId: vi.fn(),
+  })),
+}));
+
+vi.mock("../accountDeletionService", () => ({
+  AccountDeletionService: vi.fn().mockImplementation(() => ({
+    deleteAccount: vi.fn().mockResolvedValue({ success: true }),
+  })),
 }));
 
 // Mock auth utils
@@ -47,6 +67,7 @@ describe("UserHandler Endpoints", () => {
         email: "user@example.com",
         fullName: "John Doe",
         onboardingCompleted: true,
+        notificationPreferences: {},
         createdAt: new Date("2024-01-01"),
         updatedAt: new Date("2024-01-15"),
       };
@@ -109,6 +130,7 @@ describe("UserHandler Endpoints", () => {
         email: "user@example.com",
         fullName: "Jane Doe",
         onboardingCompleted: false,
+        notificationPreferences: {},
         createdAt: new Date("2024-02-01"),
         updatedAt: new Date("2024-02-20"),
       };
@@ -172,6 +194,7 @@ describe("UserHandler Endpoints", () => {
         email: "user@example.com",
         fullName: "John Doe",
         onboardingCompleted: true,
+        notificationPreferences: {},
         createdAt: new Date("2024-01-01"),
         updatedAt: new Date("2024-01-01"),
       };

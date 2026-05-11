@@ -15,14 +15,40 @@ vi.mock("@axel-saas/api-utils/auth/supabaseAuth", () => {
 });
 
 // Mock repository
-vi.mock("../repositories/userRepository", () => {
+vi.mock("../../repositories/userRepository", () => {
   return {
+    UserRepository: vi.fn().mockImplementation(() => ({
+      deleteById: vi.fn(),
+    })),
     userRepository: {
       getUserBySupabaseId: vi.fn(),
       updateUser: vi.fn(),
+      updateProfile: vi.fn(),
+      updateNotificationPreferences: vi.fn(),
+      deleteById: vi.fn(),
     },
+    withNotificationDefaults: (
+      prefs: Record<string, boolean> | null | undefined,
+    ) => ({
+      emailNotifications: true,
+      weeklyDigest: true,
+      ...(prefs ?? {}),
+    }),
+    NOTIFICATION_DEFAULTS: { emailNotifications: true, weeklyDigest: true },
   };
 });
+
+vi.mock("../../repositories/subscriptionRepository", () => ({
+  SubscriptionRepository: vi.fn().mockImplementation(() => ({
+    findByUserId: vi.fn(),
+  })),
+}));
+
+vi.mock("../accountDeletionService", () => ({
+  AccountDeletionService: vi.fn().mockImplementation(() => ({
+    deleteAccount: vi.fn().mockResolvedValue({ success: true }),
+  })),
+}));
 
 describe("UserHandler - Available Methods", () => {
   beforeEach(() => {

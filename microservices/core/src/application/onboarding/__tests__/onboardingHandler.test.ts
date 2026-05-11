@@ -62,6 +62,7 @@ describe("OnboardingHandler Endpoints", () => {
         email: "test@example.com",
         fullName: "Test User",
         onboardingCompleted: false,
+        notificationPreferences: {},
         createdAt: new Date(),
         updatedAt: new Date(),
       };
@@ -108,6 +109,7 @@ describe("OnboardingHandler Endpoints", () => {
         email: "test@example.com",
         fullName: "Test User",
         onboardingCompleted: true,
+        notificationPreferences: {},
         createdAt: new Date("2024-01-15"),
         updatedAt: new Date("2024-01-15"),
       };
@@ -127,6 +129,7 @@ describe("OnboardingHandler Endpoints", () => {
         email: "test@example.com",
         fullName: "Test User",
         onboardingCompleted: false,
+        notificationPreferences: {},
         createdAt: new Date(),
         updatedAt: new Date(),
       };
@@ -190,6 +193,7 @@ describe("OnboardingHandler Endpoints", () => {
         email: "test@example.com",
         fullName: "Test User",
         onboardingCompleted: true,
+        notificationPreferences: {},
         createdAt: new Date(),
         updatedAt: new Date(),
       };

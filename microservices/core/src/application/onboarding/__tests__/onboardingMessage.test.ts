@@ -88,6 +88,7 @@ const MOCK_USER = {
   email: "test@example.com",
   fullName: "Test User",
   onboardingCompleted: false,
+  notificationPreferences: {},
   createdAt: new Date(),
   updatedAt: new Date(),
 };

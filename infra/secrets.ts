@@ -1,6 +1,17 @@
 export const supabaseDatabaseUrl = new sst.Secret(
   "AxelSaasSupabaseDatabaseUrl",
 );
+// Supabase service-role key, used by the account-deletion flow to call
+// the admin REST API (`auth/v1/admin/users/:id`). MUST be the
+// service-role key — the anon key silently no-ops on admin endpoints.
+// The "" placeholder lets the secret stay unset in previews / fresh
+// stages without blocking `sst deploy`; the deletion handler then
+// returns a 5xx with a "contact support" message until the real value
+// is bound via `sst secret set AxelSaasSupabaseServiceRoleKey`.
+export const supabaseServiceRoleKey = new sst.Secret(
+  "AxelSaasSupabaseServiceRoleKey",
+  "",
+);
 export const stripeSecretKey = new sst.Secret("AxelSaasStripeSecretKey");
 export const stripeWebhookSecret = new sst.Secret(
   "AxelSaasStripeWebhookSecret",
