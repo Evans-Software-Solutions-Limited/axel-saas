@@ -89,6 +89,21 @@ export interface WorkspaceConfigFs {
     content: string,
     encoding: BufferEncoding,
   ) => Promise<void>;
+  /**
+   * Read a file's contents, returning `null` when the file doesn't
+   * exist. Any other error propagates — callers (notably the
+   * `openclaw.json` regen path) want to distinguish "missing" from
+   * "I/O failure" because the former is the legitimate first-regen
+   * case and the latter is a real problem worth surfacing.
+   *
+   * Returning `null` rather than throwing on ENOENT keeps the call
+   * sites readable; the default impl converts the Node `ENOENT`
+   * to a null and lets every other error through.
+   */
+  readFile: (
+    target: string,
+    encoding: BufferEncoding,
+  ) => Promise<string | null>;
 }
 
 export interface WorkspaceConfigLogger {
@@ -215,6 +230,25 @@ export class WorkspaceConfigService {
   }
 
   /**
+   * Read a single file from the user's workspace. Returns `null`
+   * when the file doesn't exist (e.g. `openclaw.json` before the
+   * container has ever booted). Used by the openclaw.json regen
+   * pipeline to read the existing on-disk state before merging
+   * with a freshly-generated config.
+   *
+   * Other I/O errors propagate so the caller can decide whether
+   * to retry or skip — for the regen path we want to abort cleanly
+   * rather than write a half-merged file.
+   */
+  async readWorkspaceFile(
+    userId: string,
+    filename: string,
+  ): Promise<string | null> {
+    const workspacePath = this.resolveWorkspacePath(userId);
+    return this.fs.readFile(path.join(workspacePath, filename), "utf8");
+  }
+
+  /**
    * Wait for every in-flight reload signal started by `updateFiles`
    * to finish (success, error, or timeout). Useful in tests where
    * assertions over reload behaviour would otherwise race the
@@ -306,6 +340,23 @@ const defaultFs: WorkspaceConfigFs = {
   mkdir: (target, opts) => fs.mkdir(target, opts),
   writeFile: (target, content, encoding) =>
     fs.writeFile(target, content, encoding),
+  readFile: async (target, encoding) => {
+    try {
+      return await fs.readFile(target, encoding);
+    } catch (err: unknown) {
+      // Node's ENOENT is the "file doesn't exist" path; everything
+      // else (EACCES, EIO, EBUSY) is a real failure we want surfaced.
+      if (
+        err !== null &&
+        typeof err === "object" &&
+        "code" in err &&
+        (err as { code?: string }).code === "ENOENT"
+      ) {
+        return null;
+      }
+      throw err;
+    }
+  },
 };
 
 function defaultResolveGatewayAuthorization(): string | null {

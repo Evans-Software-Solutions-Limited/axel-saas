@@ -26,10 +26,12 @@ const ACTIVE_CONTAINER = {
 function makeFakeFs(): WorkspaceConfigFs & {
   mkdir: ReturnType<typeof vi.fn>;
   writeFile: ReturnType<typeof vi.fn>;
+  readFile: ReturnType<typeof vi.fn>;
 } {
   return {
     mkdir: vi.fn().mockResolvedValue(undefined),
     writeFile: vi.fn().mockResolvedValue(undefined),
+    readFile: vi.fn().mockResolvedValue(null),
   };
 }
 
@@ -445,5 +447,102 @@ describe("WorkspaceConfigService.updateFiles", () => {
       fs: makeFakeFs(),
     });
     await expect(svc.drainPendingReloads()).resolves.toBeUndefined();
+  });
+});
+
+describe("WorkspaceConfigService.readWorkspaceFile", () => {
+  it("reads a file from the resolved workspace path with utf8 encoding", async () => {
+    const fs = makeFakeFs();
+    fs.readFile.mockResolvedValueOnce('{"openclaw": "config"}');
+    const svc = new WorkspaceConfigService({
+      provisioningRepo: makeFakeProvisioningRepo(
+        ACTIVE_CONTAINER,
+      ) as ProvisioningRepository,
+      triggerReload: vi.fn(),
+      resolveWorkspacePath: () => "/efs/u-1/workspace",
+      fs,
+    });
+
+    const content = await svc.readWorkspaceFile("u-1", "openclaw.json");
+    expect(content).toBe('{"openclaw": "config"}');
+    expect(fs.readFile).toHaveBeenCalledWith(
+      "/efs/u-1/workspace/openclaw.json",
+      "utf8",
+    );
+  });
+
+  it("returns null when the file doesn't exist", async () => {
+    const fs = makeFakeFs();
+    fs.readFile.mockResolvedValueOnce(null);
+    const svc = new WorkspaceConfigService({
+      provisioningRepo: makeFakeProvisioningRepo(
+        ACTIVE_CONTAINER,
+      ) as ProvisioningRepository,
+      triggerReload: vi.fn(),
+      resolveWorkspacePath: () => "/efs/u-1/workspace",
+      fs,
+    });
+    const content = await svc.readWorkspaceFile("u-1", "openclaw.json");
+    expect(content).toBeNull();
+  });
+
+  it("propagates non-ENOENT I/O errors so the caller can abort cleanly", async () => {
+    const fs = makeFakeFs();
+    fs.readFile.mockRejectedValueOnce(new Error("EACCES: permission denied"));
+    const svc = new WorkspaceConfigService({
+      provisioningRepo: makeFakeProvisioningRepo(
+        ACTIVE_CONTAINER,
+      ) as ProvisioningRepository,
+      triggerReload: vi.fn(),
+      resolveWorkspacePath: () => "/efs/u-1/workspace",
+      fs,
+    });
+    await expect(svc.readWorkspaceFile("u-1", "openclaw.json")).rejects.toThrow(
+      /EACCES/,
+    );
+  });
+});
+
+describe("WorkspaceConfigService default fs readFile (smoke)", () => {
+  it("returns the real file contents on disk", async () => {
+    const tmpDir = await realFs.mkdtemp(
+      path.join(tmpdir(), "axel-workspace-read-"),
+    );
+    try {
+      await realFs.writeFile(
+        path.join(tmpDir, "openclaw.json"),
+        '{"hello": "world"}',
+      );
+      const svc = new WorkspaceConfigService({
+        provisioningRepo: makeFakeProvisioningRepo(
+          null,
+        ) as ProvisioningRepository,
+        triggerReload: vi.fn(),
+        resolveWorkspacePath: () => tmpDir,
+      });
+      const content = await svc.readWorkspaceFile("u-1", "openclaw.json");
+      expect(content).toBe('{"hello": "world"}');
+    } finally {
+      await realFs.rm(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("returns null for an ENOENT (file doesn't exist)", async () => {
+    const tmpDir = await realFs.mkdtemp(
+      path.join(tmpdir(), "axel-workspace-read-"),
+    );
+    try {
+      const svc = new WorkspaceConfigService({
+        provisioningRepo: makeFakeProvisioningRepo(
+          null,
+        ) as ProvisioningRepository,
+        triggerReload: vi.fn(),
+        resolveWorkspacePath: () => tmpDir,
+      });
+      const content = await svc.readWorkspaceFile("u-1", "missing.json");
+      expect(content).toBeNull();
+    } finally {
+      await realFs.rm(tmpDir, { recursive: true, force: true });
+    }
   });
 });
