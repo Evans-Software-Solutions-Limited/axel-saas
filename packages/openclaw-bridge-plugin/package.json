@@ -18,8 +18,8 @@
       "minGatewayVersion": "2026.4.26"
     },
     "build": {
-      "openclawVersion": "2026.4.26",
-      "pluginSdkVersion": "2026.4.26"
+      "openclawVersion": "2026.5.7",
+      "pluginSdkVersion": "2026.5.7"
     }
   },
   "scripts": {
@@ -30,7 +30,7 @@
     "test:unit": "vitest run --coverage"
   },
   "peerDependencies": {
-    "openclaw": "2026.4.26"
+    "openclaw": "2026.5.7"
   },
   "devDependencies": {
     "@axel-saas/eslint-config": "workspace:*",
@@ -38,7 +38,7 @@
     "@types/node": "^22",
     "@vitest/coverage-v8": "^4.0.18",
     "eslint": "^9.39.1",
-    "openclaw": "2026.4.26",
+    "openclaw": "2026.5.7",
     "vitest": "^4.0.18"
   }
 }
