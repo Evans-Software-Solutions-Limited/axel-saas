@@ -58,12 +58,16 @@ export interface IntegrationsSyncDeps {
     "updateFiles" | "readWorkspaceFile"
   >;
   /**
-   * Optional logger so the orchestrator's "openclaw.json was
-   * malformed, skipping regen" warning has somewhere to land. Tests
-   * inject a stub; production callers can use the same logger they
-   * pass to the workspace service.
+   * Logger for orchestrator-level events the underlying service
+   * doesn't see — currently just the "openclaw.json was malformed,
+   * skipping regen" warning. **Required** so call sites can't
+   * accidentally swallow operator signals: this used to be optional
+   * with a noop default, which meant the malformed-file warning
+   * silently dropped in production because the only production
+   * caller (`integrationHandler`) didn't pass one. Caught by bugbot
+   * on #104. Tests can pass `{ warn: vi.fn() }`.
    */
-  logger?: {
+  logger: {
     warn: (message: string, ctx?: Record<string, unknown>) => void;
   };
 }
@@ -80,8 +84,6 @@ export interface SyncOptions {
   reason?: UpdateReason;
 }
 
-const noopLogger = { warn: () => {} };
-
 /**
  * Regenerate workspace files (TOOLS.md + openclaw.json) from the
  * user's current integrations + tier, write them atomically, and
@@ -93,7 +95,7 @@ export async function syncWorkspaceAfterIntegrationChange(
   tier: SubscriptionTier | null,
   options: SyncOptions = {},
 ): Promise<void> {
-  const logger = deps.logger ?? noopLogger;
+  const { logger } = deps;
   const effectiveTier = tier ?? "free";
 
   // 1. TOOLS.md — purely a function of integrations + tier.

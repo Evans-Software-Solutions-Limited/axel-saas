@@ -53,6 +53,18 @@ function makeWorkspaceServiceStub(
   };
 }
 
+/**
+ * Default noop logger for tests that don't care about logging
+ * assertions — `logger` on `IntegrationsSyncDeps` is required (the
+ * orchestrator's "openclaw.json malformed; skipping regen" warning
+ * was silently dropping in production before bugbot caught it on
+ * #104; making the type required forces every call site to think
+ * about which logger to use).
+ */
+function makeNoopLogger() {
+  return { warn: vi.fn() };
+}
+
 describe("syncWorkspaceAfterIntegrationChange", () => {
   it("regenerates TOOLS.md AND openclaw.json in a single updateFiles call", async () => {
     const integrationService = {
@@ -61,7 +73,7 @@ describe("syncWorkspaceAfterIntegrationChange", () => {
     const workspaceConfigService = makeWorkspaceServiceStub();
 
     await syncWorkspaceAfterIntegrationChange(
-      { integrationService, workspaceConfigService },
+      { integrationService, workspaceConfigService, logger: makeNoopLogger() },
       "u-1",
       "premium",
     );
@@ -86,7 +98,7 @@ describe("syncWorkspaceAfterIntegrationChange", () => {
     });
 
     await syncWorkspaceAfterIntegrationChange(
-      { integrationService, workspaceConfigService },
+      { integrationService, workspaceConfigService, logger: makeNoopLogger() },
       "u-1",
       "free",
     );
@@ -143,7 +155,7 @@ describe("syncWorkspaceAfterIntegrationChange", () => {
     const integrationService = { list: vi.fn().mockResolvedValue([]) };
 
     await syncWorkspaceAfterIntegrationChange(
-      { integrationService, workspaceConfigService },
+      { integrationService, workspaceConfigService, logger: makeNoopLogger() },
       "u-1",
       "free",
     );
@@ -177,7 +189,7 @@ describe("syncWorkspaceAfterIntegrationChange", () => {
     const integrationService = { list: vi.fn().mockResolvedValue([]) };
 
     await syncWorkspaceAfterIntegrationChange(
-      { integrationService, workspaceConfigService },
+      { integrationService, workspaceConfigService, logger: makeNoopLogger() },
       "u-1",
       "premium",
     );
@@ -216,7 +228,7 @@ describe("syncWorkspaceAfterIntegrationChange", () => {
     const integrationService = { list: vi.fn().mockResolvedValue([]) };
 
     await syncWorkspaceAfterIntegrationChange(
-      { integrationService, workspaceConfigService },
+      { integrationService, workspaceConfigService, logger: makeNoopLogger() },
       "u-1",
       "free",
     );
@@ -266,7 +278,7 @@ describe("syncWorkspaceAfterIntegrationChange", () => {
     const workspaceConfigService = makeWorkspaceServiceStub();
 
     await syncWorkspaceAfterIntegrationChange(
-      { integrationService, workspaceConfigService },
+      { integrationService, workspaceConfigService, logger: makeNoopLogger() },
       "u-2",
       null,
     );
@@ -288,7 +300,7 @@ describe("syncWorkspaceAfterIntegrationChange", () => {
     const workspaceConfigService = makeWorkspaceServiceStub();
 
     await syncWorkspaceAfterIntegrationChange(
-      { integrationService, workspaceConfigService },
+      { integrationService, workspaceConfigService, logger: makeNoopLogger() },
       "u-3",
       "premium",
       { reason: "byom_changed" },
@@ -308,7 +320,11 @@ describe("syncWorkspaceAfterIntegrationChange", () => {
 
     await expect(
       syncWorkspaceAfterIntegrationChange(
-        { integrationService, workspaceConfigService },
+        {
+          integrationService,
+          workspaceConfigService,
+          logger: makeNoopLogger(),
+        },
         "u-4",
         "free",
       ),

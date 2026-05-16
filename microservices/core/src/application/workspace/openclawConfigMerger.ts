@@ -116,25 +116,33 @@ export function mergeOpenClawConfig(
 }
 
 /**
- * Carry through any top-level keys that exist on disk but aren't in
- * the generator's output (e.g. a future `telemetry: { ... }` block
- * upstream OpenClaw adds before we've modelled it). The three keys
- * the merger explicitly handles (`gateway`, `agents`, `plugins`) are
- * filtered out so the per-key merge logic owns them.
+ * Carry through any keys on `existing` that aren't in `managedKeys`
+ * (the per-merge list of keys the caller owns and will overwrite).
+ * Shared by every merge layer — top-level, agents, plugins — so the
+ * forward-compat story is consistent: anything we don't manage, we
+ * preserve. Asymmetry between the three layers was the cause of
+ * #104's two low-severity findings.
  */
+function passThroughSiblings(
+  existing: Record<string, unknown>,
+  managedKeys: readonly string[],
+): Record<string, unknown> {
+  const carry: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(existing)) {
+    if (managedKeys.includes(key)) continue;
+    carry[key] = value;
+  }
+  return carry;
+}
+
 function passThroughTopLevelKeys(
   existing: Record<string, unknown>,
   generated: OpenClawConfig,
 ): OpenClawConfig {
-  const carry: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(existing)) {
-    if (key === "gateway" || key === "agents" || key === "plugins") continue;
-    carry[key] = value;
-  }
   // `generated` provides the typed shape for the keys the merger
   // overwrites; the carry-through adds the unknown extras alongside.
   return {
-    ...carry,
+    ...passThroughSiblings(existing, ["gateway", "agents", "plugins"]),
     gateway: generated.gateway,
     agents: generated.agents,
     plugins: generated.plugins,
@@ -146,24 +154,36 @@ function mergeAgents(
   generatedAgents: OpenClawConfig["agents"],
 ): OpenClawConfig["agents"] {
   if (!isPlainObject(existingAgents)) return generatedAgents;
-  const existingDefaults = existingAgents["defaults"];
-  if (!isPlainObject(existingDefaults)) return generatedAgents;
 
-  // Generated wins for workspace + model.primary; existing carries
-  // anything else (overrides, upstream additions) through.
-  const carry: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(existingDefaults)) {
-    if (key === "workspace" || key === "model") continue;
-    carry[key] = value;
+  // Preserve any sibling keys of `defaults` (e.g. `agents.fleet`,
+  // `agents.policies`, `agents.providers` — anything upstream
+  // OpenClaw adds before we've modelled it). We only own `defaults`.
+  const agentsSiblings = passThroughSiblings(existingAgents, ["defaults"]);
+
+  const existingDefaults = existingAgents["defaults"];
+  if (!isPlainObject(existingDefaults)) {
+    return {
+      ...agentsSiblings,
+      defaults: generatedAgents.defaults,
+    } as OpenClawConfig["agents"];
   }
 
+  // Generated wins for workspace + model.primary; existing carries
+  // anything else inside `defaults` (overrides, upstream additions)
+  // through.
+  const defaultsSiblings = passThroughSiblings(existingDefaults, [
+    "workspace",
+    "model",
+  ]);
+
   return {
+    ...agentsSiblings,
     defaults: {
-      ...carry,
+      ...defaultsSiblings,
       workspace: generatedAgents.defaults.workspace,
       model: generatedAgents.defaults.model,
     },
-  };
+  } as OpenClawConfig["agents"];
 }
 
 function mergePlugins(
@@ -171,8 +191,21 @@ function mergePlugins(
   generatedPlugins: OpenClawConfig["plugins"],
 ): OpenClawConfig["plugins"] {
   if (!isPlainObject(existingPlugins)) return generatedPlugins;
+
+  // Preserve any sibling keys of `entries` (e.g. `plugins.registry`,
+  // `plugins.featureFlags` — anything `openclaw plugins install`
+  // might write at `plugins.*` rather than inside `plugins.entries`).
+  // Without this, regen silently drops them — the asymmetry bugbot
+  // flagged on #104.
+  const pluginsSiblings = passThroughSiblings(existingPlugins, ["entries"]);
+
   const existingEntries = existingPlugins["entries"];
-  if (!isPlainObject(existingEntries)) return generatedPlugins;
+  if (!isPlainObject(existingEntries)) {
+    return {
+      ...pluginsSiblings,
+      entries: generatedPlugins.entries,
+    } as OpenClawConfig["plugins"];
+  }
 
   // Start from existing entries (preserves third-party plugins),
   // then overlay the merged axel-bridge entry. Object spread keeps
@@ -185,8 +218,9 @@ function mergePlugins(
   );
 
   return {
+    ...pluginsSiblings,
     entries: mergedEntries as OpenClawConfig["plugins"]["entries"],
-  };
+  } as OpenClawConfig["plugins"];
 }
 
 /**

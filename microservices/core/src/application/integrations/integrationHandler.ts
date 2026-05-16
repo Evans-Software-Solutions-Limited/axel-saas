@@ -35,16 +35,24 @@ const integrationService = new IntegrationService(
   integrationRepository,
   awsSecretsClient,
 );
+// Shared by both the workspace service AND the integrations-sync
+// orchestrator so operator signals from either layer land under the
+// same `[workspace-sync]` prefix in CloudWatch. The orchestrator
+// emits the "openclaw.json malformed; skipping regen" warning that
+// previously dropped silently because the orchestrator's logger was
+// optional with a noop default (caught by bugbot on #104).
+const workspaceLogger = {
+  info: (msg: string, ctx?: Record<string, unknown>) =>
+    console.log(`[workspace-sync] ${msg}`, ctx ?? {}),
+  warn: (msg: string, ctx?: Record<string, unknown>) =>
+    console.warn(`[workspace-sync] ${msg}`, ctx ?? {}),
+  error: (msg: string, ctx?: Record<string, unknown>) =>
+    console.error(`[workspace-sync] ${msg}`, ctx ?? {}),
+};
+
 const workspaceConfigService = new WorkspaceConfigService({
   provisioningRepo: provisioningRepository,
-  // Default file/network/logger plug-points; overridable in tests via
-  // a custom `WorkspaceConfigService` instance constructed at the
-  // handler-injection boundary if/when needed.
-  logger: {
-    info: (msg, ctx) => console.log(`[workspace-sync] ${msg}`, ctx ?? {}),
-    warn: (msg, ctx) => console.warn(`[workspace-sync] ${msg}`, ctx ?? {}),
-    error: (msg, ctx) => console.error(`[workspace-sync] ${msg}`, ctx ?? {}),
-  },
+  logger: workspaceLogger,
 });
 const oauthService = new OauthService({
   stateRepo: oauthStateRepository,
@@ -81,7 +89,14 @@ async function safelySyncWorkspace(
 ): Promise<void> {
   try {
     await syncWorkspaceAfterIntegrationChange(
-      { integrationService, workspaceConfigService },
+      {
+        integrationService,
+        workspaceConfigService,
+        // Same logger as the workspace service so a malformed
+        // openclaw.json warning lands under the same prefix and
+        // doesn't get silently dropped.
+        logger: workspaceLogger,
+      },
       userId,
       tier,
       { reason },

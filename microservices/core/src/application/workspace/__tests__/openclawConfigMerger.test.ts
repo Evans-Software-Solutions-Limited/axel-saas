@@ -195,6 +195,100 @@ describe("mergeOpenClawConfig", () => {
     ).toBe("user-set");
   });
 
+  it("preserves sibling keys of agents.defaults (bugbot #104 — forward-compat for agents.fleet / agents.policies / agents.providers)", () => {
+    // Without this preservation rule, any future upstream OpenClaw
+    // additions (or user-managed `agents.fleet` etc.) get wiped on
+    // every regen — silently — because the merger only knew about
+    // `agents.defaults`. Mirrors `passThroughTopLevelKeys`'s
+    // forward-compat story.
+    const existing: Record<string, unknown> = {
+      agents: {
+        defaults: {
+          workspace: "/data/workspace",
+          model: { primary: "anthropic/haiku" },
+        },
+        fleet: { workers: 4 },
+        policies: { retry: { maxAttempts: 3 } },
+        providers: ["anthropic", "openai"],
+      },
+    };
+    const merged = mergeOpenClawConfig(existing, generatedFree);
+    const agents = merged.agents as Record<string, unknown>;
+    expect(agents["fleet"]).toEqual({ workers: 4 });
+    expect(agents["policies"]).toEqual({ retry: { maxAttempts: 3 } });
+    expect(agents["providers"]).toEqual(["anthropic", "openai"]);
+    // `defaults` still refreshed from the generator.
+    expect(merged.agents.defaults.model.primary).toBe("anthropic/haiku");
+  });
+
+  it("preserves agents.* siblings even when agents.defaults itself is malformed", () => {
+    // Defensive: a malformed `defaults` doesn't justify wiping the
+    // sibling keys (which might be the only valid data on disk).
+    const existing: Record<string, unknown> = {
+      agents: {
+        defaults: "not-an-object",
+        fleet: { workers: 8 },
+      },
+    };
+    const merged = mergeOpenClawConfig(existing, generatedFree);
+    const agents = merged.agents as Record<string, unknown>;
+    expect(agents["fleet"]).toEqual({ workers: 8 });
+    // defaults falls back to the generator's value.
+    expect(merged.agents.defaults).toEqual(generatedFree.agents.defaults);
+  });
+
+  it("preserves sibling keys of plugins.entries (bugbot #104 — forward-compat for plugins.registry / plugins.featureFlags)", () => {
+    // `openclaw plugins install --link` can write metadata under
+    // `plugins.*` rather than only under `plugins.entries.<id>`;
+    // future OpenClaw versions may add `plugins.registry`,
+    // `plugins.featureFlags`, etc. The merger must preserve them
+    // to match the forward-compat promise made by the file header.
+    const existing: Record<string, unknown> = {
+      plugins: {
+        entries: {
+          "axel-bridge": {
+            enabled: true,
+            config: {
+              chatCompletionsBaseUrl: "http://127.0.0.1:18789",
+              defaultModel: "openclaw",
+            },
+            path: "/opt/axel-bridge",
+          },
+        },
+        registry: {
+          source: "npm",
+          lastSyncedAt: "2026-05-10T00:00:00Z",
+        },
+        featureFlags: { experimentalLoader: true },
+      },
+    };
+    const merged = mergeOpenClawConfig(existing, generatedFree);
+    const plugins = merged.plugins as Record<string, unknown>;
+    expect(plugins["registry"]).toEqual({
+      source: "npm",
+      lastSyncedAt: "2026-05-10T00:00:00Z",
+    });
+    expect(plugins["featureFlags"]).toEqual({ experimentalLoader: true });
+    // axel-bridge still gets the merged treatment.
+    expect(merged.plugins.entries["axel-bridge"]?.path).toBe(
+      "/opt/axel-bridge",
+    );
+  });
+
+  it("preserves plugins.* siblings even when plugins.entries itself is malformed", () => {
+    const existing: Record<string, unknown> = {
+      plugins: {
+        entries: "not-an-object",
+        registry: { source: "npm" },
+      },
+    };
+    const merged = mergeOpenClawConfig(existing, generatedFree);
+    const plugins = merged.plugins as Record<string, unknown>;
+    expect(plugins["registry"]).toEqual({ source: "npm" });
+    // entries falls back to the generator's value.
+    expect(merged.plugins.entries).toEqual(generatedFree.plugins.entries);
+  });
+
   it("treats a malformed agents block as missing and falls back to generated", () => {
     // Defensive: if the agents block is the wrong shape we don't
     // want to throw; we want a usable config out the other side.
