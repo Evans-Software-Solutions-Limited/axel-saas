@@ -221,6 +221,56 @@ describe("mergeOpenClawConfig", () => {
     expect(merged.agents.defaults.model.primary).toBe("anthropic/haiku");
   });
 
+  it("preserves siblings of agents.defaults.model.primary (bugbot #104 round 2 — fallback / contextWindow / temperature stay)", () => {
+    // The previous round of sibling-preservation fixed `agents.*` and
+    // `agents.defaults.*` siblings but stopped one level too shallow:
+    // the whole `model` object was being replaced, so `model.fallback`,
+    // `model.contextWindow`, `model.temperature`, `model.providers` all
+    // walked out the back door on every regen. Contract per the
+    // generator + the merger file header: ONLY `primary` is template-
+    // managed; every other key in `model` is preserved.
+    const existing: Record<string, unknown> = {
+      agents: {
+        defaults: {
+          workspace: "/data/workspace",
+          model: {
+            primary: "anthropic/haiku",
+            fallback: "anthropic/sonnet",
+            contextWindow: 200_000,
+            temperature: 0.7,
+            providers: ["anthropic", "openai"],
+          },
+        },
+      },
+    };
+    const merged = mergeOpenClawConfig(existing, generatedPremium);
+    const model = merged.agents.defaults.model as Record<string, unknown>;
+    // `primary` is regenerated (haiku → sonnet on a premium upgrade).
+    expect(model["primary"]).toBe("anthropic/sonnet");
+    // Every other model.* key is preserved.
+    expect(model["fallback"]).toBe("anthropic/sonnet");
+    expect(model["contextWindow"]).toBe(200_000);
+    expect(model["temperature"]).toBe(0.7);
+    expect(model["providers"]).toEqual(["anthropic", "openai"]);
+  });
+
+  it("falls back to the generated model when existing model is malformed", () => {
+    // Defensive: if `model` is the wrong shape we don't want to
+    // throw or carry a broken value through; reset to the generator.
+    const existing: Record<string, unknown> = {
+      agents: {
+        defaults: {
+          workspace: "/data/workspace",
+          model: "not-an-object",
+        },
+      },
+    };
+    const merged = mergeOpenClawConfig(existing, generatedFree);
+    expect(merged.agents.defaults.model).toEqual(
+      generatedFree.agents.defaults.model,
+    );
+  });
+
   it("preserves agents.* siblings even when agents.defaults itself is malformed", () => {
     // Defensive: a malformed `defaults` doesn't justify wiping the
     // sibling keys (which might be the only valid data on disk).

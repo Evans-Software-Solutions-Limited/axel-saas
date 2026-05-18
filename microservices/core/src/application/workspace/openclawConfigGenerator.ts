@@ -63,8 +63,21 @@ export interface OpenClawConfig {
   agents: {
     defaults: {
       workspace: string;
-      model: { primary: string };
+      // Open-shaped so the merger can carry through user-set or
+      // upstream-OpenClaw-added keys (`fallback`, `contextWindow`,
+      // `temperature`, `providers`, …) alongside the regenerated
+      // `primary`. Only `primary` is template-managed; everything
+      // else flows through `mergeAgentsModel` untouched.
+      model: { primary: string; [otherModelKey: string]: unknown };
+      // Forward-compat: any other `agents.defaults.*` keys
+      // (overrides, upstream additions) get carried through by the
+      // merger.
+      [otherDefaultsKey: string]: unknown;
     };
+    // Forward-compat: `agents.*` siblings of `defaults`
+    // (e.g. `agents.fleet`, `agents.policies`) flow through the
+    // merger untouched.
+    [otherAgentsKey: string]: unknown;
   };
   plugins: {
     entries: {

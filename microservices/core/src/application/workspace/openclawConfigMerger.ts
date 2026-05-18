@@ -181,9 +181,34 @@ function mergeAgents(
     defaults: {
       ...defaultsSiblings,
       workspace: generatedAgents.defaults.workspace,
-      model: generatedAgents.defaults.model,
+      model: mergeAgentsModel(
+        existingDefaults["model"],
+        generatedAgents.defaults.model,
+      ),
     },
   } as OpenClawConfig["agents"];
+}
+
+/**
+ * Merge the `agents.defaults.model` block. Only `primary` is
+ * regenerated; every other key (`fallback`, `contextWindow`,
+ * `temperature`, `providers`, anything upstream OpenClaw adds before
+ * we've modelled it) is preserved from the existing file.
+ *
+ * This used to be a wholesale `model: generatedAgents.defaults.model`
+ * replacement, which silently dropped sibling keys — caught by bugbot
+ * after the previous round of sibling-preservation fixes; same
+ * asymmetry one level deeper.
+ */
+function mergeAgentsModel(
+  existingModel: unknown,
+  generatedModel: OpenClawConfig["agents"]["defaults"]["model"],
+): OpenClawConfig["agents"]["defaults"]["model"] {
+  if (!isPlainObject(existingModel)) return generatedModel;
+  return {
+    ...passThroughSiblings(existingModel, ["primary"]),
+    primary: generatedModel.primary,
+  } as OpenClawConfig["agents"]["defaults"]["model"];
 }
 
 function mergePlugins(
