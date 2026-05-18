@@ -143,10 +143,28 @@ async function regenerateOpenClawJsonUpdate(
   tier: SubscriptionTier,
   logger: { warn: (message: string, ctx?: Record<string, unknown>) => void },
 ): Promise<FileUpdate | null> {
-  const existingRaw = await deps.workspaceConfigService.readWorkspaceFile(
-    userId,
-    "openclaw.json",
-  );
+  // Read failures (non-ENOENT — EACCES, EIO, EBUSY, anything the
+  // default fs.readFile re-throws) used to propagate straight through
+  // and short-circuit the TOOLS.md write below. That was a behavioural
+  // regression vs the pre-PR orchestrator: TOOLS.md is purely a
+  // function of integrations + tier and has no dependency on
+  // openclaw.json being readable, so an EFS hiccup turning every
+  // subsequent /connect / /revoke into a silent TOOLS.md no-op (with
+  // a 200 to the user) was the wrong failure mode. Mirror the
+  // malformed-JSON branch: log, return null, let TOOLS.md through.
+  let existingRaw: string | null;
+  try {
+    existingRaw = await deps.workspaceConfigService.readWorkspaceFile(
+      userId,
+      "openclaw.json",
+    );
+  } catch (err: unknown) {
+    logger.warn("openclaw.json read failed; skipping regen", {
+      userId,
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return null;
+  }
 
   const parsed = parseExistingOpenClawConfig(existingRaw);
   if (parsed.kind === "malformed") {

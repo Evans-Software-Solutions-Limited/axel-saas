@@ -245,6 +245,45 @@ describe("syncWorkspaceAfterIntegrationChange", () => {
     });
   });
 
+  it("skips openclaw.json regen (but still writes TOOLS.md) when readWorkspaceFile throws (bugbot #104 round 3)", async () => {
+    // A non-ENOENT read failure (EACCES, EIO, EBUSY) used to
+    // propagate up and short-circuit the TOOLS.md write entirely —
+    // turning every subsequent integration mutation into a silent
+    // TOOLS.md no-op while the user still saw a 200. TOOLS.md has
+    // no dependency on openclaw.json being readable, so the read
+    // failure has to be caught and logged here, not bubbled up.
+    const warn = vi.fn();
+    const workspaceConfigService = {
+      updateFiles: vi.fn().mockResolvedValue(undefined),
+      readWorkspaceFile: vi
+        .fn()
+        .mockRejectedValue(new Error("EACCES: permission denied")),
+    };
+    const integrationService = { list: vi.fn().mockResolvedValue([]) };
+
+    await syncWorkspaceAfterIntegrationChange(
+      { integrationService, workspaceConfigService, logger: { warn } },
+      "u-1",
+      "free",
+    );
+
+    // The crucial assertion: updateFiles DID run, with TOOLS.md, even
+    // though the read threw. Pre-fix, this expectation failed with 0
+    // calls — the throw walked all the way out.
+    expect(workspaceConfigService.updateFiles).toHaveBeenCalledOnce();
+    const updates = workspaceConfigService.updateFiles.mock.calls[0]![1];
+    const filenames = updates.map((u: { filename: string }) => u.filename);
+    expect(filenames).toContain("TOOLS.md");
+    expect(filenames).not.toContain("openclaw.json");
+    expect(warn).toHaveBeenCalledWith(
+      "openclaw.json read failed; skipping regen",
+      expect.objectContaining({
+        userId: "u-1",
+        error: expect.stringContaining("EACCES"),
+      }),
+    );
+  });
+
   it("skips openclaw.json regen (but still writes TOOLS.md) when the existing file is malformed", async () => {
     // Don't clobber evidence of corruption. The container's next
     // boot will rewrite from the template via the entrypoint
