@@ -1,0 +1,20 @@
+{
+  "name": "@axel-saas/openclaw-infra",
+  "version": "0.0.0",
+  "private": true,
+  "description": "SST v3 app provisioning the OpenClaw Fargate runtime — ECR, ECS, EFS, ALB, IAM, task definitions. Separate from the root axel-saas SST app per the Fargate spec.",
+  "type": "module",
+  "scripts": {
+    "deploy": "sst deploy",
+    "diff": "sst diff",
+    "remove": "sst remove",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "sst": "*"
+  },
+  "devDependencies": {
+    "@types/node": "^22",
+    "typescript": "~5.9.3"
+  }
+}

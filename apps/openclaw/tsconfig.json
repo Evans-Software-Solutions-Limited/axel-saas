@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "@tsconfig/node22/tsconfig.json",
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "types": ["node"],
+    "noEmit": true,
+    "allowImportingTsExtensions": false,
+    "strict": true
+  },
+  "include": ["sst.config.ts", "infra/**/*.ts"],
+  "exclude": ["node_modules", ".sst"]
+}
