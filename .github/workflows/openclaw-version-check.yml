@@ -1,0 +1,239 @@
+name: OpenClaw Version Watcher
+
+# Runs on a weekly cron and on manual dispatch. If npm's `latest` dist-tag
+# for `openclaw` is ahead of the version pinned in
+# `docker/openclaw/versions.json`, opens a `chore/openclaw-bump-<version>`
+# PR that mirrors the diff pattern established by PR #102:
+#
+#   - docker/openclaw/versions.json                              (canonical pin)
+#   - docker/openclaw/docker-compose.yml                         (build arg + image tag defaults)
+#   - docker/openclaw/Dockerfile                                 (example tag in the comment)
+#   - packages/openclaw-bridge-plugin/package.json               (build / peer / dev — compat floor unchanged)
+#   - bun.lock                                                   (regenerated)
+#
+# Hard rules:
+#   - NEVER auto-merge. The PR is for human review. Breaking-change SDK
+#     bumps require lock-step bridge-plugin updates and that is a human
+#     decision.
+#   - Pre-release tags (-beta, -rc, -alpha, anything with a hyphen
+#     suffix) are filtered out. Stable releases only.
+#   - If a `chore/openclaw-bump-*` PR already exists for the target
+#     version, skip — don't stack duplicates.
+#
+# The compat floor in the bridge plugin (`pluginApi: ">=2026.4.26"`,
+# `minGatewayVersion: "2026.4.26"`) is INTENTIONALLY left alone — the
+# plugin uses surface stable since 2026.4.26, and raising the floor
+# would needlessly reject older gateways for no functional gain.
+
+on:
+  schedule:
+    # Monday 09:00 UTC — early enough that any new PR is in the review
+    # queue before mid-morning, late enough that a Sunday-evening
+    # OpenClaw release has had time to propagate to npm.
+    - cron: "0 9 * * 1"
+  workflow_dispatch:
+    inputs:
+      force_version:
+        description: "Override the detected latest version (semver, no leading 'v'). Leave blank to use npm's latest dist-tag."
+        required: false
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  check-and-bump:
+    name: Check npm for new OpenClaw release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.3.9"
+
+      - name: Read currently-pinned version
+        id: current
+        run: |
+          CURRENT=$(jq -r '.openclaw' docker/openclaw/versions.json)
+          echo "tag=$CURRENT" >> "$GITHUB_OUTPUT"
+          echo "raw=${CURRENT#v}" >> "$GITHUB_OUTPUT"
+          echo "Currently pinned: $CURRENT"
+
+      - name: Resolve target version
+        id: target
+        run: |
+          if [ -n "${{ inputs.force_version }}" ]; then
+            RAW="${{ inputs.force_version }}"
+            echo "Manual override: openclaw@$RAW"
+          else
+            RAW=$(npm view openclaw dist-tags.latest)
+            echo "npm dist-tags.latest: $RAW"
+          fi
+
+          # Stable-only gate. dist-tags.latest is usually stable but the
+          # check is cheap and defends against publishers fat-fingering
+          # a beta into `latest`. Any hyphen suffix is treated as
+          # pre-release (semver pre-release identifiers).
+          if printf '%s' "$RAW" | grep -qE '(-beta|-rc|-alpha|-)'; then
+            echo "::warning::Latest is a pre-release ($RAW) — skipping."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          {
+            echo "raw=$RAW"
+            echo "tag=v$RAW"
+            echo "branch=chore/openclaw-bump-$RAW"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Determine if bump is needed
+        id: gate
+        if: steps.target.outputs.skip != 'true'
+        run: |
+          if [ "${{ steps.current.outputs.tag }}" = "${{ steps.target.outputs.tag }}" ]; then
+            echo "Already on ${{ steps.target.outputs.tag }} — nothing to do."
+            echo "needed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "Bump needed: ${{ steps.current.outputs.tag }} → ${{ steps.target.outputs.tag }}"
+            echo "needed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Skip if a PR already exists for this target
+        id: existing
+        if: steps.gate.outputs.needed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          BRANCH="${{ steps.target.outputs.branch }}"
+          OPEN=$(gh pr list --head "$BRANCH" --state open --json number --jq 'length')
+          if [ "$OPEN" -gt 0 ]; then
+            echo "::notice::PR for $BRANCH already open — skipping."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Fetch upstream release notes
+        id: notes
+        if: steps.gate.outputs.needed == 'true' && steps.existing.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Best-effort. The OpenClaw repo is public so an unauthenticated
+          # token can read releases. If the call fails (missing release,
+          # network blip) we still want the PR — just without notes.
+          BODY=$(gh api "repos/openclaw/openclaw/releases/tags/${{ steps.target.outputs.tag }}" --jq '.body' 2>/dev/null || echo "")
+          if [ -z "$BODY" ]; then
+            BODY="_Release notes not available via the GitHub API. See https://github.com/openclaw/openclaw/releases/tag/${{ steps.target.outputs.tag }}_"
+          fi
+          # Multi-line output for the create-pull-request body field.
+          {
+            echo "body<<RELEASE_NOTES_EOF"
+            echo "$BODY"
+            echo "RELEASE_NOTES_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Apply version bumps
+        if: steps.gate.outputs.needed == 'true' && steps.existing.outputs.skip != 'true'
+        env:
+          CURRENT_TAG: ${{ steps.current.outputs.tag }}
+          TARGET_TAG: ${{ steps.target.outputs.tag }}
+          TARGET_RAW: ${{ steps.target.outputs.raw }}
+        run: |
+          # 1. versions.json — the canonical source of truth.
+          jq --arg v "$TARGET_TAG" '.openclaw = $v' docker/openclaw/versions.json > .versions.json.tmp
+          mv .versions.json.tmp docker/openclaw/versions.json
+
+          # 2 + 3. docker-compose.yml and Dockerfile — a single sed against
+          # the bare semver catches every occurrence. The v-prefixed tag
+          # contains the bare semver as a substring (`v2026.5.7` ⊃
+          # `2026.5.7`) so one pass handles both the `OPENCLAW_VERSION:-v…`
+          # defaults in docker-compose.yml and the bare `… -> …` example
+          # in the Dockerfile parameter-expansion comment. Doing this as
+          # two passes (v-prefixed first, then bare) silently broke for
+          # the `v2026.4.26 -> 2026.4.26` line during dry-run because the
+          # first pass mutated the line and the second pass's search
+          # pattern no longer matched.
+          CURRENT_RAW="${CURRENT_TAG#v}"
+          sed -i "s|${CURRENT_RAW}|${TARGET_RAW}|g" docker/openclaw/docker-compose.yml
+          sed -i "s|${CURRENT_RAW}|${TARGET_RAW}|g" docker/openclaw/Dockerfile
+
+          # 4. Bridge plugin package.json — bump build / peer / dev
+          #    versions. Leave compat floor alone (see workflow comment).
+          jq --arg v "$TARGET_RAW" '
+            .openclaw.build.openclawVersion = $v |
+            .openclaw.build.pluginSdkVersion = $v |
+            .peerDependencies.openclaw = $v |
+            .devDependencies.openclaw = $v
+          ' packages/openclaw-bridge-plugin/package.json > .pkg.tmp
+          mv .pkg.tmp packages/openclaw-bridge-plugin/package.json
+
+          # 5. Refresh the lockfile against the new peer/dev deps.
+          bun install
+
+          # Sanity check — show the diff so it's visible in the action log.
+          echo "--- Diff summary ---"
+          git diff --stat docker/openclaw/ packages/openclaw-bridge-plugin/package.json bun.lock
+
+      - name: Verify bridge plugin still builds against new SDK
+        if: steps.gate.outputs.needed == 'true' && steps.existing.outputs.skip != 'true'
+        # If the new SDK breaks `definePluginEntry` / `registerHttpRoute`
+        # the plugin build will fail here. That's fine — the PR will
+        # still open with the bumps applied, but CI on the resulting PR
+        # will be red, and the reviewer will see exactly which version
+        # introduced the break. That's a signal, not a failure.
+        continue-on-error: true
+        run: |
+          bun run --filter @axel-saas/openclaw-bridge-plugin build
+          bun run --filter @axel-saas/openclaw-bridge-plugin typecheck
+
+      - name: Open pull request
+        if: steps.gate.outputs.needed == 'true' && steps.existing.outputs.skip != 'true'
+        uses: peter-evans/create-pull-request@v6
+        with:
+          branch: ${{ steps.target.outputs.branch }}
+          # Auto-generated, but cleanly attributable so the audit trail
+          # is clear. The committer is the workflow; the human reviewer
+          # signs the merge.
+          commit-message: |
+            chore(openclaw): bump pinned version ${{ steps.current.outputs.tag }} → ${{ steps.target.outputs.tag }}
+
+            Auto-opened by .github/workflows/openclaw-version-check.yml.
+            Human review required — do not auto-merge.
+          author: "openclaw-version-watcher <noreply@github.com>"
+          committer: "openclaw-version-watcher <noreply@github.com>"
+          title: "chore(openclaw): bump pinned version ${{ steps.current.outputs.tag }} → ${{ steps.target.outputs.tag }}"
+          labels: |
+            openclaw-bump
+            chore
+          body: |
+            Auto-opened by `.github/workflows/openclaw-version-check.yml`.
+
+            Bumps `docker/openclaw/versions.json` from `${{ steps.current.outputs.tag }}` to `${{ steps.target.outputs.tag }}`. Mirror of the manual diff pattern established by PR #102.
+
+            ## Diff scope
+
+            - `docker/openclaw/versions.json` — canonical pin
+            - `docker/openclaw/docker-compose.yml` — build-arg + image-tag defaults
+            - `docker/openclaw/Dockerfile` — comment example tags only (no logic change)
+            - `packages/openclaw-bridge-plugin/package.json` — `build.openclawVersion`, `build.pluginSdkVersion`, `peerDependencies.openclaw`, `devDependencies.openclaw`. **`compat` floor unchanged** — the plugin uses surface stable since 2026.4.26.
+            - `bun.lock` — regenerated.
+
+            ## Upstream release notes
+
+            ${{ steps.notes.outputs.body }}
+
+            ## Before merging
+
+            - [ ] CI green (bridge plugin still builds + typechecks + tests pass against the new SDK)
+            - [ ] No breaking changes to `definePluginEntry` or `registerHttpRoute` (the plugin's surface)
+            - [ ] If CI is red on a breaking change: update the bridge plugin in this same PR rather than opening a follow-up
+            - [ ] Workspace templates still load cleanly (no changes expected, but the build-time `openclaw plugins install` in the entrypoint will catch a manifest-schema break)
+
+            **Do not auto-merge.** This PR is opened by a scheduled workflow; the human reviewer owns the call on whether to take the bump now or wait.
+
+            🤖 Auto-generated by [openclaw-version-watcher](.github/workflows/openclaw-version-check.yml)
