@@ -19,7 +19,10 @@
  *
  * Three security groups per spec §9.2:
  *
- *   - **ALB SG** — public ingress on 443 only.
+ *   - **ALB SG** — public ingress on whichever port the listener uses
+ *     (443 on staged envs with the ACM cert; 80 on dev fallback).
+ *     The actual ingress rule lives in `alb.ts` so the SG port and
+ *     listener port stay in lock-step.
  *   - **Task SG** — ingress on 18789 from the ALB SG only; full
  *     egress (LLM APIs, MCP, integrations need it).
  *   - **EFS SG** — NFS port 2049 inbound from the task SG only.
@@ -43,29 +46,12 @@ import { defaultVpc } from "./cluster";
 export const albSecurityGroup = new aws.ec2.SecurityGroup("openclaw-alb-sg", {
   name: `openclaw-${$app.stage}-alb`,
   description:
-    "OpenClaw ALB — Phase 2 opens port 80 to match the HTTP listener; Phase 3 flips this to 443 when ACM is wired",
+    "OpenClaw ALB — public-facing SG. Public ingress is added in alb.ts as a separate SecurityGroupRule so its port stays in lock-step with the listener (HTTPS-443 on staged envs, HTTP-80 on dev). Inlining the ingress here previously caused the SG/listener mismatch class inspector-brad caught on #105 (SG=443 vs listener=80) and #106 (SG=80 vs listener=443 on staging).",
   vpcId: defaultVpc.id,
-  // Phase 2's listener is HTTP-80 (no ACM yet — see `alb.ts`). The SG
-  // ingress port MUST match the listener port; an earlier draft of
-  // this PR opened 443 to match the Phase 3 target state and the
-  // Phase 2 exit-criterion smoke test (`curl http://<alb-dns>/`)
-  // would have hit the SG drop instead of the listener's 404. The
-  // SG and listener don't cross-validate at deploy time, so the
-  // mismatch only surfaces at the smoke test — exactly the failure
-  // class inspector-brad caught on PR #105. Keep this rule in lock-
-  // step with `alb.ts`'s `port` when Phase 3 changes the listener.
-  ingress: [
-    {
-      protocol: "tcp",
-      fromPort: 80,
-      toPort: 80,
-      cidrBlocks: ["0.0.0.0/0"],
-      description:
-        "Phase 2: HTTP-80 from anywhere — matches the Phase 2 HTTP listener; flipped to HTTPS-443 in Phase 3",
-    },
-  ],
-  // Egress rules added below — `ec2.SecurityGroupRule` so the rule
-  // can reference the task SG without a circular declaration.
+  // Ingress lives in alb.ts so its port follows the listener. Egress
+  // is a separate SecurityGroupRule below so it can reference the
+  // task SG without a circular declaration.
+  ingress: [],
   egress: [],
 });
 

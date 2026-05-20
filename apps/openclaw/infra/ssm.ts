@@ -12,10 +12,10 @@
  * Instead, we write to SSM Parameter Store under
  * `/axel/<stage>/openclaw/*`. The core API reads these at boot.
  *
- * **Phase 2 publishes everything except `hosted-zone-id`** — that's
- * a Phase 3 deliverable (when DNS is wired up). Until then, the
- * core API doesn't need it (it can't launch sessions yet anyway —
- * that's Phase 5).
+ * **Phase 3 adds `hosted-zone-id`** for the per-stage OpenClaw
+ * wildcard zone. On dev stages the zone is null and the parameter
+ * is skipped — the core API's session-creation endpoint is also
+ * disabled on dev, so the missing param doesn't gate anything.
  *
  * Why one parameter per concern rather than a single JSON blob:
  *   - `aws ssm get-parameter --name /axel/<stage>/openclaw/cluster-arn`
@@ -34,6 +34,7 @@
 import { apiCallerRole } from "./apiCaller";
 import { listener, loadBalancer } from "./alb";
 import { cluster, defaultSubnets } from "./cluster";
+import { zoneId } from "./dns";
 import { fileSystem } from "./efs";
 import { taskSecurityGroup } from "./iam";
 import { taskDefinitionArns } from "./taskDefinition";
@@ -103,7 +104,7 @@ new aws.ssm.Parameter("openclaw-ssm-alb-dns-name", {
   type: "String",
   value: loadBalancer.dnsName,
   description:
-    "ALB DNS name (the Phase-3 wildcard ALIAS record points at this). Exported for manual smoke tests in Phase 2.",
+    "ALB DNS name. Phase 3's wildcard ALIAS record points at this; kept in SSM for manual smoke tests too.",
 });
 
 new aws.ssm.Parameter("openclaw-ssm-api-caller-role-arn", {
@@ -113,3 +114,16 @@ new aws.ssm.Parameter("openclaw-ssm-api-caller-role-arn", {
   description:
     "IAM role the core API Lambda assumes via STS for per-session lifecycle calls",
 });
+
+// Hosted zone ID for `*.openclaw.<zone>` — Phase 3 addition.
+// Skipped on dev stages where `dns.ts` returns `null` (no Route53
+// zone exists for the stage).
+if (zoneId !== null) {
+  new aws.ssm.Parameter("openclaw-ssm-hosted-zone-id", {
+    name: `${prefix}/hosted-zone-id`,
+    type: "String",
+    value: zoneId,
+    description:
+      "Route53 hosted zone ID containing the *.openclaw.<zone> wildcard record",
+  });
+}

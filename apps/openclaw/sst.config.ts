@@ -9,10 +9,17 @@
  * cross-stack contract values from SSM Parameter Store under
  * `/axel/<stage>/openclaw/*` (see `infra/ssm.ts`).
  *
- * Phase 2 of the Fargate spec: ECR, ECS cluster, EFS, IAM roles,
- * ALB with a default 404 listener, task definitions for all three
- * tiers, SSM parameter writes. NO `dns.ts` and NO `reaper.ts` —
- * those land in phases 3 and 6 respectively.
+ * Phases delivered so far:
+ *   - Phase 2: ECR, ECS cluster, EFS, IAM roles, ALB with default
+ *     404 listener, task definitions for all three tiers, SSM
+ *     parameter writes.
+ *   - Phase 3 (this update): Route53 wildcard ALIAS + ACM wildcard
+ *     cert + HTTPS-443 listener (HTTP-80 on dev). `infra/dns.ts`,
+ *     hosted-zone-id added to SSM cross-stack contract.
+ *
+ * Still to come: Phase 4 (GitHub deploy workflow), Phase 5 (per-user
+ * RunTask + session lifecycle in the core API), Phase 6 (reaper +
+ * alarms).
  *
  * Stage vocabulary note: the spec uses "preprod" throughout, but the
  * code's existing stages (per `infra/domains/`) are `staging` and
@@ -57,6 +64,10 @@ export default $config({
     const cluster = await import("./infra/cluster");
     const efs = await import("./infra/efs");
     const apiCaller = await import("./infra/apiCaller");
+    // dns.ts MUST load before alb.ts — the listener attaches the
+    // ACM cert that dns.ts owns. On dev stages dns.ts exports null
+    // and alb.ts falls back to its Phase 2 HTTP-80 listener.
+    const dns = await import("./infra/dns");
     const alb = await import("./infra/alb");
     const taskDef = await import("./infra/taskDefinition");
     await import("./infra/ssm");
@@ -71,6 +82,11 @@ export default $config({
       ecsTaskDefinitionArnEnterprise: taskDef.taskDefinitionArns.enterprise,
       albDnsName: alb.loadBalancer.dnsName,
       albListenerArn: alb.listener.arn,
+      // `null` on dev stages where there's no hosted zone — outputs
+      // record the null literally so `sst output` shows the dev-stage
+      // state honestly rather than crashing.
+      hostedZoneId: dns.zoneId,
+      wildcardName: dns.wildcardName,
       efsFileSystemId: efs.fileSystem.id,
       apiCallerRoleArn: apiCaller.apiCallerRole.arn,
     };
