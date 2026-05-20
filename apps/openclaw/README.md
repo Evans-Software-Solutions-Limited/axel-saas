@@ -1,9 +1,10 @@
-# `@axel-saas/openclaw-infra` — Phase 2 SST app
+# `@axel-saas/openclaw-infra` — SST app (Phases 2 + 3)
 
 Provisions the long-lived AWS resources the OpenClaw Fargate runtime
-needs: ECR, ECS cluster, EFS, IAM roles, ALB with a default 404
-listener, task definitions for all three tiers, and SSM parameter
-writes for the cross-stack contract.
+needs: ECR, ECS cluster, EFS, IAM roles, ALB with the wildcard ACM
+cert + HTTPS-443 listener, Route53 wildcard ALIAS, task definitions
+for all three tiers, and SSM parameter writes for the cross-stack
+contract.
 
 This is a **separate, independent SST v3 app** from the root
 `axel-saas` SST config at the repo root. Same AWS accounts, same
@@ -11,22 +12,25 @@ stages, but no cross-stack `sst.Linkable` references. The boundary
 is intentional per `docs/openclaw-fargate-spec.md` §1 — the core
 API reads everything it needs from SSM Parameter Store (`/axel/<stage>/openclaw/*`).
 
-## What's in scope (Phase 2)
+## What's in scope (Phases 2 + 3)
 
 - ECR repo (`openclaw-<stage>`) with image scanning + 30-image retention.
 - ECS cluster (`openclaw-<stage>`) with Fargate + Fargate Spot capacity providers.
 - EFS file system with mount targets in all default-VPC subnets and 30-day IA transition.
 - Three IAM roles: task role (empty for now), execution role (ECR pull + logs), API caller role (assumed by the core API Lambda in Phase 5).
 - Three security groups: ALB SG (443 from the world), task SG (18789 from ALB only, full egress), EFS SG (2049 from task SG only).
-- ALB with a default-404 HTTP-80 listener. **HTTPS comes in Phase 3** alongside the wildcard ACM cert.
+- **Phase 3 additions:** ACM wildcard cert for `*.openclaw.<zone>`, DNS-validated via Route53. Route53 wildcard ALIAS `*.openclaw.<zone>` → ALB. ALB listener swapped from HTTP-80 → HTTPS-443 with that cert + `ELBSecurityPolicy-TLS13-1-2-2021-06` (TLS 1.2+).
 - Three task definitions (Free / Premium / Enterprise) with per-tier (vCPU, memory). Image URI is `<ecr-repo>:bootstrap` — see [Bootstrap image](#bootstrap-image-one-time-operator-step) below.
-- SSM parameters under `/axel/<stage>/openclaw/*` for the cross-stack contract.
+- SSM parameters under `/axel/<stage>/openclaw/*` for the cross-stack contract (Phase 3 adds `hosted-zone-id`).
+
+### Dev stages
+
+Dev / preview stages (anything that isn't `staging` or `production`) have no hosted zone available. The DNS module no-ops on those: no cert, no Route53 record, no `hosted-zone-id` SSM param. **Both the ALB listener AND the ALB SG ingress** fall back to HTTP-80 in lock-step (the SG ingress rule's port branches on the same `certificateArn !== null` check as the listener, both in `alb.ts`) so smoke tests work via the raw ALB DNS name — matches spec §9.1 ("ALB DNS direct").
 
 ## What's NOT in scope (deferred to later phases)
 
-- **Phase 3** — DNS (Route53 wildcard ALIAS + ACM wildcard cert). Listener stays HTTP-80 until Phase 3 lands.
-- **Phase 4** — `.github/workflows/openclaw-deploy.yml`. Phase 2 is `sst deploy` from a local CLI; Phase 4 makes it `workflow_dispatch` from CI.
-- **Phase 5** — `POST /openclaw/sessions` in the core API + per-user EFS access points + ALB per-session rules. The API caller role is wired up but unassumable from outside this stack until Phase 5 grants the core API Lambda explicit `sts:AssumeRole`.
+- **Phase 4** — `.github/workflows/openclaw-deploy.yml`. Phase 2+3 is `sst deploy` from a local CLI; Phase 4 makes it `workflow_dispatch` from CI.
+- **Phase 5** — `POST /openclaw/sessions` in the core API + per-user EFS access points + ALB per-session rules. The API caller role is wired up but unassumable from outside this stack until Phase 5 grants the core API Lambda explicit `sts:AssumeRole`. The manual recipe below is what Phase 5 will automate.
 - **Phase 6** — reaper Lambda + CloudWatch alarms.
 
 ## Deploy
@@ -90,9 +94,9 @@ docker push "${ECR_URI}:bootstrap"
 Phase 4 replaces this with a workflow-dispatched build per the
 `openclaw-deploy.yml` design in the spec.
 
-## Verification (Phase 2 exit criteria)
+## Verification
 
-Per the Fargate spec §1a "Phase 2" exit criteria:
+### Phase 2 exit criteria
 
 ```bash
 # (1) Deploy succeeds end-to-end.
@@ -102,7 +106,8 @@ cd apps/openclaw && bun x sst deploy --stage staging
 ALB_DNS=$(aws ssm get-parameter \
   --name /axel/staging/openclaw/alb-dns-name \
   --query Parameter.Value --output text)
-curl -i "http://${ALB_DNS}/"
+# Pre-Phase 3 deploys use HTTP; staging + production are HTTPS post-Phase 3.
+curl -ki "http://${ALB_DNS}/" || curl -ki "https://${ALB_DNS}/"
 # Expected: HTTP/1.1 404 Not Found  →  body "Not Found"
 
 # (3) Cross-stack contract is populated.
@@ -112,9 +117,10 @@ aws ssm get-parameter --name /axel/staging/openclaw/cluster-arn
 aws ssm get-parameters-by-path \
   --path /axel/staging/openclaw \
   --query 'Parameters[].Name' --output table
-# Expected: cluster-arn, task-definition-arns, subnet-ids,
-#           task-security-group-id, efs-file-system-id,
-#           alb-listener-arn, alb-dns-name, api-caller-role-arn
+# Expected (Phase 2): cluster-arn, task-definition-arns, subnet-ids,
+#                     task-security-group-id, efs-file-system-id,
+#                     alb-listener-arn, alb-dns-name, api-caller-role-arn
+# Expected (Phase 3, additionally): hosted-zone-id
 
 # (4) No new VPC was created.
 aws cloudformation describe-stack-resources \
@@ -125,6 +131,172 @@ aws cloudformation describe-stack-resources \
 # (5) `sst remove` tears everything down cleanly.
 bun x sst remove --stage staging
 ```
+
+### Phase 3 exit criteria
+
+Phase 3 adds DNS + TLS + the manual-session smoke test. The infra
+checks first:
+
+```bash
+# (1) Wildcard ACM cert is issued + validated.
+aws acm list-certificates --region eu-west-2 \
+  --query "CertificateSummaryList[?DomainName=='*.openclaw.staging.meetaxel.ai'].Status"
+# Expected: ["ISSUED"]
+
+# (2) Listener is HTTPS-443 with the cert attached.
+LISTENER_ARN=$(aws ssm get-parameter \
+  --name /axel/staging/openclaw/alb-listener-arn \
+  --query Parameter.Value --output text)
+aws elbv2 describe-listeners --listener-arns "${LISTENER_ARN}" \
+  --query 'Listeners[0].{Port:Port,Protocol:Protocol,SslPolicy:SslPolicy}'
+# Expected: { "Port": 443, "Protocol": "HTTPS", "SslPolicy": "ELBSecurityPolicy-TLS13-1-2-2021-06" }
+
+# (3) Wildcard ALIAS record resolves to the ALB.
+dig +short test.openclaw.staging.meetaxel.ai
+# Expected: a CNAME chain ending at an *.elb.amazonaws.com IP
+
+# (4) TLS handshake succeeds at any subdomain.
+curl -i https://test.openclaw.staging.meetaxel.ai/
+# Expected: HTTP/1.1 404 Not Found  (default listener action — there's
+# no session running on `test` yet, see the manual recipe below)
+```
+
+The "URL serves OpenClaw end-to-end" criterion needs a manually-launched task; see the next section.
+
+## Phase 3 manual session smoke test
+
+Until Phase 5 wires up `POST /openclaw/sessions` in the core API, the only way to prove `https://<name>.openclaw.<zone>` serves a real OpenClaw runtime is to do it by hand. This recipe brings up one task, registers it under `test.openclaw.staging.meetaxel.ai`, and tears it back down. **Run from `apps/openclaw/`** unless noted.
+
+```bash
+# ── 0. Prerequisite: bootstrap image must be in ECR ────────────────
+# See "Bootstrap image" above. Confirm:
+ECR_URI=$(aws ecr describe-repositories \
+  --repository-names openclaw-staging \
+  --query 'repositories[0].repositoryUri' --output text)
+aws ecr describe-images --repository-name openclaw-staging \
+  --image-ids imageTag=bootstrap >/dev/null && echo "image present"
+
+# ── 1. Gather the SSM-published infra IDs ──────────────────────────
+STAGE=staging
+TARGET_GROUP_NAME="openclaw-${STAGE}-smoke"     # any unique name, ≤ 32 chars
+SESSION_SUBDOMAIN="test.openclaw.staging.meetaxel.ai"
+VPC_ID=$(aws ec2 describe-vpcs --filters 'Name=is-default,Values=true' \
+  --query 'Vpcs[0].VpcId' --output text)
+SUBNETS=$(aws ssm get-parameter \
+  --name /axel/${STAGE}/openclaw/subnet-ids \
+  --query Parameter.Value --output text)
+TASK_SG=$(aws ssm get-parameter \
+  --name /axel/${STAGE}/openclaw/task-security-group-id \
+  --query Parameter.Value --output text)
+CLUSTER_ARN=$(aws ssm get-parameter \
+  --name /axel/${STAGE}/openclaw/cluster-arn \
+  --query Parameter.Value --output text)
+TASK_DEF_ARN=$(aws ssm get-parameter \
+  --name /axel/${STAGE}/openclaw/task-definition-arns \
+  --query Parameter.Value --output text | jq -r .premium)
+LISTENER_ARN=$(aws ssm get-parameter \
+  --name /axel/${STAGE}/openclaw/alb-listener-arn \
+  --query Parameter.Value --output text)
+EFS_ID=$(aws ssm get-parameter \
+  --name /axel/${STAGE}/openclaw/efs-file-system-id \
+  --query Parameter.Value --output text)
+
+# ── 2. Run the task ────────────────────────────────────────────────
+# `--enable-execute-command true` is optional but useful for shell-in
+# debugging while we're still bringing this up. `assignPublicIp ENABLED`
+# is required because tasks need ECR pull + outbound LLM traffic and
+# there's no NAT gateway (spec §13.3 + §9.2).
+TASK_ARN=$(aws ecs run-task \
+  --cluster "${CLUSTER_ARN}" \
+  --task-definition "${TASK_DEF_ARN}" \
+  --launch-type FARGATE \
+  --network-configuration "awsvpcConfiguration={subnets=[${SUBNETS}],securityGroups=[${TASK_SG}],assignPublicIp=ENABLED}" \
+  --overrides '{
+    "containerOverrides": [{
+      "name": "openclaw",
+      "environment": [
+        {"name": "AXEL_USER_ID",    "value": "smoke-test"},
+        {"name": "AXEL_SESSION_ID", "value": "smoke-test-1"},
+        {"name": "AXEL_TIER",       "value": "premium"},
+        {"name": "OPENCLAW_GATEWAY_TOKEN", "value": "smoke-test-token-do-not-leak"}
+      ]
+    }]
+  }' \
+  --query 'tasks[0].taskArn' --output text)
+echo "Started task: ${TASK_ARN}"
+
+# Wait for the ENI to attach + the task to start.
+aws ecs wait tasks-running --cluster "${CLUSTER_ARN}" --tasks "${TASK_ARN}"
+
+# ── 3. Find the task's private IP ──────────────────────────────────
+ENI_ID=$(aws ecs describe-tasks \
+  --cluster "${CLUSTER_ARN}" --tasks "${TASK_ARN}" \
+  --query 'tasks[0].attachments[0].details[?name==`networkInterfaceId`].value' \
+  --output text)
+TASK_IP=$(aws ec2 describe-network-interfaces \
+  --network-interface-ids "${ENI_ID}" \
+  --query 'NetworkInterfaces[0].PrivateIpAddress' --output text)
+echo "Task IP: ${TASK_IP}"
+
+# ── 4. Create + register the target group ──────────────────────────
+TG_ARN=$(aws elbv2 create-target-group \
+  --name "${TARGET_GROUP_NAME}" \
+  --protocol HTTP \
+  --port 18789 \
+  --vpc-id "${VPC_ID}" \
+  --target-type ip \
+  --health-check-protocol HTTP \
+  --health-check-path "/" \
+  --health-check-interval-seconds 15 \
+  --healthy-threshold-count 2 \
+  --query 'TargetGroups[0].TargetGroupArn' --output text)
+
+aws elbv2 register-targets \
+  --target-group-arn "${TG_ARN}" \
+  --targets "Id=${TASK_IP},Port=18789"
+
+# ── 5. Listener rule: route the subdomain to the target group ─────
+aws elbv2 create-rule \
+  --listener-arn "${LISTENER_ARN}" \
+  --priority 100 \
+  --conditions "Field=host-header,Values=${SESSION_SUBDOMAIN}" \
+  --actions "Type=forward,TargetGroupArn=${TG_ARN}"
+
+# ── 6. Wait for the target to become healthy + smoke-test ─────────
+aws elbv2 wait target-in-service --target-group-arn "${TG_ARN}"
+curl -i "https://${SESSION_SUBDOMAIN}/"
+# Expected: 200 with OpenClaw's Control-UI SPA, OR whatever the
+# bridge plugin's `/` returns. A non-404 response confirms the
+# route is working end-to-end.
+
+# ── 7. Teardown (always do this — Free tier wall-clock is 1h, Premium 8h) ─
+RULE_ARN=$(aws elbv2 describe-rules --listener-arn "${LISTENER_ARN}" \
+  --query "Rules[?Conditions[?Field=='host-header' && Values[0]=='${SESSION_SUBDOMAIN}']].RuleArn" \
+  --output text)
+aws elbv2 delete-rule --rule-arn "${RULE_ARN}"
+aws elbv2 deregister-targets \
+  --target-group-arn "${TG_ARN}" \
+  --targets "Id=${TASK_IP},Port=18789"
+aws elbv2 delete-target-group --target-group-arn "${TG_ARN}"
+aws ecs stop-task --cluster "${CLUSTER_ARN}" --task "${TASK_ARN}" \
+  --reason "phase-3 smoke test complete"
+```
+
+### What this recipe approximates
+
+Each numbered step in the recipe maps to one of the operations Phase 5's `POST /openclaw/sessions` will perform programmatically via the AWS SDK from the core API:
+
+| Recipe step       | Phase 5 equivalent                                                           |
+| ----------------- | ---------------------------------------------------------------------------- |
+| 1 — gather IDs    | Read SSM on Lambda cold start                                                |
+| 2 — `run-task`    | `ecs:RunTask` with per-user EFS access-point override + per-session env vars |
+| 3 — get IP        | `ecs:DescribeTasks` (poll until ENI attached)                                |
+| 4 — target group  | `elbv2:CreateTargetGroup` + `RegisterTargets`                                |
+| 5 — listener rule | `elbv2:CreateRule` with host condition                                       |
+| 6 — wait healthy  | `elbv2:DescribeTargetHealth` poll                                            |
+| 7 — teardown      | `DELETE /openclaw/sessions/:id` runs steps 5→4→2 in reverse                  |
+
+If anything in the recipe fails, the corresponding Phase 5 step has the same failure mode — worth treating that as a deliberate test.
 
 ## Repo layout (this app only)
 
@@ -140,10 +312,14 @@ apps/openclaw/
     iam.ts            # Task role + execution role + 3 security groups
     efs.ts            # File system + mount targets per AZ
     apiCaller.ts      # API caller role + scoped inline policy
-    alb.ts            # ALB + HTTP-80 listener with 404 default action
+    dns.ts            # Route53 zone lookup + ACM wildcard cert (Phase 3)
+    alb.ts            # ALB + HTTPS-443 listener + wildcard ALIAS record
     taskDefinition.ts # 3 task definitions (one per tier)
     ssm.ts            # Cross-stack contract under /axel/<stage>/openclaw/*
 ```
 
 The order of imports in `sst.config.ts` is significant — modules
-that reference others must load after their dependencies.
+that reference others must load after their dependencies. `dns.ts`
+must load before `alb.ts` (the listener attaches the cert from
+`dns.ts`); `apiCaller.ts` must load after `cluster.ts` + `efs.ts`
+(its inline policy scopes by their ARNs).
