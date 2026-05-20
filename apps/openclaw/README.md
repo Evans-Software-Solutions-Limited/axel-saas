@@ -31,7 +31,16 @@ API reads everything it needs from SSM Parameter Store (`/axel/<stage>/openclaw/
 
 ## Deploy
 
-From `apps/openclaw/`:
+This app is **not** a member of the root workspaces (`packages/*`, `microservices/*` only). It has its own `package.json` + `bun.lock` + `node_modules`. On a clean clone, install + bootstrap SST's platform types before deploying or typechecking:
+
+```bash
+cd apps/openclaw
+bun install              # installs sst, @tsconfig/node22, @types/node, typescript
+bun x sst install        # generates .sst/platform/config.d.ts (provides the
+                         # ambient `aws`, `$app`, `$util`, `$config` globals)
+```
+
+After that, the normal SST workflow:
 
 ```bash
 # Diff first (read-only) to inspect resource plan
@@ -65,13 +74,13 @@ ECR_URI=$(aws ecr describe-repositories \
 aws ecr get-login-password --region eu-west-2 \
   | docker login --username AWS --password-stdin "${ECR_URI%/*}"
 
-# 3. Build the OpenClaw image. From the repo root:
+# 3. Build the OpenClaw image. From `apps/openclaw/`:
 cd ../../docker/openclaw
 OPENCLAW_VERSION=$(jq -r .openclaw versions.json)
 docker build --platform linux/amd64 \
   --build-arg OPENCLAW_VERSION="${OPENCLAW_VERSION}" \
   -t openclaw:bootstrap \
-  -f Dockerfile .. # build context is repo root — Dockerfile COPYs from packages/openclaw-bridge-plugin/
+  -f Dockerfile ../.. # build context is repo root — Dockerfile COPYs both docker/openclaw/ AND packages/openclaw-bridge-plugin/ so it needs the full tree
 
 # 4. Tag + push as `:bootstrap`.
 docker tag openclaw:bootstrap "${ECR_URI}:bootstrap"

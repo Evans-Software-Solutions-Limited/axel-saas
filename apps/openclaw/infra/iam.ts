@@ -42,15 +42,26 @@ import { defaultVpc } from "./cluster";
  */
 export const albSecurityGroup = new aws.ec2.SecurityGroup("openclaw-alb-sg", {
   name: `openclaw-${$app.stage}-alb`,
-  description: "OpenClaw ALB — public ingress on 443 only",
+  description:
+    "OpenClaw ALB — Phase 2 opens port 80 to match the HTTP listener; Phase 3 flips this to 443 when ACM is wired",
   vpcId: defaultVpc.id,
+  // Phase 2's listener is HTTP-80 (no ACM yet — see `alb.ts`). The SG
+  // ingress port MUST match the listener port; an earlier draft of
+  // this PR opened 443 to match the Phase 3 target state and the
+  // Phase 2 exit-criterion smoke test (`curl http://<alb-dns>/`)
+  // would have hit the SG drop instead of the listener's 404. The
+  // SG and listener don't cross-validate at deploy time, so the
+  // mismatch only surfaces at the smoke test — exactly the failure
+  // class inspector-brad caught on PR #105. Keep this rule in lock-
+  // step with `alb.ts`'s `port` when Phase 3 changes the listener.
   ingress: [
     {
       protocol: "tcp",
-      fromPort: 443,
-      toPort: 443,
+      fromPort: 80,
+      toPort: 80,
       cidrBlocks: ["0.0.0.0/0"],
-      description: "HTTPS from anywhere — TLS terminates at the ALB",
+      description:
+        "Phase 2: HTTP-80 from anywhere — matches the Phase 2 HTTP listener; flipped to HTTPS-443 in Phase 3",
     },
   ],
   // Egress rules added below — `ec2.SecurityGroupRule` so the rule
