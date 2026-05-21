@@ -36,12 +36,46 @@ export const coreAPI = new sst.aws.ApiGatewayV2("api-core", {
   },
 });
 
+// Resolve the openclaw apiCaller role ARN from the cross-stack SSM
+// contract (`/axel/<stage>/openclaw/api-caller-role-arn`). On stages
+// where the openclaw SST app hasn't been deployed yet, the parameter
+// is absent and we skip the grant — the runtime returns 503 from the
+// session endpoints in that case. Once the openclaw stack lands, a
+// `sst deploy` of this app picks up the grant.
+let openclawApiCallerRoleArn: string | null = null;
+try {
+  const param = await aws.ssm.getParameter({
+    name: `/axel/${$app.stage}/openclaw/api-caller-role-arn`,
+  });
+  openclawApiCallerRoleArn = param.value ?? null;
+} catch {
+  // SSM parameter not found — openclaw stack not deployed on this stage.
+}
+
 coreAPI.route("$default", {
   // Linking the table grants the Lambda role `dynamodb:GetItem`,
   // `dynamodb:UpdateItem`, etc. on this table only — least-privilege by
   // default with no extra IAM wiring.
   link: [rateLimitsTable],
   handler: "microservices/core/src/api.handler",
+  // sts:AssumeRole on the openclaw apiCaller role + read on the SSM
+  // namespace that publishes the cross-stack contract. Without the
+  // SSM read the loader cannot resolve cluster/task-def/etc; without
+  // the AssumeRole the Lambda can't launch tasks even with the IDs.
+  permissions: [
+    {
+      actions: ["ssm:GetParameter", "ssm:GetParameters"],
+      resources: [`arn:aws:ssm:*:*:parameter/axel/${$app.stage}/openclaw/*`],
+    },
+    ...(openclawApiCallerRoleArn
+      ? [
+          {
+            actions: ["sts:AssumeRole"],
+            resources: [openclawApiCallerRoleArn],
+          },
+        ]
+      : []),
+  ],
   environment: {
     DATABASE_URL: supabaseDatabaseUrl.value,
     SUPABASE_URL: process.env.SUPABASE_URL || "",
@@ -73,5 +107,14 @@ coreAPI.route("$default", {
     // the rate-limit client doesn't have to re-derive it from sst
     // resource bindings at runtime.
     RATE_LIMITS_TABLE: rateLimitsTable.name,
+    // Stage name surfaced to runtime so the openclaw SSM contract
+    // loader can build its `/axel/<stage>/openclaw/*` prefix without
+    // a second deploy-time injection.
+    STAGE: $app.stage,
+    // Optional shared token for the bridge plugin's auth: "gateway"
+    // routes. When set, the openclaw service injects it into every
+    // task via `OPENCLAW_GATEWAY_TOKEN` so the core API and the
+    // task agree on the bearer.
+    OPENCLAW_GATEWAY_TOKEN: process.env.OPENCLAW_GATEWAY_TOKEN || "",
   },
 });

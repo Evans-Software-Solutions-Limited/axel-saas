@@ -19,6 +19,7 @@ import {
   integrationPublicHandler,
 } from "./application/integrations/integrationHandler";
 import { usageHandler } from "./application/usage/usageHandler";
+import { openclawSessionsHandler } from "./application/openclaw/openclawSessionsHandler";
 
 const getAllowedOrigins = (): string[] => {
   const origins: string[] = [];
@@ -70,7 +71,8 @@ const app = new Elysia()
   .use(provisioningHandler)
   .use(taskHandler)
   .use(integrationHandler)
-  .use(usageHandler);
+  .use(usageHandler)
+  .use(openclawSessionsHandler);
 
 export type CoreApi = typeof app;
 

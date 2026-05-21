@@ -15,6 +15,7 @@ import {
 } from "../provisioning/provisioningService";
 import { normaliseTier } from "./tierNormaliser";
 import { sendEmail } from "../email/emailService";
+import { openclawSessionsService } from "../openclaw/openclawSessionsHandler";
 
 function getStripeInstance() {
   const secretKey = process.env.STRIPE_SECRET_KEY;
@@ -288,6 +289,33 @@ export const stripeHandler = new Elysia({ name: "StripeHandler" })
           // Keeps state consistent if the user later resubscribes.
           if (sub.cancelAtPeriodEnd) {
             await subRepo.updateCancelAtPeriodEnd(sub.id, false);
+          }
+
+          // Tear down active OpenClaw sessions for the cancelled user
+          // per spec §10. Awaited so the webhook reflects the real
+          // outcome, but try/catch'd so a partial AWS failure doesn't
+          // make Stripe retry the whole event — the rows would
+          // already be marked stopped where it succeeded, and a
+          // human can clean up the rest manually. We DO NOT delete
+          // the EFS access points here — keeping the user's
+          // workspace intact across resubscriptions matches the
+          // "stopped → restart on same name" behaviour for the
+          // sessions themselves.
+          try {
+            const summary = await openclawSessionsService.stopAllForUser(
+              sub.userId,
+              "tier_change",
+            );
+            if (summary.stopped > 0 || summary.failed > 0) {
+              console.log(
+                `[stripe] subscription.deleted: openclaw teardown — stopped=${summary.stopped} failed=${summary.failed} (user ${sub.userId})`,
+              );
+            }
+          } catch (err: unknown) {
+            console.error(
+              "[stripe] subscription.deleted: openclaw teardown failed",
+              { userId: sub.userId, error: err },
+            );
           }
 
           // Cancellation email — fire-and-forget. The template reads
