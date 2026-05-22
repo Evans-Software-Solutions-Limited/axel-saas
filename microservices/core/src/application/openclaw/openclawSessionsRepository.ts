@@ -20,6 +20,15 @@ import {
 export type OpenclawStoppedReason = "user" | "reaper" | "error" | "tier_change";
 
 export interface CreateOpenclawSessionInput {
+  /**
+   * Optional explicit row ID — when present, the insert uses it
+   * instead of letting the DB generate one. The service generates the
+   * sessionId up front (so it can flow into ECS task tags and the
+   * target-group name BEFORE the row exists) and threads it through
+   * here so the returned `sessionId` from the API matches the row
+   * the row that `DELETE /openclaw/sessions/:id` later resolves.
+   */
+  id?: string;
   userId: string;
   name: string;
   taskArn: string;
@@ -41,6 +50,7 @@ export class OpenclawSessionsRepository {
     const [row] = await this.db
       .insert(openclawSessions)
       .values({
+        ...(input.id ? { id: input.id } : {}),
         userId: input.userId,
         name: input.name,
         taskArn: input.taskArn,

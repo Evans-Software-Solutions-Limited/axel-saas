@@ -80,6 +80,50 @@ describe("OpenclawSessionsRepository", () => {
       expect(insertMock).toHaveBeenCalledOnce();
     });
 
+    it("forwards an explicit `id` to the insert when provided", async () => {
+      const valuesSpy = vi.fn(() => mockChain([mockRow()]));
+      insertMock.mockReturnValue({
+        values: valuesSpy,
+        returning: () => Promise.resolve([mockRow()]),
+      });
+      await repo.create({
+        id: "explicit-session-uuid",
+        userId: "user-uuid-1",
+        name: "demo",
+        taskArn: "arn:task",
+        targetGroupArn: "arn:tg",
+        listenerRuleArn: "arn:rule",
+        efsAccessPointId: "fsap",
+      });
+      // Without `id` set in input, drizzle uses the column default;
+      // with it, the value is forwarded. Critical for the
+      // sessionId-must-match-row invariant called out by inspector-brad.
+      expect(valuesSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ id: "explicit-session-uuid" }),
+      );
+    });
+
+    it("omits `id` from .values when not provided (DB generates it)", async () => {
+      const valuesSpy = vi.fn(() => mockChain([mockRow()]));
+      insertMock.mockReturnValue({
+        values: valuesSpy,
+        returning: () => Promise.resolve([mockRow()]),
+      });
+      await repo.create({
+        userId: "user-uuid-1",
+        name: "demo",
+        taskArn: "arn:task",
+        targetGroupArn: "arn:tg",
+        listenerRuleArn: "arn:rule",
+        efsAccessPointId: "fsap",
+      });
+      const call = valuesSpy.mock.calls[0] as unknown as [
+        Record<string, unknown>,
+      ];
+      const valuesArg = call[0];
+      expect(Object.prototype.hasOwnProperty.call(valuesArg, "id")).toBe(false);
+    });
+
     it("throws when insert returns nothing", async () => {
       insertMock.mockReturnValue(mockChain([]));
       await expect(

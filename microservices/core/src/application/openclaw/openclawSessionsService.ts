@@ -86,6 +86,24 @@ export interface OpenclawSessionsServiceDeps {
   gatewayToken?: string | null;
 }
 
+/**
+ * Detect the ELB v2 "priority slot already taken" error across the
+ * shapes the SDK can surface it as. AWS' modular v3 client mostly
+ * tags errors with `name`, but mocks (and some older SDK middlewares)
+ * use `Code`, and a literal Error from a fetch failure carries it in
+ * the message. Belt + braces.
+ */
+export function isPriorityCollision(err: unknown): boolean {
+  if (!err || typeof err !== "object") return false;
+  const e = err as { name?: string; Code?: string; message?: string };
+  if (e.name === "PriorityInUseException") return true;
+  if (e.Code === "PriorityInUse") return true;
+  if (typeof e.message === "string" && /priority.*in.?use/i.test(e.message)) {
+    return true;
+  }
+  return false;
+}
+
 /** Stable UID/GID per spec §7.1 — same user always gets the same POSIX ID. */
 export function stableUidGid(userId: string): number {
   let hash = 0;
@@ -207,6 +225,7 @@ export class OpenclawSessionsService {
 
     let targetGroupArn: string | undefined;
     let listenerRuleArn: string | undefined;
+    let startedAt: Date | undefined;
 
     try {
       const taskIp = await this.waitForTaskIp({
@@ -227,6 +246,31 @@ export class OpenclawSessionsService {
         targetGroupArn,
         listenerArn: infra.albListenerArn,
       });
+      // Insert is INSIDE the try block so a unique-constraint
+      // violation on `lower(name) WHERE stopped_at IS NULL` (the
+      // partial index added in migration 0013) triggers the same
+      // rollback path as any other AWS-step failure. Without this,
+      // concurrent same-name retries from one user would both pass
+      // the up-front `findActiveByName` check, both run the full
+      // AWS lifecycle, and the second insert would 23505 — leaving
+      // its ECS task + target group + listener rule orphaned with
+      // no row to track them.
+      //
+      // The explicit `id: sessionId` is critical: without it, the
+      // DB generates its own UUID via `defaultRandom()` and the
+      // value the API returns to the caller would have no row,
+      // making every subsequent `DELETE /openclaw/sessions/:id`
+      // 404 in the handler.
+      startedAt = this.clock();
+      await this.repository.create({
+        id: sessionId,
+        userId: input.userId,
+        name: lowerName,
+        taskArn,
+        targetGroupArn,
+        listenerRuleArn,
+        efsAccessPointId,
+      });
     } catch (err) {
       this.logger.error("Session post-RunTask wiring failed; rolling back", {
         sessionId,
@@ -241,16 +285,6 @@ export class OpenclawSessionsService {
       });
       throw err;
     }
-
-    const startedAt = this.clock();
-    await this.repository.create({
-      userId: input.userId,
-      name: lowerName,
-      taskArn,
-      targetGroupArn: targetGroupArn!,
-      listenerRuleArn: listenerRuleArn!,
-      efsAccessPointId,
-    });
 
     return {
       kind: "created",
@@ -458,6 +492,17 @@ export class OpenclawSessionsService {
     // free slot above the wildcard default. Priorities 1-100 are
     // reserved for the existing wildcard/bootstrap; sessions use
     // 1000+.
+    //
+    // DescribeRules→pick→CreateRule is non-atomic across concurrent
+    // callers, so two simultaneous bring-ups can both grab the same
+    // "next free" slot and the loser gets `PriorityInUse`. We retry
+    // with monotonically incrementing priorities (rather than
+    // re-DescribeRules every loop) up to MAX_PRIORITY_RETRIES — bounded
+    // because priority space is 1..50000 and a runaway loop would
+    // chew through the limit. Re-reading every retry would also work
+    // but adds an ELB round-trip per attempt; this is cheaper and
+    // converges in O(concurrent_starts) attempts.
+    const MAX_PRIORITY_RETRIES = 5;
     const rules = await elbv2.send(
       new DescribeRulesCommand({ ListenerArn: args.listenerArn }),
     );
@@ -468,21 +513,47 @@ export class OpenclawSessionsService {
     }
     let priority = 1000;
     while (used.has(priority)) priority += 1;
-    const out = await elbv2.send(
-      new CreateRuleCommand({
-        ListenerArn: args.listenerArn,
-        Priority: priority,
-        Conditions: [{ Field: "host-header", Values: [args.host] }],
-        Actions: [{ Type: "forward", TargetGroupArn: args.targetGroupArn }],
-        Tags: [
-          { Key: "App", Value: "openclaw" },
-          { Key: "SessionId", Value: args.sessionId },
-        ],
-      }),
-    );
-    const ruleArn = out.Rules?.[0]?.RuleArn;
-    if (!ruleArn) throw new Error("CreateRule returned no ARN");
-    return ruleArn;
+
+    let attempt = 0;
+    while (true) {
+      try {
+        const out = await elbv2.send(
+          new CreateRuleCommand({
+            ListenerArn: args.listenerArn,
+            Priority: priority,
+            Conditions: [{ Field: "host-header", Values: [args.host] }],
+            Actions: [{ Type: "forward", TargetGroupArn: args.targetGroupArn }],
+            Tags: [
+              { Key: "App", Value: "openclaw" },
+              { Key: "SessionId", Value: args.sessionId },
+            ],
+          }),
+        );
+        const ruleArn = out.Rules?.[0]?.RuleArn;
+        if (!ruleArn) throw new Error("CreateRule returned no ARN");
+        return ruleArn;
+      } catch (err) {
+        const collision = isPriorityCollision(err);
+        if (!collision || attempt >= MAX_PRIORITY_RETRIES) {
+          throw err;
+        }
+        attempt += 1;
+        priority += 1;
+        // Skip any priorities that have shown up as taken in the
+        // initial read — concurrency-races aside, this also handles
+        // the case where a separate listener-rule grew while we
+        // were doing the AWS work.
+        while (used.has(priority)) priority += 1;
+        this.logger.warn(
+          "createListenerRule: PriorityInUse, retrying with next slot",
+          {
+            sessionId: args.sessionId,
+            attempt,
+            priority,
+          },
+        );
+      }
+    }
   }
 
   private async resolveDefaultVpcId(infra: OpenclawInfra): Promise<string> {

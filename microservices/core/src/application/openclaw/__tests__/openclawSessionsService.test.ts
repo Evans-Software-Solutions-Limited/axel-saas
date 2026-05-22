@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import {
   OpenclawSessionsService,
+  isPriorityCollision,
   stableUidGid,
   type AwsClientFactory,
 } from "../openclawSessionsService";
@@ -184,6 +185,32 @@ function primeHappyPathAws() {
   });
 }
 
+describe("isPriorityCollision", () => {
+  it("matches PriorityInUseException (modular SDK shape)", () => {
+    expect(
+      isPriorityCollision(
+        Object.assign(new Error("x"), { name: "PriorityInUseException" }),
+      ),
+    ).toBe(true);
+  });
+
+  it("matches Code=PriorityInUse (older middleware shape)", () => {
+    expect(isPriorityCollision({ Code: "PriorityInUse" })).toBe(true);
+  });
+
+  it("matches priority-mentioning messages as a fallback", () => {
+    expect(isPriorityCollision(new Error("Priority in use"))).toBe(true);
+    expect(isPriorityCollision(new Error("priority IN USE"))).toBe(true);
+  });
+
+  it("does not match unrelated errors", () => {
+    expect(isPriorityCollision(new Error("network timeout"))).toBe(false);
+    expect(isPriorityCollision(null)).toBe(false);
+    expect(isPriorityCollision(undefined)).toBe(false);
+    expect(isPriorityCollision("string error")).toBe(false);
+  });
+});
+
 describe("stableUidGid", () => {
   it("is deterministic for the same userId", () => {
     expect(stableUidGid("user-1")).toBe(stableUidGid("user-1"));
@@ -353,6 +380,10 @@ describe("OpenclawSessionsService.createSession", () => {
       expect(r.url).toBe("https://demo.openclaw.staging.meetaxel.ai");
       expect(r.taskArn).toBe("arn:task/abc");
       expect(r.expiresAt).toBe("2026-05-20T20:00:00.000Z"); // +8h premium
+      // Critical regression: the sessionId returned to the caller
+      // must be the same value persisted on the row, so a follow-up
+      // DELETE /openclaw/sessions/:id resolves the row.
+      expect(r.sessionId).toBe("sess-new-uuid");
     }
     // EFS access point created (no prior).
     expect(efsSend).toHaveBeenCalled();
@@ -360,8 +391,142 @@ describe("OpenclawSessionsService.createSession", () => {
     expect(ecsSend.mock.calls.length).toBeGreaterThanOrEqual(2);
     expect(elbv2Send.mock.calls.length).toBeGreaterThanOrEqual(3);
     expect(ec2Send).toHaveBeenCalled();
-    // Row inserted.
+    // Row inserted with the same id the API returned.
     expect(repo.create).toHaveBeenCalledOnce();
+    expect(repo.create).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "sess-new-uuid" }),
+    );
+  });
+
+  it("rolls back AWS resources when repository.create throws (concurrent name race)", async () => {
+    // Two simultaneous bring-ups with the same name both pass the
+    // up-front findActiveByName check, both finish the AWS lifecycle,
+    // and the loser's insert hits the partial unique index. Without
+    // wrapping the insert in the same try/catch as the AWS calls,
+    // the loser's task + target group + listener rule would leak.
+    const repo = makeRepo({
+      create: vi.fn().mockRejectedValue(
+        Object.assign(new Error("23505 duplicate key"), {
+          code: "23505",
+        }),
+      ),
+    });
+    const svc = new OpenclawSessionsService({
+      repository: repo,
+      loadInfra: async () => goldenInfra,
+      awsClients: makeAwsClients(),
+      uuid: () => "sess-loser",
+    });
+    await expect(
+      svc.createSession({ userId: "u1", tier: "premium", name: "demo" }),
+    ).rejects.toThrow(/duplicate key/);
+    // Rollback ran — DeleteTargetGroup + StopTask were called.
+    const elbTypes = elbv2Send.mock.calls.map((c) => c[0].__type);
+    expect(elbTypes).toContain("DeleteTargetGroupCommand");
+    expect(elbTypes).toContain("DeleteRuleCommand");
+    const ecsTypes = ecsSend.mock.calls.map((c) => c[0].__type);
+    expect(ecsTypes).toContain("StopTaskCommand");
+  });
+
+  it("retries CreateRule on PriorityInUse with the next slot", async () => {
+    let createRuleCount = 0;
+    elbv2Send.mockImplementation(async (cmd) => {
+      switch (cmd.__type) {
+        case "CreateTargetGroupCommand":
+          return { TargetGroups: [{ TargetGroupArn: "arn:tg/abc" }] };
+        case "DescribeRulesCommand":
+          return { Rules: [{ Priority: "1000" }, { Priority: "1001" }] };
+        case "RegisterTargetsCommand":
+          return {};
+        case "CreateRuleCommand": {
+          createRuleCount += 1;
+          if (createRuleCount === 1) {
+            // First attempt races another caller — ELB returns
+            // PriorityInUse. Service should retry with the next slot.
+            const err = new Error("Priority in use") as Error & {
+              name: string;
+            };
+            err.name = "PriorityInUseException";
+            throw err;
+          }
+          return { Rules: [{ RuleArn: "arn:rule/retried" }] };
+        }
+        case "DescribeTargetHealthCommand":
+          return {
+            TargetHealthDescriptions: [
+              { Target: { Id: "10.0.0.5", Port: 18789 } },
+            ],
+          };
+        case "DeleteRuleCommand":
+        case "DeleteTargetGroupCommand":
+        case "DeregisterTargetsCommand":
+          return {};
+        default:
+          return {};
+      }
+    });
+    const repo = makeRepo();
+    const svc = new OpenclawSessionsService({
+      repository: repo,
+      loadInfra: async () => goldenInfra,
+      awsClients: makeAwsClients(),
+    });
+    const r = await svc.createSession({
+      userId: "u1",
+      tier: "premium",
+      name: "demo",
+    });
+    expect(r.kind).toBe("created");
+    expect(createRuleCount).toBe(2);
+    // The successful priority must NOT be 1000 or 1001 (those are in
+    // `used` from DescribeRules) and must NOT be 1002 (the colliding
+    // first attempt) — so it's 1003.
+    const createCalls = elbv2Send.mock.calls
+      .map((c) => c[0])
+      .filter((c) => c.__type === "CreateRuleCommand");
+    expect(createCalls.at(-1).input.Priority).toBe(1003);
+  });
+
+  it("gives up after MAX_PRIORITY_RETRIES and surfaces the original error", async () => {
+    elbv2Send.mockImplementation(async (cmd) => {
+      switch (cmd.__type) {
+        case "CreateTargetGroupCommand":
+          return { TargetGroups: [{ TargetGroupArn: "arn:tg/abc" }] };
+        case "DescribeRulesCommand":
+          return { Rules: [] };
+        case "RegisterTargetsCommand":
+          return {};
+        case "CreateRuleCommand": {
+          // Permanent collision — never succeeds.
+          const err = new Error("Priority in use") as Error & {
+            name: string;
+          };
+          err.name = "PriorityInUseException";
+          throw err;
+        }
+        case "DescribeTargetHealthCommand":
+          return { TargetHealthDescriptions: [] };
+        case "DeleteRuleCommand":
+        case "DeleteTargetGroupCommand":
+        case "DeregisterTargetsCommand":
+          return {};
+        default:
+          return {};
+      }
+    });
+    const svc = new OpenclawSessionsService({
+      repository: makeRepo(),
+      loadInfra: async () => goldenInfra,
+      awsClients: makeAwsClients(),
+    });
+    await expect(
+      svc.createSession({ userId: "u1", tier: "premium", name: "demo" }),
+    ).rejects.toThrow(/Priority in use/);
+    const createCalls = elbv2Send.mock.calls
+      .map((c) => c[0])
+      .filter((c) => c.__type === "CreateRuleCommand");
+    // 1 initial + 5 retries = 6 attempts before giving up.
+    expect(createCalls).toHaveLength(6);
   });
 
   it("reuses an existing EFS access point when present", async () => {
