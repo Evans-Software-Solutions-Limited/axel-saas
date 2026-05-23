@@ -31,6 +31,16 @@ export const coreAPI = new sst.aws.ApiGatewayV2("api-core", {
     route: {
       handler: (args) => {
         args.runtime ??= "nodejs22.x";
+        // POST /openclaw/sessions polls DescribeTasks for up to ~22s
+        // for the ENI attach plus several seconds of TG + listener
+        // rule wiring. The Lambda default (20s) cuts it close on
+        // warm bring-ups and breaks on slow paths. 60s leaves
+        // headroom for the ENI poll to complete in-process even
+        // when API Gateway has already 504'd the client at its 30s
+        // integration cap — keeping the row + AWS resources
+        // consistent so the user's retry idempotently returns the
+        // running session per spec §7.1.
+        args.timeout ??= "60 seconds";
       },
     },
   },
@@ -48,8 +58,16 @@ try {
     name: `/axel/${$app.stage}/openclaw/api-caller-role-arn`,
   });
   openclawApiCallerRoleArn = param.value ?? null;
-} catch {
-  // SSM parameter not found — openclaw stack not deployed on this stage.
+} catch (err: unknown) {
+  // Only swallow ParameterNotFound — that's the documented "openclaw
+  // stack not yet deployed on this stage" case. Throttling, IAM-denied,
+  // region-misconfig, expired credentials etc. must surface as deploy
+  // failures so the operator notices, otherwise the Lambda would 503 at
+  // runtime with no breadcrumb back to the failed deploy-time read.
+  const e = err as { code?: string; name?: string };
+  const isNotFound =
+    e?.code === "ParameterNotFound" || e?.name === "ParameterNotFound";
+  if (!isNotFound) throw err;
 }
 
 coreAPI.route("$default", {

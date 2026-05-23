@@ -187,6 +187,17 @@ export class OpenclawSessionsService {
         limit: policy.maxConcurrentSessions,
       };
     }
+    // Note on TOCTOU: countActiveByUserId + repository.create are not
+    // atomic, so two concurrent POSTs from the same user with
+    // DIFFERENT names — both started when the user is at `limit - 1`
+    // — can both pass this check and both insert successfully. The
+    // partial unique index on `lower(name) WHERE stopped_at IS NULL`
+    // only blocks the same-name race, not the same-user-different-name
+    // one. We add a compensating recheck after insert (below) so the
+    // over-cap row gets torn down — bounded blast radius is one extra
+    // task running for the duration of the slower request's AWS
+    // lifecycle, which is preferable to a full per-user advisory
+    // lock held across the 22s ENI poll.
 
     const sessionId = this.uuid();
     const efsAccessPointId = await this.resolveEfsAccessPoint({
@@ -271,6 +282,40 @@ export class OpenclawSessionsService {
         listenerRuleArn,
         efsAccessPointId,
       });
+
+      // Compensating check for the concurrency-cap TOCTOU documented
+      // above. If a concurrent POST also passed at `limit - 1` and
+      // inserted in parallel, the post-insert count is now > limit.
+      // Roll THIS request back (we're the loser; the earlier one
+      // wins) and surface a 429 to the user. Slightly wasteful
+      // because the AWS lifecycle already ran, but cheaper than
+      // holding a per-user lock for the full 22s ENI poll.
+      const postInsertCount = await this.repository.countActiveByUserId(
+        input.userId,
+      );
+      if (postInsertCount > policy.maxConcurrentSessions) {
+        this.logger.warn(
+          "Concurrency cap exceeded via TOCTOU race — rolling back this request",
+          {
+            userId: input.userId,
+            sessionId,
+            postInsertCount,
+            limit: policy.maxConcurrentSessions,
+          },
+        );
+        await this.safeRollback({
+          clusterArn: infra.clusterArn,
+          taskArn,
+          targetGroupArn,
+          listenerRuleArn,
+        });
+        await this.repository.markStopped(sessionId, "error");
+        return {
+          kind: "concurrency_cap",
+          current: postInsertCount - 1,
+          limit: policy.maxConcurrentSessions,
+        };
+      }
     } catch (err) {
       this.logger.error("Session post-RunTask wiring failed; rolling back", {
         sessionId,
@@ -391,11 +436,24 @@ export class OpenclawSessionsService {
   }): Promise<string> {
     const ecs = await this.awsClients.getEcs();
     const { DescribeTasksCommand } = await import("@aws-sdk/client-ecs");
-    // Up to 60s of polling at 2s intervals — covers the typical
-    // Fargate ENI-attach window (10-30s for warm image, longer on
-    // cold pull). RunTask returns before the ENI is attached, so we
-    // can't shortcut this.
-    const deadline = Date.now() + 60_000;
+    // API Gateway HTTP API caps the integration timeout at 30s (with
+    // service-quota bumps available up to 60s). The Lambda timeout in
+    // `infra/api.ts` is set to 60s so this method has headroom to
+    // complete in-process even when the client has already received
+    // a 504 — that way the row + AWS resources stay consistent and
+    // the user's retry resolves the same row via idempotency.
+    //
+    // Poll budget here is tightened to ~22s so that on warm image
+    // pulls (the 90%+ case) we return well inside API Gateway's 30s
+    // wire. Cold-pull Fargate launches (30–90s per spec §11) will
+    // exceed this and surface as a 504 to the user; the row is left
+    // in the DB and a retry within the wall-clock cap returns the
+    // running session via the spec §7.1 idempotency clause. A fully
+    // async start-then-poll refactor is tracked as a Phase 6
+    // follow-up — out of scope here.
+    const ENI_WAIT_MS = 22_000;
+    const POLL_INTERVAL_MS = 1_500;
+    const deadline = Date.now() + ENI_WAIT_MS;
     let eni: string | undefined;
     while (Date.now() < deadline) {
       const out = await ecs.send(
@@ -409,11 +467,12 @@ export class OpenclawSessionsService {
         (d) => d.name === "networkInterfaceId",
       )?.value;
       if (eni) break;
-      await new Promise((r) => setTimeout(r, 2_000));
+      await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
     }
     if (!eni) {
       throw new Error(
-        `Task ENI did not attach within 60s for task ${args.taskArn}`,
+        `Task ENI did not attach within ${ENI_WAIT_MS / 1000}s for task ${args.taskArn} ` +
+          `(likely a cold image pull; user can retry — the idempotency clause will return the same session if it does come up)`,
       );
     }
     const ec2 = await this.awsClients.getEc2();
@@ -714,10 +773,14 @@ export class OpenclawSessionsService {
     targetGroupArn: string;
     listenerRuleArn: string;
   }): Promise<void> {
-    // Order: rule → target group → task. Same as safeRollback in
-    // the start lifecycle, but here each step is awaited and a
-    // failure rejects the whole call — the row stays "active"
-    // until cleanup actually succeeds, so the operator can retry.
+    // Order: rule → target group → task. The whole call is
+    // idempotent: each AWS delete swallows the "already gone" error
+    // shape (RuleNotFoundException / TargetGroupNotFoundException /
+    // ClusterNotFoundException) so a partial teardown can be retried.
+    // Without this, a single bad first attempt would leave the row
+    // stuck at `stopped_at IS NULL` forever — the user retries DELETE,
+    // findById returns the same row, the AWS call re-throws on the
+    // already-deleted resource, and `markStopped` never runs.
     const elbv2 = await this.awsClients.getElbV2();
     const {
       DeleteRuleCommand,
@@ -752,19 +815,64 @@ export class OpenclawSessionsService {
       });
     }
 
-    await elbv2.send(new DeleteRuleCommand({ RuleArn: args.listenerRuleArn }));
-    await elbv2.send(
-      new DeleteTargetGroupCommand({ TargetGroupArn: args.targetGroupArn }),
+    await this.swallowNotFound(
+      () =>
+        elbv2.send(new DeleteRuleCommand({ RuleArn: args.listenerRuleArn })),
+      "RuleNotFoundException",
+      "DeleteRule",
+    );
+    await this.swallowNotFound(
+      () =>
+        elbv2.send(
+          new DeleteTargetGroupCommand({
+            TargetGroupArn: args.targetGroupArn,
+          }),
+        ),
+      "TargetGroupNotFoundException",
+      "DeleteTargetGroup",
     );
 
     const ecs = await this.awsClients.getEcs();
     const { StopTaskCommand } = await import("@aws-sdk/client-ecs");
-    await ecs.send(
-      new StopTaskCommand({
-        cluster: args.clusterArn,
-        task: args.taskArn,
-        reason: "openclaw session stopped",
-      }),
+    await this.swallowNotFound(
+      () =>
+        ecs.send(
+          new StopTaskCommand({
+            cluster: args.clusterArn,
+            task: args.taskArn,
+            reason: "openclaw session stopped",
+          }),
+        ),
+      // ECS surfaces this as InvalidParameterException("The referenced
+      // task does not exist") when the task is already gone, or
+      // ClusterNotFoundException if the whole cluster is gone — accept
+      // either as "already stopped".
+      ["InvalidParameterException", "ClusterNotFoundException"],
+      "StopTask",
     );
+  }
+
+  /**
+   * Run `fn` and silently absorb a NotFound-shape error so the
+   * stop path is idempotent. Re-throws anything else.
+   */
+  private async swallowNotFound(
+    fn: () => Promise<unknown>,
+    notFoundNames: string | string[],
+    label: string,
+  ): Promise<void> {
+    const names = Array.isArray(notFoundNames)
+      ? notFoundNames
+      : [notFoundNames];
+    try {
+      await fn();
+    } catch (err: unknown) {
+      const e = err as { name?: string; Code?: string };
+      const matched = names.some((n) => e?.name === n || e?.Code === n);
+      if (!matched) throw err;
+      this.logger.info(`tearDown: ${label} returned NotFound (already gone)`, {
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
   }
 }

@@ -671,6 +671,39 @@ describe("OpenclawSessionsService.createSession", () => {
     expect(createRuleCount).toBeGreaterThan(0);
   });
 
+  it("rolls back when a TOCTOU concurrent insert pushes the user over the cap", async () => {
+    // First countActiveByUserId returns `limit - 1` (1 for premium),
+    // so the up-front check passes. The post-insert count (after a
+    // concurrent peer also inserted) returns `limit + 1` = 3, which
+    // trips the compensating check.
+    const countMock = vi
+      .fn()
+      .mockResolvedValueOnce(1) // pre-create
+      .mockResolvedValueOnce(3); // post-create
+    const repo = makeRepo({ countActiveByUserId: countMock });
+    const svc = new OpenclawSessionsService({
+      repository: repo,
+      loadInfra: async () => goldenInfra,
+      awsClients: makeAwsClients(),
+      uuid: () => "sess-toctou-uuid",
+    });
+    const r = await svc.createSession({
+      userId: "u1",
+      tier: "premium",
+      name: "demo",
+    });
+    expect(r.kind).toBe("concurrency_cap");
+    if (r.kind === "concurrency_cap") {
+      expect(r.current).toBe(2); // postInsertCount - 1
+      expect(r.limit).toBe(2);
+    }
+    // Compensating rollback ran — markStopped called with the same
+    // sessionId that was returned to the (would-be) caller.
+    expect(repo.markStopped).toHaveBeenCalledWith("sess-toctou-uuid", "error");
+    const ecsTypes = ecsSend.mock.calls.map((c) => c[0].__type);
+    expect(ecsTypes).toContain("StopTaskCommand");
+  });
+
   it("treats null tier as free (no concurrency cap)", async () => {
     const repo = makeRepo({
       countActiveByUserId: vi.fn().mockResolvedValue(0),
@@ -815,6 +848,86 @@ describe("OpenclawSessionsService.stopSession", () => {
       reason: "user",
     });
     expect(r.kind).toBe("stopped");
+  });
+
+  it("is idempotent when AWS reports the rule + TG + task as already gone", async () => {
+    // A prior partial teardown deleted the rule and TG out-of-band.
+    // Without idempotent error-swallowing, the user's retry would
+    // perpetually 500 and the row would stay `stopped_at IS NULL`.
+    elbv2Send.mockImplementation(async (cmd) => {
+      switch (cmd.__type) {
+        case "DescribeTargetHealthCommand":
+          return { TargetHealthDescriptions: [] };
+        case "DeleteRuleCommand": {
+          const err = new Error("Rule gone") as Error & { name: string };
+          err.name = "RuleNotFoundException";
+          throw err;
+        }
+        case "DeleteTargetGroupCommand": {
+          const err = new Error("TG gone") as Error & { name: string };
+          err.name = "TargetGroupNotFoundException";
+          throw err;
+        }
+        case "DeregisterTargetsCommand":
+          return {};
+        default:
+          return {};
+      }
+    });
+    ecsSend.mockImplementation(async (cmd) => {
+      if (cmd.__type === "StopTaskCommand") {
+        const err = new Error("task does not exist") as Error & {
+          name: string;
+        };
+        err.name = "InvalidParameterException";
+        throw err;
+      }
+      return {};
+    });
+    const { svc, repo } = buildWithRow({
+      id: "s",
+      userId: "u1",
+      taskArn: "arn:task/gone",
+      targetGroupArn: "arn:tg/gone",
+      listenerRuleArn: "arn:rule/gone",
+      stoppedAt: null,
+    });
+    const r = await svc.stopSession({
+      sessionId: "s",
+      userId: "u1",
+      reason: "user",
+    });
+    expect(r.kind).toBe("stopped");
+    // Crucial: markStopped MUST run despite each AWS call surfacing
+    // a NotFound — otherwise the row sticks at stopped_at IS NULL
+    // and the user can never reclaim the name.
+    expect(repo.markStopped).toHaveBeenCalledWith("s", "user");
+  });
+
+  it("re-throws non-NotFound AWS errors during teardown", async () => {
+    elbv2Send.mockImplementation(async (cmd) => {
+      if (cmd.__type === "DescribeTargetHealthCommand")
+        return { TargetHealthDescriptions: [] };
+      if (cmd.__type === "DeleteRuleCommand") {
+        const err = new Error("AccessDenied") as Error & { name: string };
+        err.name = "AccessDeniedException";
+        throw err;
+      }
+      return {};
+    });
+    const { svc, repo } = buildWithRow({
+      id: "s",
+      userId: "u1",
+      taskArn: "arn:task",
+      targetGroupArn: "arn:tg",
+      listenerRuleArn: "arn:rule",
+      stoppedAt: null,
+    });
+    await expect(
+      svc.stopSession({ sessionId: "s", userId: "u1", reason: "user" }),
+    ).rejects.toThrow(/AccessDenied/);
+    // Row NOT marked stopped — operator must fix the IAM issue and retry.
+    expect(repo.markStopped).not.toHaveBeenCalled();
   });
 });
 
