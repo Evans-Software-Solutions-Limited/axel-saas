@@ -514,3 +514,58 @@ export const waitlist = pgTable(
 
 export type WaitlistEntry = typeof waitlist.$inferSelect;
 export type NewWaitlistEntry = typeof waitlist.$inferInsert;
+
+// ─── OpenClaw Sessions ────────────────────────────────────────────────────────
+
+// Why a session is no longer running. `user` covers explicit
+// DELETE /openclaw/sessions/:id; `reaper` covers the wall-clock
+// backstop Lambda (Phase 6, not in this PR); `error` covers a
+// teardown triggered by a midstream AWS-SDK failure during start;
+// `tier_change` covers the Stripe webhook cleanup when a subscription
+// is cancelled.
+export const openclawStoppedReasonEnum = pgEnum("openclaw_stopped_reason", [
+  "user",
+  "reaper",
+  "error",
+  "tier_change",
+]);
+
+export const openclawSessions = pgTable(
+  "openclaw_sessions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id").notNull(),
+    name: text("name").notNull(),
+    // Tier-at-start. See migration 0013 header for why this is
+    // pinned on the row (idempotent reconnect would otherwise
+    // compute expiresAt against the user's CURRENT tier and return
+    // a past timestamp after a downgrade).
+    tier: subscriptionTierEnum("tier").notNull(),
+    taskArn: text("task_arn").notNull(),
+    targetGroupArn: text("target_group_arn").notNull(),
+    listenerRuleArn: text("listener_rule_arn").notNull(),
+    efsAccessPointId: text("efs_access_point_id").notNull(),
+    startedAt: timestamp("started_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    stoppedAt: timestamp("stopped_at", { withTimezone: true }),
+    stoppedReason: openclawStoppedReasonEnum("stopped_reason"),
+  },
+  (table) => ({
+    // Drizzle doesn't model partial unique indexes cleanly in its
+    // schema introspection, so the partial constraint (WHERE
+    // stopped_at IS NULL) lives in the migration SQL only. Declaring
+    // the non-partial counterpart here would shadow the real
+    // constraint at typecheck time without enforcing anything
+    // different — better to leave it off and rely on the SQL.
+    userIdIdx: index("openclaw_sessions_user_id_idx").on(table.userId),
+    openclawSessionsUserFk: foreignKey({
+      columns: [table.userId],
+      foreignColumns: [users.id],
+      name: "openclaw_sessions_user_id_fkey",
+    }).onDelete("cascade"),
+  }),
+);
+
+export type OpenclawSession = typeof openclawSessions.$inferSelect;
+export type NewOpenclawSession = typeof openclawSessions.$inferInsert;

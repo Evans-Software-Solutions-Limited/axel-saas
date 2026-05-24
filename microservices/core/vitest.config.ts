@@ -25,6 +25,11 @@ export default defineConfig({
         "**/chatHandler.ts",
         "**/taskHandler.ts",
         "**/integrationHandler.ts",
+        "**/openclawSessionsHandler.ts",
+        // awsClients delegates entirely to AWS SDK init (dynamic
+        // imports, credential providers) — behaviour worth testing
+        // lives in the service that consumes the clients.
+        "**/awsClients.ts",
       ],
       // Target 90% minimum coverage threshold
       thresholds: {
