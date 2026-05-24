@@ -115,6 +115,7 @@ function makeRepo(overrides: Partial<OpenclawSessionsRepository> = {}) {
     findById: vi.fn().mockResolvedValue(null),
     listActiveByUserId: vi.fn().mockResolvedValue([]),
     countActiveByUserId: vi.fn().mockResolvedValue(0),
+    rankAmongActive: vi.fn().mockResolvedValue(0),
     findLastEfsAccessPointId: vi.fn().mockResolvedValue(null),
     markStopped: vi.fn().mockResolvedValue(undefined),
     ...overrides,
@@ -671,21 +672,19 @@ describe("OpenclawSessionsService.createSession", () => {
     expect(createRuleCount).toBeGreaterThan(0);
   });
 
-  it("rolls back when a TOCTOU concurrent insert pushes the user over the cap", async () => {
-    // First countActiveByUserId returns `limit - 1` (1 for premium),
-    // so the up-front check passes. The post-insert count (after a
-    // concurrent peer also inserted) returns `limit + 1` = 3, which
-    // trips the compensating check.
-    const countMock = vi
-      .fn()
-      .mockResolvedValueOnce(1) // pre-create
-      .mockResolvedValueOnce(3); // post-create
-    const repo = makeRepo({ countActiveByUserId: countMock });
+  it("rolls back the loser when TOCTOU rank >= limit", async () => {
+    // Pre-create count says we're under the cap (1 of 2 used).
+    // Post-create rank says we landed at position 2 (premium limit
+    // is 2, so positions 0–1 are kept, position 2 is the loser).
+    const repo = makeRepo({
+      countActiveByUserId: vi.fn().mockResolvedValueOnce(1),
+      rankAmongActive: vi.fn().mockResolvedValue(2),
+    });
     const svc = new OpenclawSessionsService({
       repository: repo,
       loadInfra: async () => goldenInfra,
       awsClients: makeAwsClients(),
-      uuid: () => "sess-toctou-uuid",
+      uuid: () => "sess-loser-uuid",
     });
     const r = await svc.createSession({
       userId: "u1",
@@ -694,14 +693,111 @@ describe("OpenclawSessionsService.createSession", () => {
     });
     expect(r.kind).toBe("concurrency_cap");
     if (r.kind === "concurrency_cap") {
-      expect(r.current).toBe(2); // postInsertCount - 1
       expect(r.limit).toBe(2);
     }
     // Compensating rollback ran — markStopped called with the same
     // sessionId that was returned to the (would-be) caller.
-    expect(repo.markStopped).toHaveBeenCalledWith("sess-toctou-uuid", "error");
+    expect(repo.markStopped).toHaveBeenCalledWith("sess-loser-uuid", "error");
     const ecsTypes = ecsSend.mock.calls.map((c) => c[0].__type);
     expect(ecsTypes).toContain("StopTaskCommand");
+  });
+
+  it("keeps the winner when TOCTOU rank < limit", async () => {
+    // Same post-insert state, different rank: position 1 (within
+    // the limit) → keep. This is the OTHER racer in the same
+    // concurrent scenario as the test above.
+    const repo = makeRepo({
+      countActiveByUserId: vi.fn().mockResolvedValueOnce(1),
+      rankAmongActive: vi.fn().mockResolvedValue(1),
+    });
+    const svc = new OpenclawSessionsService({
+      repository: repo,
+      loadInfra: async () => goldenInfra,
+      awsClients: makeAwsClients(),
+      uuid: () => "sess-winner-uuid",
+    });
+    const r = await svc.createSession({
+      userId: "u1",
+      tier: "premium",
+      name: "demo",
+    });
+    expect(r.kind).toBe("created");
+    // Winner: no markStopped call, no rollback.
+    expect(repo.markStopped).not.toHaveBeenCalled();
+  });
+
+  it("symmetric verdict — same shared state yields one winner and one loser, not two losers", async () => {
+    // Inspector round 3 scenario: two same-user racers both pass the
+    // up-front count gate, both insert, both read the post-insert
+    // state. Under the old count-based check (`count > limit →
+    // rollback`) BOTH racers would see `count === limit + 1` and
+    // both would roll back — user ends up with 0 sessions instead
+    // of 1. Under the rank-based check, the SAME committed state
+    // gives ONE racer rank < limit (keeps) and the OTHER racer
+    // rank >= limit (rolls back). This test models that exact
+    // shared state: both racers run sequentially against the same
+    // mocked rank source-of-truth (which encodes the deterministic
+    // total order), and exactly one rolls back.
+    const rankFor = vi.fn(
+      async (_userId: string, sessionId: string): Promise<number> =>
+        sessionId === "racer-A" ? 0 : 1,
+    );
+
+    function buildFor(sessionId: string) {
+      const repo = makeRepo({
+        countActiveByUserId: vi.fn().mockResolvedValueOnce(0),
+        rankAmongActive: rankFor,
+      });
+      const svc = new OpenclawSessionsService({
+        repository: repo,
+        loadInfra: async () => goldenInfra,
+        awsClients: makeAwsClients(),
+        uuid: () => sessionId,
+      });
+      return { repo, svc };
+    }
+    const a = buildFor("racer-A");
+    const resultA = await a.svc.createSession({
+      userId: "u1",
+      tier: "free",
+      name: "alpha",
+    });
+    const b = buildFor("racer-B");
+    const resultB = await b.svc.createSession({
+      userId: "u1",
+      tier: "free",
+      name: "beta",
+    });
+
+    // Exactly one wins. Under the old count-based bug both would
+    // have returned `concurrency_cap`.
+    expect(resultA.kind).toBe("created");
+    expect(resultB.kind).toBe("concurrency_cap");
+    expect(a.repo.markStopped).not.toHaveBeenCalled();
+    expect(b.repo.markStopped).toHaveBeenCalledWith("racer-B", "error");
+  });
+
+  it("rolls back if rankAmongActive returns -1 (row vanished)", async () => {
+    // Defensive: a concurrent operator stop between our insert and
+    // our rank check could remove the row from the active set.
+    // Treat as a loss and clean up so we don't leak AWS resources.
+    const repo = makeRepo({
+      countActiveByUserId: vi.fn().mockResolvedValueOnce(0),
+      rankAmongActive: vi.fn().mockResolvedValue(-1),
+    });
+    const svc = new OpenclawSessionsService({
+      repository: repo,
+      loadInfra: async () => goldenInfra,
+      awsClients: makeAwsClients(),
+      uuid: () => "sess-vanished",
+    });
+    const r = await svc.createSession({
+      userId: "u1",
+      tier: "premium",
+      name: "demo",
+    });
+    expect(r.kind).toBe("concurrency_cap");
+    expect(repo.markStopped).toHaveBeenCalledWith("sess-vanished", "error");
   });
 
   it("treats null tier as free (no concurrency cap)", async () => {

@@ -285,21 +285,27 @@ export class OpenclawSessionsService {
 
       // Compensating check for the concurrency-cap TOCTOU documented
       // above. If a concurrent POST also passed at `limit - 1` and
-      // inserted in parallel, the post-insert count is now > limit.
-      // Roll THIS request back (we're the loser; the earlier one
-      // wins) and surface a 429 to the user. Slightly wasteful
-      // because the AWS lifecycle already ran, but cheaper than
-      // holding a per-user lock for the full 22s ENI poll.
-      const postInsertCount = await this.repository.countActiveByUserId(
+      // inserted in parallel, we'd both be over-cap. A naive
+      // "post-insert count > limit → rollback" check fails here
+      // because BOTH racers see the same committed state and both
+      // conclude they're the loser — the user ends up with zero
+      // sessions instead of one. Instead we ask the repository for
+      // OUR row's rank among the user's active rows sorted by
+      // (started_at, id). Rank < limit → keep; rank ≥ limit → we're
+      // the loser, roll back. The (started_at, id) total order is
+      // stable across both racers' views, so exactly one of them
+      // rolls back.
+      const rank = await this.repository.rankAmongActive(
         input.userId,
+        sessionId,
       );
-      if (postInsertCount > policy.maxConcurrentSessions) {
+      if (rank < 0 || rank >= policy.maxConcurrentSessions) {
         this.logger.warn(
           "Concurrency cap exceeded via TOCTOU race — rolling back this request",
           {
             userId: input.userId,
             sessionId,
-            postInsertCount,
+            rank,
             limit: policy.maxConcurrentSessions,
           },
         );
@@ -312,7 +318,11 @@ export class OpenclawSessionsService {
         await this.repository.markStopped(sessionId, "error");
         return {
           kind: "concurrency_cap",
-          current: postInsertCount - 1,
+          // Report the cap itself — the user's actual current is
+          // whatever the winners landed on, which we don't have a
+          // clean read of from here without a second roundtrip.
+          // Reporting `limit` is honest: "you're already at cap."
+          current: policy.maxConcurrentSessions,
           limit: policy.maxConcurrentSessions,
         };
       }

@@ -9,7 +9,7 @@
  * resolving by name.
  */
 
-import { and, eq, isNull, sql } from "drizzle-orm";
+import { and, asc, eq, isNull, sql } from "drizzle-orm";
 import {
   type Db,
   type OpenclawSession,
@@ -99,6 +99,40 @@ export class OpenclawSessionsRepository {
           isNull(openclawSessions.stoppedAt),
         ),
       );
+  }
+
+  /**
+   * 0-based position of `sessionId` among the user's active rows when
+   * sorted by (started_at ASC, id ASC). Returns -1 if the row isn't
+   * in the active set (already stopped, or belongs to another user).
+   *
+   * Used by the service's compensating TOCTOU check after insert:
+   * concurrent same-user creates that both pass the up-front count
+   * gate need a deterministic tiebreaker so only the loser rolls
+   * back. Without this, BOTH racers see the same post-insert count
+   * and BOTH conclude they're over-cap — the user ends up with no
+   * sessions instead of one. Ranking by (started_at, id) gives a
+   * total order that's stable across both racers' views of the same
+   * committed state, so the same row is selected as the loser
+   * regardless of which racer evaluates first.
+   *
+   * `id` is the secondary sort because Postgres timestamps can tie at
+   * sub-microsecond precision (especially in tests with a frozen
+   * clock); UUIDs are random but deterministic, so the tie-break is
+   * stable across both racers.
+   */
+  async rankAmongActive(userId: string, sessionId: string): Promise<number> {
+    const rows = await this.db
+      .select({ id: openclawSessions.id })
+      .from(openclawSessions)
+      .where(
+        and(
+          eq(openclawSessions.userId, userId),
+          isNull(openclawSessions.stoppedAt),
+        ),
+      )
+      .orderBy(asc(openclawSessions.startedAt), asc(openclawSessions.id));
+    return rows.findIndex((r) => r.id === sessionId);
   }
 
   async countActiveByUserId(userId: string): Promise<number> {

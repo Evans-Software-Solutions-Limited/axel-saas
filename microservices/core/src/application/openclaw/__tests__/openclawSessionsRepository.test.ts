@@ -180,6 +180,30 @@ describe("OpenclawSessionsRepository", () => {
     });
   });
 
+  describe("rankAmongActive", () => {
+    it("returns the 0-based index when the session is in the active set", async () => {
+      selectMock.mockReturnValue(
+        mockChain([{ id: "s1" }, { id: "s2" }, { id: "s3" }]),
+      );
+      expect(await repo.rankAmongActive("user-uuid-1", "s2")).toBe(1);
+    });
+
+    it("returns -1 when the session id is not in the active set", async () => {
+      selectMock.mockReturnValue(mockChain([{ id: "s1" }, { id: "s2" }]));
+      expect(await repo.rankAmongActive("user-uuid-1", "missing")).toBe(-1);
+    });
+
+    it("returns -1 when the user has no active sessions", async () => {
+      selectMock.mockReturnValue(mockChain([]));
+      expect(await repo.rankAmongActive("user-uuid-1", "any")).toBe(-1);
+    });
+
+    it("returns 0 when the session is the only active row", async () => {
+      selectMock.mockReturnValue(mockChain([{ id: "only" }]));
+      expect(await repo.rankAmongActive("user-uuid-1", "only")).toBe(0);
+    });
+  });
+
   describe("countActiveByUserId", () => {
     it("returns the length of the active rows", async () => {
       selectMock.mockReturnValue(
