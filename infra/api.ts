@@ -59,26 +59,33 @@ try {
   });
   openclawApiCallerRoleArn = param.value ?? null;
 } catch (err: unknown) {
-  // Only swallow ParameterNotFound — that's the documented "openclaw
-  // stack not yet deployed on this stage" case. Throttling, IAM-denied,
-  // region-misconfig, expired credentials etc. must surface as deploy
-  // failures so the operator notices, otherwise the Lambda would 503 at
-  // runtime with no breadcrumb back to the failed deploy-time read.
+  // Only swallow "param doesn't exist" — that's the documented
+  // "openclaw stack not yet deployed on this stage" case.
+  // Throttling, IAM-denied, region-misconfig, expired credentials
+  // etc. must surface as deploy failures so the operator notices,
+  // otherwise the Lambda would 503 at runtime with no breadcrumb
+  // back to the failed deploy-time read.
   //
-  // `aws.ssm.getParameter` is a Pulumi data source — it wraps the
-  // underlying SDK error in a generic `Error` whose `name` is just
-  // `"Error"` and whose `message` looks like
-  // `"reading SSM Parameter (...): operation error SSM: GetParameter,
-  // api error ParameterNotFound: ..."`. The `.code`/`.name` checks
-  // are kept as defence in depth in case Pulumi narrows the error
-  // type in a future version, but the message-substring match is
-  // the load-bearing one today.
+  // `aws.ssm.getParameter` is a Pulumi data source that wraps the
+  // underlying SDK error in a generic `Error` with `name === "Error"`.
+  // The wording the Pulumi AWS provider produces for a missing
+  // parameter has changed at least once:
+  //   - older shape: "...api error ParameterNotFound: ..."
+  //   - actual shape (observed PR #107 staging deploy, eu-west-2,
+  //     provider 6.66.2): "reading SSM Parameter (...): couldn't
+  //     find resource"
+  // We match BOTH wordings (and keep the `.code`/`.name` checks as
+  // defence in depth in case the provider ever surfaces a typed
+  // error). If the wording changes again we'll see the deploy
+  // abort with the exact substring in the failure — easy to add a
+  // new match arm.
   const e = err as { code?: string; name?: string; message?: string };
   const msg = typeof e?.message === "string" ? e.message : "";
   const isNotFound =
     e?.code === "ParameterNotFound" ||
     e?.name === "ParameterNotFound" ||
-    msg.includes("ParameterNotFound");
+    msg.includes("ParameterNotFound") ||
+    msg.includes("couldn't find resource");
   if (!isNotFound) throw err;
 }
 
