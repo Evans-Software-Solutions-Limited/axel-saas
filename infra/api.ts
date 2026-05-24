@@ -46,65 +46,47 @@ export const coreAPI = new sst.aws.ApiGatewayV2("api-core", {
   },
 });
 
-// Resolve the openclaw apiCaller role ARN from the cross-stack SSM
-// contract (`/axel/<stage>/openclaw/api-caller-role-arn`). On stages
-// where the openclaw SST app hasn't been deployed yet, the parameter
-// is absent and we skip the grant — the runtime returns 503 from the
-// session endpoints in that case. Once the openclaw stack lands, a
-// `sst deploy` of this app picks up the grant.
-let openclawApiCallerRoleArn: string | null = null;
-try {
-  const param = await aws.ssm.getParameter({
-    name: `/axel/${$app.stage}/openclaw/api-caller-role-arn`,
-  });
-  openclawApiCallerRoleArn = param.value ?? null;
-} catch (err: unknown) {
-  // Only swallow ParameterNotFound — that's the documented "openclaw
-  // stack not yet deployed on this stage" case. Throttling, IAM-denied,
-  // region-misconfig, expired credentials etc. must surface as deploy
-  // failures so the operator notices, otherwise the Lambda would 503 at
-  // runtime with no breadcrumb back to the failed deploy-time read.
-  //
-  // `aws.ssm.getParameter` is a Pulumi data source — it wraps the
-  // underlying SDK error in a generic `Error` whose `name` is just
-  // `"Error"` and whose `message` looks like
-  // `"reading SSM Parameter (...): operation error SSM: GetParameter,
-  // api error ParameterNotFound: ..."`. The `.code`/`.name` checks
-  // are kept as defence in depth in case Pulumi narrows the error
-  // type in a future version, but the message-substring match is
-  // the load-bearing one today.
-  const e = err as { code?: string; name?: string; message?: string };
-  const msg = typeof e?.message === "string" ? e.message : "";
-  const isNotFound =
-    e?.code === "ParameterNotFound" ||
-    e?.name === "ParameterNotFound" ||
-    msg.includes("ParameterNotFound");
-  if (!isNotFound) throw err;
-}
-
 coreAPI.route("$default", {
   // Linking the table grants the Lambda role `dynamodb:GetItem`,
   // `dynamodb:UpdateItem`, etc. on this table only — least-privilege by
   // default with no extra IAM wiring.
   link: [rateLimitsTable],
   handler: "microservices/core/src/api.handler",
-  // sts:AssumeRole on the openclaw apiCaller role + read on the SSM
-  // namespace that publishes the cross-stack contract. Without the
-  // SSM read the loader cannot resolve cluster/task-def/etc; without
-  // the AssumeRole the Lambda can't launch tasks even with the IDs.
+  // Permissions for the openclaw session-lifecycle integration:
+  //
+  //   1. ssm:GetParameter on the openclaw cross-stack contract
+  //      namespace — the Lambda reads cluster ARN, task-def ARNs,
+  //      subnets, etc. at boot via getOpenclawInfra().
+  //   2. sts:AssumeRole on the openclaw apiCaller role by NAME
+  //      PATTERN (`openclaw-<stage>-api-caller`). The openclaw SST
+  //      app (apps/openclaw/infra/apiCaller.ts) registers exactly
+  //      that name, so the wildcard matches the one real role per
+  //      stage. The role's own trust policy is the actual
+  //      authorisation gate (account-root + explicit grant) — this
+  //      grant just lets the Lambda attempt the assume.
+  //
+  // Why the name pattern instead of resolving the exact ARN at
+  // deploy time: the deploy-time resolve required `aws.ssm.
+  // getParameter` (a Pulumi data source), which:
+  //   - bound this stack's deploy to the openclaw stack already
+  //     being deployed first (violating the spec §4.3 spirit of
+  //     "runtime-only cross-stack reads"), and
+  //   - was fragile to the Pulumi provider's error-message wording
+  //     changing — every "openclaw not yet deployed" path required
+  //     a substring match against an undocumented error format.
+  // The name-pattern grant is declarative and self-contained: this
+  // stack deploys clean on any stage regardless of whether openclaw
+  // is up, and the runtime endpoints return 503 (dns_unavailable)
+  // gracefully until openclaw is present.
   permissions: [
     {
       actions: ["ssm:GetParameter", "ssm:GetParameters"],
       resources: [`arn:aws:ssm:*:*:parameter/axel/${$app.stage}/openclaw/*`],
     },
-    ...(openclawApiCallerRoleArn
-      ? [
-          {
-            actions: ["sts:AssumeRole"],
-            resources: [openclawApiCallerRoleArn],
-          },
-        ]
-      : []),
+    {
+      actions: ["sts:AssumeRole"],
+      resources: [`arn:aws:iam::*:role/openclaw-${$app.stage}-api-caller`],
+    },
   ],
   environment: {
     DATABASE_URL: supabaseDatabaseUrl.value,
