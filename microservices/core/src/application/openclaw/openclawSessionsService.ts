@@ -151,7 +151,32 @@ export class OpenclawSessionsService {
     const tier = resolveTier(input.tier);
     const policy = getTierPolicy(tier);
 
-    const infra = await this.loadInfra();
+    // Two shapes of "openclaw isn't available on this stage" need to
+    // collapse into the same `dns_unavailable` result, so the handler
+    // returns a clean 503 instead of a 500:
+    //
+    //   1. SSM contract is FULLY present but `hosted-zone-id` is null
+    //      (dev / preview stages — the openclaw SST app explicitly
+    //      skips writing the zone id when no Route53 zone exists).
+    //   2. SSM contract is MISSING ENTIRELY — the openclaw SST app
+    //      hasn't been deployed to this stage at all. The loader
+    //      throws "Missing SSM parameter ..." in that case.
+    //
+    // Pre-fix, only (1) returned dns_unavailable; (2) bubbled the
+    // loader's throw up to the handler's catch-all and 500'd, which
+    // looked like an outage instead of a "feature disabled" signal
+    // and noised up CloudWatch alarms. Now both paths return the
+    // same kind and the handler maps cleanly to 503.
+    let infra: OpenclawInfra;
+    try {
+      infra = await this.loadInfra();
+    } catch (err) {
+      this.logger.warn(
+        "openclaw infra not available; treating as dns_unavailable",
+        { error: err instanceof Error ? err.message : String(err) },
+      );
+      return { kind: "dns_unavailable" };
+    }
     if (!infra.hostedZoneId || !infra.dnsSuffix) {
       return { kind: "dns_unavailable" };
     }

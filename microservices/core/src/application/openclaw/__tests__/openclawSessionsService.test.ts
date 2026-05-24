@@ -276,6 +276,31 @@ describe("OpenclawSessionsService.createSession", () => {
     expect(r.kind).toBe("dns_unavailable");
   });
 
+  it("returns dns_unavailable when the SSM contract is missing entirely", async () => {
+    // Smoke-test regression: on stages where the openclaw SST app
+    // hasn't been deployed yet, getOpenclawInfra() throws "Missing
+    // SSM parameter ...". Pre-fix that threw past the service and
+    // the handler 500'd; the contract said dns_unavailable / 503,
+    // unit tests only exercised the null-dnsSuffix branch, so the
+    // integration mismatch slipped through. This test guards the
+    // throw path.
+    const svc = new OpenclawSessionsService({
+      repository: makeRepo(),
+      loadInfra: async () => {
+        throw new Error(
+          "Missing SSM parameter /axel/staging/openclaw/cluster-arn (the openclaw SST app must be deployed to this stage first)",
+        );
+      },
+      awsClients: makeAwsClients(),
+    });
+    const r = await svc.createSession({
+      userId: "u1",
+      tier: "premium",
+      name: "demo",
+    });
+    expect(r.kind).toBe("dns_unavailable");
+  });
+
   it("returns existing session when the same user reconnects to a running name", async () => {
     const repo = makeRepo({
       findActiveByName: vi.fn().mockResolvedValue({
