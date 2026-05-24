@@ -31,6 +31,13 @@ export interface CreateOpenclawSessionInput {
   id?: string;
   userId: string;
   name: string;
+  /**
+   * Tier-at-start. Pinned to the row so the idempotent reconnect
+   * path computes `expiresAt` against the tier the session
+   * started under, not the user's current tier (which may have
+   * been downgraded since).
+   */
+  tier: "free" | "premium" | "enterprise";
   taskArn: string;
   targetGroupArn: string;
   listenerRuleArn: string;
@@ -53,6 +60,7 @@ export class OpenclawSessionsRepository {
         ...(input.id ? { id: input.id } : {}),
         userId: input.userId,
         name: input.name,
+        tier: input.tier,
         taskArn: input.taskArn,
         targetGroupArn: input.targetGroupArn,
         listenerRuleArn: input.listenerRuleArn,

@@ -536,6 +536,11 @@ export const openclawSessions = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     userId: uuid("user_id").notNull(),
     name: text("name").notNull(),
+    // Tier-at-start. See migration 0013 header for why this is
+    // pinned on the row (idempotent reconnect would otherwise
+    // compute expiresAt against the user's CURRENT tier and return
+    // a past timestamp after a downgrade).
+    tier: subscriptionTierEnum("tier").notNull(),
     taskArn: text("task_arn").notNull(),
     targetGroupArn: text("target_group_arn").notNull(),
     listenerRuleArn: text("listener_rule_arn").notNull(),

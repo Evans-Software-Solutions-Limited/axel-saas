@@ -36,6 +36,7 @@ function mockRow(overrides: Record<string, unknown> = {}) {
     id: "session-uuid-1",
     userId: "user-uuid-1",
     name: "demo",
+    tier: "premium" as const,
     taskArn: "arn:aws:ecs:eu-west-2:111:task/abc",
     targetGroupArn: "arn:aws:elb:tg/abc",
     listenerRuleArn: "arn:aws:elb:rule/abc",
@@ -71,6 +72,7 @@ describe("OpenclawSessionsRepository", () => {
       const row = await repo.create({
         userId: "user-uuid-1",
         name: "demo",
+        tier: "premium",
         taskArn: "arn:task",
         targetGroupArn: "arn:tg",
         listenerRuleArn: "arn:rule",
@@ -90,6 +92,7 @@ describe("OpenclawSessionsRepository", () => {
         id: "explicit-session-uuid",
         userId: "user-uuid-1",
         name: "demo",
+        tier: "premium",
         taskArn: "arn:task",
         targetGroupArn: "arn:tg",
         listenerRuleArn: "arn:rule",
@@ -112,6 +115,7 @@ describe("OpenclawSessionsRepository", () => {
       await repo.create({
         userId: "user-uuid-1",
         name: "demo",
+        tier: "premium",
         taskArn: "arn:task",
         targetGroupArn: "arn:tg",
         listenerRuleArn: "arn:rule",
@@ -130,6 +134,7 @@ describe("OpenclawSessionsRepository", () => {
         repo.create({
           userId: "user-uuid-1",
           name: "demo",
+          tier: "premium",
           taskArn: "arn:task",
           targetGroupArn: "arn:tg",
           listenerRuleArn: "arn:rule",

@@ -245,6 +245,22 @@ export const openclawSessionsHandler = new Elysia({
       }
     },
     {
+      // UUID validation at the route boundary. Without this, a
+      // malformed input (`DELETE /openclaw/sessions/not-a-uuid`)
+      // reaches the repository's `where(eq(id, "not-a-uuid"))`
+      // against a uuid column, Postgres throws `invalid input
+      // syntax for type uuid (22P02)`, the catch returns 500, and
+      // the client sees "Failed to stop session" instead of the
+      // 404 they should have got. The regex is the broad UUID
+      // shape — any version, lower-or-upper hex — because the
+      // service is happy to receive any well-formed UUID even
+      // though we only mint v4s ourselves.
+      params: t.Object({
+        sessionId: t.String({
+          pattern:
+            "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+        }),
+      }),
       detail: {
         description: "Stop an OpenClaw session and release its AWS resources",
         tags: ["OpenClaw"],

@@ -64,9 +64,21 @@ try {
   // region-misconfig, expired credentials etc. must surface as deploy
   // failures so the operator notices, otherwise the Lambda would 503 at
   // runtime with no breadcrumb back to the failed deploy-time read.
-  const e = err as { code?: string; name?: string };
+  //
+  // `aws.ssm.getParameter` is a Pulumi data source — it wraps the
+  // underlying SDK error in a generic `Error` whose `name` is just
+  // `"Error"` and whose `message` looks like
+  // `"reading SSM Parameter (...): operation error SSM: GetParameter,
+  // api error ParameterNotFound: ..."`. The `.code`/`.name` checks
+  // are kept as defence in depth in case Pulumi narrows the error
+  // type in a future version, but the message-substring match is
+  // the load-bearing one today.
+  const e = err as { code?: string; name?: string; message?: string };
+  const msg = typeof e?.message === "string" ? e.message : "";
   const isNotFound =
-    e?.code === "ParameterNotFound" || e?.name === "ParameterNotFound";
+    e?.code === "ParameterNotFound" ||
+    e?.name === "ParameterNotFound" ||
+    msg.includes("ParameterNotFound");
   if (!isNotFound) throw err;
 }
 

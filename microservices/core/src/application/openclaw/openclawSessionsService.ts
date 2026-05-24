@@ -166,6 +166,13 @@ export class OpenclawSessionsService {
       }
       // Same user reconnecting to their own running session — return
       // the existing one untouched (spec §7.1 idempotency clause).
+      // expiresAt MUST be computed against the row's pinned tier
+      // (the tier the session started under), not the caller's
+      // current tier. Otherwise a downgrade after start would shrink
+      // wallClockMs and return a past timestamp for a still-running
+      // session, which would make any client comparing against `now`
+      // render the session as expired.
+      const existingPolicy = getTierPolicy(existing.tier);
       return {
         kind: "existing",
         sessionId: existing.id,
@@ -174,7 +181,7 @@ export class OpenclawSessionsService {
         taskArn: existing.taskArn,
         expiresAt: this.computeExpiresAt(
           existing.startedAt,
-          policy.wallClockMs,
+          existingPolicy.wallClockMs,
         ),
       };
     }
@@ -277,6 +284,7 @@ export class OpenclawSessionsService {
         id: sessionId,
         userId: input.userId,
         name: lowerName,
+        tier,
         taskArn,
         targetGroupArn,
         listenerRuleArn,

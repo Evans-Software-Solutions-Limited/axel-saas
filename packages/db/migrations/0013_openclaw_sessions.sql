@@ -36,6 +36,13 @@ CREATE TABLE IF NOT EXISTS "openclaw_sessions" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
 	"user_id" uuid NOT NULL,
 	"name" text NOT NULL,
+	-- The tier the session started under. Pinned to the row (not
+	-- looked up from the subscription at read time) so the
+	-- idempotent reconnect path returns the correct expiresAt even
+	-- if the user has been downgraded since the session started.
+	-- The reaper (Phase 6) also reads this to apply the right
+	-- wall-clock cap retroactively.
+	"tier" "subscription_tier" NOT NULL,
 	"task_arn" text NOT NULL,
 	"target_group_arn" text NOT NULL,
 	"listener_rule_arn" text NOT NULL,

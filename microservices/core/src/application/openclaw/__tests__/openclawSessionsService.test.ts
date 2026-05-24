@@ -282,6 +282,7 @@ describe("OpenclawSessionsService.createSession", () => {
         id: "existing-uuid",
         userId: "u1",
         name: "demo",
+        tier: "premium" as const,
         taskArn: "arn:task/exist",
         targetGroupArn: "arn:tg/exist",
         listenerRuleArn: "arn:rule/exist",
@@ -308,6 +309,46 @@ describe("OpenclawSessionsService.createSession", () => {
     }
     // Should NOT have called RunTask.
     expect(ecsSend).not.toHaveBeenCalled();
+  });
+
+  it("reconnect computes expiresAt from the row's pinned tier, not the caller's current tier", async () => {
+    // The user was Premium when they started this session (8h cap),
+    // then downgraded to Free (1h cap) before reconnecting. The
+    // session is still legitimately running; expiresAt must reflect
+    // its actual lifetime (started_at + premium 8h) rather than
+    // shrinking to (started_at + free 1h), which would return a
+    // past timestamp.
+    const startedAt = new Date("2026-05-20T11:00:00.000Z");
+    const repo = makeRepo({
+      findActiveByName: vi.fn().mockResolvedValue({
+        id: "downgraded-uuid",
+        userId: "u1",
+        name: "demo",
+        tier: "premium" as const, // started under premium
+        taskArn: "arn:task/exist",
+        targetGroupArn: "arn:tg/exist",
+        listenerRuleArn: "arn:rule/exist",
+        efsAccessPointId: "fsap-1",
+        startedAt,
+        stoppedAt: null,
+        stoppedReason: null,
+      }),
+    });
+    const svc = new OpenclawSessionsService({
+      repository: repo,
+      loadInfra: async () => goldenInfra,
+      awsClients: makeAwsClients(),
+    });
+    const result = await svc.createSession({
+      userId: "u1",
+      tier: "free", // CURRENT tier is downgraded
+      name: "demo",
+    });
+    expect(result.kind).toBe("existing");
+    if (result.kind === "existing") {
+      // Premium = 8h cap → startedAt + 8h, NOT startedAt + 1h.
+      expect(result.expiresAt).toBe("2026-05-20T19:00:00.000Z");
+    }
   });
 
   it("returns name_conflict when another user owns the running name", async () => {
@@ -392,10 +433,12 @@ describe("OpenclawSessionsService.createSession", () => {
     expect(ecsSend.mock.calls.length).toBeGreaterThanOrEqual(2);
     expect(elbv2Send.mock.calls.length).toBeGreaterThanOrEqual(3);
     expect(ec2Send).toHaveBeenCalled();
-    // Row inserted with the same id the API returned.
+    // Row inserted with the same id the API returned, AND with
+    // the tier-at-start pinned on the row so the reconnect path
+    // can compute expiresAt correctly even after a downgrade.
     expect(repo.create).toHaveBeenCalledOnce();
     expect(repo.create).toHaveBeenCalledWith(
-      expect.objectContaining({ id: "sess-new-uuid" }),
+      expect.objectContaining({ id: "sess-new-uuid", tier: "premium" }),
     );
   });
 
