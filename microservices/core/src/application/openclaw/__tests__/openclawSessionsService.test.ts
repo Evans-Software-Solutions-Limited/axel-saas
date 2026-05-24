@@ -820,6 +820,89 @@ describe("OpenclawSessionsService.createSession", () => {
     expect(b.repo.markStopped).toHaveBeenCalledWith("racer-B", "error");
   });
 
+  it("marks the row stopped if rankAmongActive throws after insert", async () => {
+    // The outer catch's safeRollback handles AWS cleanup, but
+    // before the round-5 fix it didn't mark the inserted row
+    // stopped. End state was: row at stopped_at IS NULL pointing
+    // at AWS resources we just deleted, partial unique index
+    // holding the name, future POST returns `kind: "existing"`
+    // with a URL that never resolves.
+    const repo = makeRepo({
+      countActiveByUserId: vi.fn().mockResolvedValueOnce(0),
+      rankAmongActive: vi
+        .fn()
+        .mockRejectedValue(new Error("transient db blip")),
+    });
+    const svc = new OpenclawSessionsService({
+      repository: repo,
+      loadInfra: async () => goldenInfra,
+      awsClients: makeAwsClients(),
+      uuid: () => "sess-rank-throws",
+    });
+    await expect(
+      svc.createSession({ userId: "u1", tier: "premium", name: "demo" }),
+    ).rejects.toThrow(/transient db blip/);
+    // Row was inserted before rank threw, so it must be marked
+    // stopped with reason="error" to release the name.
+    expect(repo.markStopped).toHaveBeenCalledWith("sess-rank-throws", "error");
+    // safeRollback also ran — AWS resources cleaned up.
+    const ecsTypes = ecsSend.mock.calls.map((c) => c[0].__type);
+    expect(ecsTypes).toContain("StopTaskCommand");
+  });
+
+  it("does not call markStopped if insert itself failed", async () => {
+    // The opposite of the test above: if repository.create throws
+    // (unique-index violation, etc.), the row was NEVER inserted, so
+    // there's nothing to mark stopped. Calling markStopped here
+    // would be a 0-row UPDATE — harmless but wasteful, and noisy in
+    // logs. The `rowInserted` sentinel skips it.
+    const repo = makeRepo({
+      countActiveByUserId: vi.fn().mockResolvedValueOnce(0),
+      create: vi.fn().mockRejectedValue(new Error("unique constraint")),
+    });
+    const svc = new OpenclawSessionsService({
+      repository: repo,
+      loadInfra: async () => goldenInfra,
+      awsClients: makeAwsClients(),
+      uuid: () => "sess-insert-fails",
+    });
+    await expect(
+      svc.createSession({ userId: "u1", tier: "premium", name: "demo" }),
+    ).rejects.toThrow(/unique constraint/);
+    // Insert failed → no row → no markStopped.
+    expect(repo.markStopped).not.toHaveBeenCalled();
+    // safeRollback still ran (AWS resources need cleanup regardless).
+    const ecsTypes = ecsSend.mock.calls.map((c) => c[0].__type);
+    expect(ecsTypes).toContain("StopTaskCommand");
+  });
+
+  it("swallows markStopped failure inside rollback so the original error surfaces", async () => {
+    // If both rankAmongActive AND the post-insert markStopped throw,
+    // the rejection should still be the rank failure (the one that
+    // triggered rollback in the first place), not the markStopped
+    // failure (which is logged and swallowed). Otherwise an operator
+    // chasing the rejection upstream would land on the wrong
+    // breadcrumb.
+    const repo = makeRepo({
+      countActiveByUserId: vi.fn().mockResolvedValueOnce(0),
+      rankAmongActive: vi
+        .fn()
+        .mockRejectedValue(new Error("rank failure (root cause)")),
+      markStopped: vi
+        .fn()
+        .mockRejectedValue(new Error("mark-stopped failure (noisy)")),
+    });
+    const svc = new OpenclawSessionsService({
+      repository: repo,
+      loadInfra: async () => goldenInfra,
+      awsClients: makeAwsClients(),
+      uuid: () => "sess-double-fail",
+    });
+    await expect(
+      svc.createSession({ userId: "u1", tier: "premium", name: "demo" }),
+    ).rejects.toThrow(/rank failure \(root cause\)/);
+  });
+
   it("rolls back if rankAmongActive returns -1 (row vanished)", async () => {
     // Defensive: a concurrent operator stop between our insert and
     // our rank check could remove the row from the active set.

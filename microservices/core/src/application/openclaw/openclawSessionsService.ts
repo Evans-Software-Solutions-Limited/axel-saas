@@ -244,6 +244,13 @@ export class OpenclawSessionsService {
     let targetGroupArn: string | undefined;
     let listenerRuleArn: string | undefined;
     let startedAt: Date | undefined;
+    // Explicit signal for the outer catch — true iff repository.create
+    // resolved. Without this, a failure in rankAmongActive (or
+    // markStopped) on the loser branch would leave the row at
+    // stopped_at IS NULL pointing at AWS resources safeRollback just
+    // deleted, holding the name reserved and serving a `kind:
+    // "existing"` URL that never resolves on the user's retry.
+    let rowInserted = false;
 
     try {
       const taskIp = await this.waitForTaskIp({
@@ -290,6 +297,7 @@ export class OpenclawSessionsService {
         listenerRuleArn,
         efsAccessPointId,
       });
+      rowInserted = true;
 
       // Compensating check for the concurrency-cap TOCTOU documented
       // above. If a concurrent POST also passed at `limit - 1` and
@@ -346,6 +354,27 @@ export class OpenclawSessionsService {
         targetGroupArn,
         listenerRuleArn,
       });
+      // If repository.create succeeded before this catch fired (i.e.
+      // rankAmongActive or markStopped threw), the row is now pointing
+      // at AWS resources safeRollback just deleted. Mark it stopped
+      // so the partial unique index releases the name and a future
+      // POST doesn't return `kind: "existing"` with a dead URL.
+      // markStopped's own failure is swallowed — we don't want to
+      // shadow the original error, and the dangling row can still be
+      // cleaned up by a `DELETE /openclaw/sessions/:id` (which now
+      // tolerates not_found per the round 2 swallowNotFound fix) or
+      // the Phase 6 reaper.
+      if (rowInserted) {
+        await this.repository
+          .markStopped(sessionId, "error")
+          .catch((markErr) => {
+            this.logger.warn("rollback: markStopped failed", {
+              sessionId,
+              error:
+                markErr instanceof Error ? markErr.message : String(markErr),
+            });
+          });
+      }
       throw err;
     }
 
