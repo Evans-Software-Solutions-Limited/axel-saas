@@ -1176,6 +1176,47 @@ describe("OpenclawSessionsService.stopSession", () => {
     // Row NOT marked stopped — operator must fix the IAM issue and retry.
     expect(repo.markStopped).not.toHaveBeenCalled();
   });
+
+  it("marks the row stopped + skips AWS teardown when loadInfra throws", async () => {
+    // Inspector PR #110 finding: if the openclaw SST stack is torn
+    // down between session start and DELETE, loadInfra throws
+    // "Missing SSM parameter ...". Pre-fix that bubbled to 500 and
+    // left the row at `stopped_at IS NULL` — the user's name stayed
+    // locked, GET kept showing the dangling session, and the URL
+    // never resolved. The AWS resources are gone with the stack, so
+    // there's nothing for tearDown to actually do; we still need to
+    // converge the DB state so the user can release the row.
+    const repo = makeRepo({
+      findById: vi.fn().mockResolvedValue({
+        id: "s",
+        userId: "u1",
+        taskArn: "arn:task",
+        targetGroupArn: "arn:tg",
+        listenerRuleArn: "arn:rule",
+        stoppedAt: null,
+      }),
+    });
+    const svc = new OpenclawSessionsService({
+      repository: repo,
+      loadInfra: async () => {
+        throw new Error(
+          "Missing SSM parameter /axel/staging/openclaw/cluster-arn (the openclaw SST app must be deployed to this stage first)",
+        );
+      },
+      awsClients: makeAwsClients(),
+    });
+    const r = await svc.stopSession({
+      sessionId: "s",
+      userId: "u1",
+      reason: "user",
+    });
+    expect(r.kind).toBe("stopped");
+    expect(repo.markStopped).toHaveBeenCalledWith("s", "user");
+    // No AWS calls — infra wasn't available so we couldn't (and
+    // didn't try to) tear anything down.
+    expect(ecsSend).not.toHaveBeenCalled();
+    expect(elbv2Send).not.toHaveBeenCalled();
+  });
 });
 
 describe("OpenclawSessionsService.stopAllForUser", () => {
@@ -1267,5 +1308,49 @@ describe("OpenclawSessionsService.stopAllForUser", () => {
     const summary = await svc.stopAllForUser("u1", "tier_change");
     expect(summary).toEqual({ stopped: 1, failed: 1 });
     expect(repo.markStopped).toHaveBeenCalledTimes(1);
+  });
+
+  it("marks all rows stopped + skips AWS teardown when loadInfra throws", async () => {
+    // Inspector PR #110 finding extended to the Stripe-webhook path:
+    // a torn-down openclaw stack must not strand a cancelled user's
+    // session rows. The webhook handler awaits stopAllForUser and
+    // logs the summary — if loadInfra blew up here, the webhook
+    // would log an error and the rows would stay active forever
+    // (until manual cleanup), so the user could later resubscribe
+    // and have phantom sessions show up in GET.
+    const sessions = [
+      {
+        id: "s1",
+        userId: "u1",
+        taskArn: "arn:task/1",
+        targetGroupArn: "arn:tg/1",
+        listenerRuleArn: "arn:rule/1",
+      },
+      {
+        id: "s2",
+        userId: "u1",
+        taskArn: "arn:task/2",
+        targetGroupArn: "arn:tg/2",
+        listenerRuleArn: "arn:rule/2",
+      },
+    ];
+    const repo = makeRepo({
+      listActiveByUserId: vi.fn().mockResolvedValue(sessions),
+    });
+    const svc = new OpenclawSessionsService({
+      repository: repo,
+      loadInfra: async () => {
+        throw new Error(
+          "Missing SSM parameter /axel/staging/openclaw/cluster-arn (the openclaw SST app must be deployed to this stage first)",
+        );
+      },
+      awsClients: makeAwsClients(),
+    });
+    const summary = await svc.stopAllForUser("u1", "tier_change");
+    expect(summary).toEqual({ stopped: 2, failed: 0 });
+    expect(repo.markStopped).toHaveBeenCalledTimes(2);
+    // No AWS teardown attempts.
+    expect(ecsSend).not.toHaveBeenCalled();
+    expect(elbv2Send).not.toHaveBeenCalled();
   });
 });

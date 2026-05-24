@@ -789,13 +789,35 @@ export class OpenclawSessionsService {
       return { kind: "forbidden" };
     }
 
-    const infra = await this.loadInfra();
-    await this.tearDownSessionResources({
-      clusterArn: infra.clusterArn,
-      taskArn: row.taskArn,
-      targetGroupArn: row.targetGroupArn,
-      listenerRuleArn: row.listenerRuleArn,
+    // If the openclaw SST stack is torn down between session start
+    // and DELETE, loadInfra throws "Missing SSM parameter ...". The
+    // AWS resources the row points at are gone with the stack, so
+    // there's nothing for tearDownSessionResources to do — but the
+    // ROW still needs marking stopped, otherwise the user is stuck:
+    // their name stays locked by the partial unique index, the row
+    // shows in GET /openclaw/sessions, and a fresh POST returns
+    // "existing" with a URL that never resolves. Mirror of the
+    // createSession loader-throw guard added in PR #110.
+    const infra = await this.loadInfra().catch((err: unknown) => {
+      this.logger.warn(
+        "openclaw infra not available; skipping AWS teardown, " +
+          "marking row stopped so the user can release it",
+        {
+          sessionId: row.id,
+          error: err instanceof Error ? err.message : String(err),
+        },
+      );
+      return null;
     });
+
+    if (infra) {
+      await this.tearDownSessionResources({
+        clusterArn: infra.clusterArn,
+        taskArn: row.taskArn,
+        targetGroupArn: row.targetGroupArn,
+        listenerRuleArn: row.listenerRuleArn,
+      });
+    }
     await this.repository.markStopped(row.id, input.reason);
     return { kind: "stopped" };
   }
@@ -814,17 +836,35 @@ export class OpenclawSessionsService {
     const active = await this.repository.listActiveByUserId(userId);
     if (active.length === 0) return { stopped: 0, failed: 0 };
 
-    const infra = await this.loadInfra();
+    // Same loader-throw guard as stopSession — if openclaw is torn
+    // down the AWS resources are gone with it, but we still want the
+    // rows marked stopped so the user isn't stuck. The Stripe
+    // webhook (the primary caller) needs this path to converge even
+    // when staging has been clean-slated.
+    const infra = await this.loadInfra().catch((err: unknown) => {
+      this.logger.warn(
+        "openclaw infra not available; skipping AWS teardown for stopAllForUser",
+        {
+          userId,
+          activeCount: active.length,
+          error: err instanceof Error ? err.message : String(err),
+        },
+      );
+      return null;
+    });
+
     let stopped = 0;
     let failed = 0;
     for (const row of active) {
       try {
-        await this.tearDownSessionResources({
-          clusterArn: infra.clusterArn,
-          taskArn: row.taskArn,
-          targetGroupArn: row.targetGroupArn,
-          listenerRuleArn: row.listenerRuleArn,
-        });
+        if (infra) {
+          await this.tearDownSessionResources({
+            clusterArn: infra.clusterArn,
+            taskArn: row.taskArn,
+            targetGroupArn: row.targetGroupArn,
+            listenerRuleArn: row.listenerRuleArn,
+          });
+        }
         await this.repository.markStopped(row.id, reason);
         stopped += 1;
       } catch (err) {
