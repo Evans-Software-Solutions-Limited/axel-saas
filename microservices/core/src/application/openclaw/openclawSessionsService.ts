@@ -36,7 +36,10 @@ import type { EC2Client } from "@aws-sdk/client-ec2";
 import type { SubscriptionTier } from "../integrations/tierGate";
 import { validateSessionName } from "./nameValidation";
 import { getTierPolicy, mapTierForOpenclaw, resolveTier } from "./tierPolicy";
-import type { OpenclawInfra } from "./ssmContract";
+import {
+  OpenclawInfraNotDeployedError,
+  type OpenclawInfra,
+} from "./ssmContract";
 import {
   OpenclawSessionsRepository,
   type OpenclawStoppedReason,
@@ -171,11 +174,19 @@ export class OpenclawSessionsService {
     try {
       infra = await this.loadInfra();
     } catch (err) {
-      this.logger.warn(
-        "openclaw infra not available; treating as dns_unavailable",
-        { error: err instanceof Error ? err.message : String(err) },
-      );
-      return { kind: "dns_unavailable" };
+      // ONLY swallow the specific "stack not deployed" signal —
+      // every other failure shape (throttling, AccessDenied, parse
+      // failures, transient network blips) must propagate so the
+      // user's retry behaviour is preserved instead of getting a
+      // fake 503 that hides a real transient AWS issue.
+      if (err instanceof OpenclawInfraNotDeployedError) {
+        this.logger.warn(
+          "openclaw infra not deployed; treating as dns_unavailable",
+          { error: err.message },
+        );
+        return { kind: "dns_unavailable" };
+      }
+      throw err;
     }
     if (!infra.hostedZoneId || !infra.dnsSuffix) {
       return { kind: "dns_unavailable" };
@@ -790,25 +801,34 @@ export class OpenclawSessionsService {
     }
 
     // If the openclaw SST stack is torn down between session start
-    // and DELETE, loadInfra throws "Missing SSM parameter ...". The
+    // and DELETE, loadInfra throws OpenclawInfraNotDeployedError. The
     // AWS resources the row points at are gone with the stack, so
     // there's nothing for tearDownSessionResources to do — but the
     // ROW still needs marking stopped, otherwise the user is stuck:
     // their name stays locked by the partial unique index, the row
     // shows in GET /openclaw/sessions, and a fresh POST returns
-    // "existing" with a URL that never resolves. Mirror of the
-    // createSession loader-throw guard added in PR #110.
-    const infra = await this.loadInfra().catch((err: unknown) => {
-      this.logger.warn(
-        "openclaw infra not available; skipping AWS teardown, " +
-          "marking row stopped so the user can release it",
-        {
-          sessionId: row.id,
-          error: err instanceof Error ? err.message : String(err),
-        },
-      );
-      return null;
-    });
+    // "existing" with a URL that never resolves.
+    //
+    // Narrow catch — transient SSM failures (throttling, AccessDenied,
+    // parse errors) MUST propagate. Swallowing them here would mark
+    // the row stopped + skip AWS teardown while the AWS resources
+    // are still running, silently leaking against the ALB rule and
+    // target-group quotas.
+    let infra: OpenclawInfra | null;
+    try {
+      infra = await this.loadInfra();
+    } catch (err) {
+      if (err instanceof OpenclawInfraNotDeployedError) {
+        this.logger.warn(
+          "openclaw infra not deployed; skipping AWS teardown, " +
+            "marking row stopped so the user can release it",
+          { sessionId: row.id, error: err.message },
+        );
+        infra = null;
+      } else {
+        throw err;
+      }
+    }
 
     if (infra) {
       await this.tearDownSessionResources({
@@ -841,17 +861,32 @@ export class OpenclawSessionsService {
     // rows marked stopped so the user isn't stuck. The Stripe
     // webhook (the primary caller) needs this path to converge even
     // when staging has been clean-slated.
-    const infra = await this.loadInfra().catch((err: unknown) => {
-      this.logger.warn(
-        "openclaw infra not available; skipping AWS teardown for stopAllForUser",
-        {
-          userId,
-          activeCount: active.length,
-          error: err instanceof Error ? err.message : String(err),
-        },
-      );
-      return null;
-    });
+    //
+    // Narrow catch — same reasoning as stopSession. A transient SSM
+    // throttle during a Stripe cancellation MUST surface so the
+    // webhook returns non-2xx and Stripe retries; swallowing it here
+    // would mark the rows stopped + leave ECS tasks running until
+    // wall-clock timeout, leaking against ALB rule + target-group
+    // quotas. Pre-narrowing this was the inspector's H-severity find
+    // on PR #110 round 1.
+    let infra: OpenclawInfra | null;
+    try {
+      infra = await this.loadInfra();
+    } catch (err) {
+      if (err instanceof OpenclawInfraNotDeployedError) {
+        this.logger.warn(
+          "openclaw infra not deployed; skipping AWS teardown for stopAllForUser",
+          {
+            userId,
+            activeCount: active.length,
+            error: err.message,
+          },
+        );
+        infra = null;
+      } else {
+        throw err;
+      }
+    }
 
     let stopped = 0;
     let failed = 0;
