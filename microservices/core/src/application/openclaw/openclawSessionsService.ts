@@ -36,7 +36,10 @@ import type { EC2Client } from "@aws-sdk/client-ec2";
 import type { SubscriptionTier } from "../integrations/tierGate";
 import { validateSessionName } from "./nameValidation";
 import { getTierPolicy, mapTierForOpenclaw, resolveTier } from "./tierPolicy";
-import type { OpenclawInfra } from "./ssmContract";
+import {
+  OpenclawInfraNotDeployedError,
+  type OpenclawInfra,
+} from "./ssmContract";
 import {
   OpenclawSessionsRepository,
   type OpenclawStoppedReason,
@@ -151,7 +154,40 @@ export class OpenclawSessionsService {
     const tier = resolveTier(input.tier);
     const policy = getTierPolicy(tier);
 
-    const infra = await this.loadInfra();
+    // Two shapes of "openclaw isn't available on this stage" need to
+    // collapse into the same `dns_unavailable` result, so the handler
+    // returns a clean 503 instead of a 500:
+    //
+    //   1. SSM contract is FULLY present but `hosted-zone-id` is null
+    //      (dev / preview stages — the openclaw SST app explicitly
+    //      skips writing the zone id when no Route53 zone exists).
+    //   2. SSM contract is MISSING ENTIRELY — the openclaw SST app
+    //      hasn't been deployed to this stage at all. The loader
+    //      throws "Missing SSM parameter ..." in that case.
+    //
+    // Pre-fix, only (1) returned dns_unavailable; (2) bubbled the
+    // loader's throw up to the handler's catch-all and 500'd, which
+    // looked like an outage instead of a "feature disabled" signal
+    // and noised up CloudWatch alarms. Now both paths return the
+    // same kind and the handler maps cleanly to 503.
+    let infra: OpenclawInfra;
+    try {
+      infra = await this.loadInfra();
+    } catch (err) {
+      // ONLY swallow the specific "stack not deployed" signal —
+      // every other failure shape (throttling, AccessDenied, parse
+      // failures, transient network blips) must propagate so the
+      // user's retry behaviour is preserved instead of getting a
+      // fake 503 that hides a real transient AWS issue.
+      if (err instanceof OpenclawInfraNotDeployedError) {
+        this.logger.warn(
+          "openclaw infra not deployed; treating as dns_unavailable",
+          { error: err.message },
+        );
+        return { kind: "dns_unavailable" };
+      }
+      throw err;
+    }
     if (!infra.hostedZoneId || !infra.dnsSuffix) {
       return { kind: "dns_unavailable" };
     }
@@ -764,13 +800,44 @@ export class OpenclawSessionsService {
       return { kind: "forbidden" };
     }
 
-    const infra = await this.loadInfra();
-    await this.tearDownSessionResources({
-      clusterArn: infra.clusterArn,
-      taskArn: row.taskArn,
-      targetGroupArn: row.targetGroupArn,
-      listenerRuleArn: row.listenerRuleArn,
-    });
+    // If the openclaw SST stack is torn down between session start
+    // and DELETE, loadInfra throws OpenclawInfraNotDeployedError. The
+    // AWS resources the row points at are gone with the stack, so
+    // there's nothing for tearDownSessionResources to do — but the
+    // ROW still needs marking stopped, otherwise the user is stuck:
+    // their name stays locked by the partial unique index, the row
+    // shows in GET /openclaw/sessions, and a fresh POST returns
+    // "existing" with a URL that never resolves.
+    //
+    // Narrow catch — transient SSM failures (throttling, AccessDenied,
+    // parse errors) MUST propagate. Swallowing them here would mark
+    // the row stopped + skip AWS teardown while the AWS resources
+    // are still running, silently leaking against the ALB rule and
+    // target-group quotas.
+    let infra: OpenclawInfra | null;
+    try {
+      infra = await this.loadInfra();
+    } catch (err) {
+      if (err instanceof OpenclawInfraNotDeployedError) {
+        this.logger.warn(
+          "openclaw infra not deployed; skipping AWS teardown, " +
+            "marking row stopped so the user can release it",
+          { sessionId: row.id, error: err.message },
+        );
+        infra = null;
+      } else {
+        throw err;
+      }
+    }
+
+    if (infra) {
+      await this.tearDownSessionResources({
+        clusterArn: infra.clusterArn,
+        taskArn: row.taskArn,
+        targetGroupArn: row.targetGroupArn,
+        listenerRuleArn: row.listenerRuleArn,
+      });
+    }
     await this.repository.markStopped(row.id, input.reason);
     return { kind: "stopped" };
   }
@@ -789,17 +856,50 @@ export class OpenclawSessionsService {
     const active = await this.repository.listActiveByUserId(userId);
     if (active.length === 0) return { stopped: 0, failed: 0 };
 
-    const infra = await this.loadInfra();
+    // Same loader-throw guard as stopSession — if openclaw is torn
+    // down the AWS resources are gone with it, but we still want the
+    // rows marked stopped so the user isn't stuck. The Stripe
+    // webhook (the primary caller) needs this path to converge even
+    // when staging has been clean-slated.
+    //
+    // Narrow catch — same reasoning as stopSession. A transient SSM
+    // throttle during a Stripe cancellation MUST surface so the
+    // webhook returns non-2xx and Stripe retries; swallowing it here
+    // would mark the rows stopped + leave ECS tasks running until
+    // wall-clock timeout, leaking against ALB rule + target-group
+    // quotas. Pre-narrowing this was the inspector's H-severity find
+    // on PR #110 round 1.
+    let infra: OpenclawInfra | null;
+    try {
+      infra = await this.loadInfra();
+    } catch (err) {
+      if (err instanceof OpenclawInfraNotDeployedError) {
+        this.logger.warn(
+          "openclaw infra not deployed; skipping AWS teardown for stopAllForUser",
+          {
+            userId,
+            activeCount: active.length,
+            error: err.message,
+          },
+        );
+        infra = null;
+      } else {
+        throw err;
+      }
+    }
+
     let stopped = 0;
     let failed = 0;
     for (const row of active) {
       try {
-        await this.tearDownSessionResources({
-          clusterArn: infra.clusterArn,
-          taskArn: row.taskArn,
-          targetGroupArn: row.targetGroupArn,
-          listenerRuleArn: row.listenerRuleArn,
-        });
+        if (infra) {
+          await this.tearDownSessionResources({
+            clusterArn: infra.clusterArn,
+            taskArn: row.taskArn,
+            targetGroupArn: row.targetGroupArn,
+            listenerRuleArn: row.listenerRuleArn,
+          });
+        }
         await this.repository.markStopped(row.id, reason);
         stopped += 1;
       } catch (err) {

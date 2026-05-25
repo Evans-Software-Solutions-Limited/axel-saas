@@ -6,7 +6,10 @@ import {
   type AwsClientFactory,
 } from "../openclawSessionsService";
 import type { OpenclawSessionsRepository } from "../openclawSessionsRepository";
-import type { OpenclawInfra } from "../ssmContract";
+import {
+  OpenclawInfraNotDeployedError,
+  type OpenclawInfra,
+} from "../ssmContract";
 
 // All AWS SDK packages are dynamic-imported by the service, so a vi.mock
 // at module level is the simplest way to control what their commands
@@ -267,6 +270,52 @@ describe("OpenclawSessionsService.createSession", () => {
       awsClients: makeAwsClients(),
       uuid: () => "x",
       clock: () => new Date(),
+    });
+    const r = await svc.createSession({
+      userId: "u1",
+      tier: "premium",
+      name: "demo",
+    });
+    expect(r.kind).toBe("dns_unavailable");
+  });
+
+  it("propagates loadInfra transient errors instead of masking as dns_unavailable", async () => {
+    // Inspector PR #110 round 2: the catch was previously a broad
+    // `catch (err) => return dns_unavailable`, which collapsed every
+    // SSM failure shape (throttling, AccessDenied, parse errors,
+    // ENI shortages) into a fake 503. Pre-fix the user would get a
+    // 503 that hid a retryable transient — post-fix only the
+    // specific OpenclawInfraNotDeployedError signal is swallowed.
+    const svc = new OpenclawSessionsService({
+      repository: makeRepo(),
+      loadInfra: async () => {
+        // Simulating SSM throttling, AccessDenied, network error,
+        // etc. — anything that isn't the "stack not deployed" signal.
+        throw new Error("ThrottlingException: Rate exceeded");
+      },
+      awsClients: makeAwsClients(),
+    });
+    await expect(
+      svc.createSession({ userId: "u1", tier: "premium", name: "demo" }),
+    ).rejects.toThrow(/ThrottlingException/);
+  });
+
+  it("returns dns_unavailable when the SSM contract is missing entirely", async () => {
+    // Smoke-test regression: on stages where the openclaw SST app
+    // hasn't been deployed yet, getOpenclawInfra() throws "Missing
+    // SSM parameter ...". Pre-fix that threw past the service and
+    // the handler 500'd; the contract said dns_unavailable / 503,
+    // unit tests only exercised the null-dnsSuffix branch, so the
+    // integration mismatch slipped through. This test guards the
+    // throw path.
+    const svc = new OpenclawSessionsService({
+      repository: makeRepo(),
+      loadInfra: async () => {
+        throw new OpenclawInfraNotDeployedError(
+          "Missing SSM parameter /axel/staging/openclaw/cluster-arn (the openclaw SST app must be deployed to this stage first)",
+        );
+      },
+      awsClients: makeAwsClients(),
     });
     const r = await svc.createSession({
       userId: "u1",
@@ -1151,6 +1200,79 @@ describe("OpenclawSessionsService.stopSession", () => {
     // Row NOT marked stopped — operator must fix the IAM issue and retry.
     expect(repo.markStopped).not.toHaveBeenCalled();
   });
+
+  it("propagates loadInfra transient errors instead of silently stranding AWS resources", async () => {
+    // Inspector PR #110 round 2 (medium severity): the broad catch
+    // would have marked the row stopped + skipped AWS teardown on a
+    // throttle/AccessDenied, leaking the ECS task + target group +
+    // listener rule. Post-fix, only OpenclawInfraNotDeployedError
+    // triggers the skip — every other shape propagates so the user
+    // can retry the DELETE once SSM recovers.
+    const repo = makeRepo({
+      findById: vi.fn().mockResolvedValue({
+        id: "s",
+        userId: "u1",
+        taskArn: "arn:task",
+        targetGroupArn: "arn:tg",
+        listenerRuleArn: "arn:rule",
+        stoppedAt: null,
+      }),
+    });
+    const svc = new OpenclawSessionsService({
+      repository: repo,
+      loadInfra: async () => {
+        throw new Error("ThrottlingException: Rate exceeded");
+      },
+      awsClients: makeAwsClients(),
+    });
+    await expect(
+      svc.stopSession({ sessionId: "s", userId: "u1", reason: "user" }),
+    ).rejects.toThrow(/ThrottlingException/);
+    // CRITICAL: row NOT marked stopped — user can retry and the
+    // operator's CloudWatch alarm can fire on the propagated 500.
+    expect(repo.markStopped).not.toHaveBeenCalled();
+  });
+
+  it("marks the row stopped + skips AWS teardown when loadInfra throws", async () => {
+    // Inspector PR #110 finding: if the openclaw SST stack is torn
+    // down between session start and DELETE, loadInfra throws
+    // "Missing SSM parameter ...". Pre-fix that bubbled to 500 and
+    // left the row at `stopped_at IS NULL` — the user's name stayed
+    // locked, GET kept showing the dangling session, and the URL
+    // never resolved. The AWS resources are gone with the stack, so
+    // there's nothing for tearDown to actually do; we still need to
+    // converge the DB state so the user can release the row.
+    const repo = makeRepo({
+      findById: vi.fn().mockResolvedValue({
+        id: "s",
+        userId: "u1",
+        taskArn: "arn:task",
+        targetGroupArn: "arn:tg",
+        listenerRuleArn: "arn:rule",
+        stoppedAt: null,
+      }),
+    });
+    const svc = new OpenclawSessionsService({
+      repository: repo,
+      loadInfra: async () => {
+        throw new OpenclawInfraNotDeployedError(
+          "Missing SSM parameter /axel/staging/openclaw/cluster-arn (the openclaw SST app must be deployed to this stage first)",
+        );
+      },
+      awsClients: makeAwsClients(),
+    });
+    const r = await svc.stopSession({
+      sessionId: "s",
+      userId: "u1",
+      reason: "user",
+    });
+    expect(r.kind).toBe("stopped");
+    expect(repo.markStopped).toHaveBeenCalledWith("s", "user");
+    // No AWS calls — infra wasn't available so we couldn't (and
+    // didn't try to) tear anything down.
+    expect(ecsSend).not.toHaveBeenCalled();
+    expect(elbv2Send).not.toHaveBeenCalled();
+  });
 });
 
 describe("OpenclawSessionsService.stopAllForUser", () => {
@@ -1242,5 +1364,96 @@ describe("OpenclawSessionsService.stopAllForUser", () => {
     const summary = await svc.stopAllForUser("u1", "tier_change");
     expect(summary).toEqual({ stopped: 1, failed: 1 });
     expect(repo.markStopped).toHaveBeenCalledTimes(1);
+  });
+
+  it("propagates loadInfra transient errors instead of silently stranding AWS resources", async () => {
+    // Inspector PR #110 round 2 (HIGH severity): the broad catch
+    // would have marked every active row stopped + skipped AWS
+    // teardown on a transient SSM throttle during a Stripe
+    // cancellation, silently leaking ECS tasks until wall-clock
+    // timeout (8h / 24h) and burning through ALB rule quota.
+    //
+    // Post round-3 fix: the throw propagates THROUGH stopAllForUser
+    // AND through the Stripe webhook handler (the inner try/catch
+    // around stopAllForUser was removed in the same change — see
+    // `microservices/core/src/application/stripe/stripeHandler.ts`
+    // for the rationale). End-to-end: throttle → service throws →
+    // handler outer catch → 500 → Stripe retries the whole event
+    // once SSM recovers.
+    //
+    // Critical invariant if a future refactor reintroduces an inner
+    // catch in the webhook: this test still passes (it doesn't
+    // touch the handler) but the production contract breaks. The
+    // stripeHandler.ts comment block flags the trap.
+    const sessions = [
+      {
+        id: "s1",
+        userId: "u1",
+        taskArn: "arn:task/1",
+        targetGroupArn: "arn:tg/1",
+        listenerRuleArn: "arn:rule/1",
+      },
+    ];
+    const repo = makeRepo({
+      listActiveByUserId: vi.fn().mockResolvedValue(sessions),
+    });
+    const svc = new OpenclawSessionsService({
+      repository: repo,
+      loadInfra: async () => {
+        throw new Error("AccessDeniedException");
+      },
+      awsClients: makeAwsClients(),
+    });
+    await expect(svc.stopAllForUser("u1", "tier_change")).rejects.toThrow(
+      /AccessDeniedException/,
+    );
+    // CRITICAL: no rows marked stopped — Stripe will retry the
+    // webhook on the 5xx and the rows + AWS resources stay
+    // consistent until cleanup actually succeeds.
+    expect(repo.markStopped).not.toHaveBeenCalled();
+  });
+
+  it("marks all rows stopped + skips AWS teardown when loadInfra throws", async () => {
+    // Inspector PR #110 finding extended to the Stripe-webhook path:
+    // a torn-down openclaw stack must not strand a cancelled user's
+    // session rows. The webhook handler awaits stopAllForUser and
+    // logs the summary — if loadInfra blew up here, the webhook
+    // would log an error and the rows would stay active forever
+    // (until manual cleanup), so the user could later resubscribe
+    // and have phantom sessions show up in GET.
+    const sessions = [
+      {
+        id: "s1",
+        userId: "u1",
+        taskArn: "arn:task/1",
+        targetGroupArn: "arn:tg/1",
+        listenerRuleArn: "arn:rule/1",
+      },
+      {
+        id: "s2",
+        userId: "u1",
+        taskArn: "arn:task/2",
+        targetGroupArn: "arn:tg/2",
+        listenerRuleArn: "arn:rule/2",
+      },
+    ];
+    const repo = makeRepo({
+      listActiveByUserId: vi.fn().mockResolvedValue(sessions),
+    });
+    const svc = new OpenclawSessionsService({
+      repository: repo,
+      loadInfra: async () => {
+        throw new OpenclawInfraNotDeployedError(
+          "Missing SSM parameter /axel/staging/openclaw/cluster-arn (the openclaw SST app must be deployed to this stage first)",
+        );
+      },
+      awsClients: makeAwsClients(),
+    });
+    const summary = await svc.stopAllForUser("u1", "tier_change");
+    expect(summary).toEqual({ stopped: 2, failed: 0 });
+    expect(repo.markStopped).toHaveBeenCalledTimes(2);
+    // No AWS teardown attempts.
+    expect(ecsSend).not.toHaveBeenCalled();
+    expect(elbv2Send).not.toHaveBeenCalled();
   });
 });

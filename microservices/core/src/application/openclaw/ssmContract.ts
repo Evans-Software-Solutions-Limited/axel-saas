@@ -21,6 +21,28 @@
 
 import { getStage } from "./stage";
 
+/**
+ * Specific error thrown when one or more SSM parameters under
+ * `/axel/<stage>/openclaw/*` are missing — the documented "openclaw
+ * SST app hasn't been deployed to this stage" signal.
+ *
+ * The service catches THIS class specifically and degrades the
+ * session endpoints to `dns_unavailable` (createSession) or
+ * skip-AWS-teardown (stopSession / stopAllForUser). Every other
+ * error shape from the loader (throttling, AccessDenied, parse
+ * failures, transient network blips, cold-start ENI miss) must
+ * propagate so the caller's retry behaviour is preserved — silently
+ * swallowing them would either leak AWS resources (stopSession /
+ * stopAllForUser) or mask the real failure as a fake 503
+ * (createSession).
+ */
+export class OpenclawInfraNotDeployedError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "OpenclawInfraNotDeployedError";
+  }
+}
+
 export interface OpenclawInfra {
   clusterArn: string;
   taskDefinitionArns: {
@@ -163,7 +185,11 @@ async function loadOpenclawInfra(
   };
   for (const [k, v] of Object.entries(required)) {
     if (!v) {
-      throw new Error(
+      // Specific error class — the service catches this and ONLY this
+      // to map to "feature disabled on this stage". Other failure
+      // shapes (throttling, AccessDenied, JSON parse, etc.) stay as
+      // plain Error and propagate so retries work.
+      throw new OpenclawInfraNotDeployedError(
         `Missing SSM parameter ${prefix}/${k} (the openclaw SST app must be deployed to this stage first)`,
       );
     }
