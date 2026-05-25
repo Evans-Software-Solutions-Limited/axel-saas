@@ -1372,8 +1372,19 @@ describe("OpenclawSessionsService.stopAllForUser", () => {
     // teardown on a transient SSM throttle during a Stripe
     // cancellation, silently leaking ECS tasks until wall-clock
     // timeout (8h / 24h) and burning through ALB rule quota.
-    // Post-fix, the throw propagates so the Stripe webhook returns
-    // non-2xx and Stripe retries the event once SSM recovers.
+    //
+    // Post round-3 fix: the throw propagates THROUGH stopAllForUser
+    // AND through the Stripe webhook handler (the inner try/catch
+    // around stopAllForUser was removed in the same change — see
+    // `microservices/core/src/application/stripe/stripeHandler.ts`
+    // for the rationale). End-to-end: throttle → service throws →
+    // handler outer catch → 500 → Stripe retries the whole event
+    // once SSM recovers.
+    //
+    // Critical invariant if a future refactor reintroduces an inner
+    // catch in the webhook: this test still passes (it doesn't
+    // touch the handler) but the production contract breaks. The
+    // stripeHandler.ts comment block flags the trap.
     const sessions = [
       {
         id: "s1",

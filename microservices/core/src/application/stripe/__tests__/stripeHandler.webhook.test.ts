@@ -2,6 +2,13 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const mockConstructEvent = vi.fn();
 
+const mockStopAllForUser = vi.fn().mockResolvedValue({ stopped: 0, failed: 0 });
+vi.mock("../../openclaw/openclawSessionsHandler", () => ({
+  openclawSessionsService: {
+    stopAllForUser: (...args: unknown[]) => mockStopAllForUser(...args),
+  },
+}));
+
 vi.mock("stripe", () => ({
   default: vi.fn().mockImplementation(() => ({
     checkout: { sessions: { create: vi.fn() } },
@@ -83,6 +90,7 @@ describe("StripeHandler webhook behaviour", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockTriggerContainerLaunch.mockResolvedValue(undefined);
+    mockStopAllForUser.mockResolvedValue({ stopped: 0, failed: 0 });
   });
 
   describe("checkout.session.completed", () => {
@@ -345,12 +353,56 @@ describe("StripeHandler webhook behaviour", () => {
       });
       mockFindByStripeCustomer.mockResolvedValueOnce({
         id: "sub-del",
+        userId: "user-del",
         cancelAtPeriodEnd: false,
       });
 
       const response = await postWebhook();
       expect(response.status).toBe(200);
       expect(mockUpdateStatus).toHaveBeenCalledWith("sub-del", "cancelled");
+    });
+
+    it("calls stopAllForUser for the cancelled user", async () => {
+      mockConstructEvent.mockReturnValueOnce({
+        type: "customer.subscription.deleted",
+        data: { object: { customer: "cus_del" } },
+      });
+      mockFindByStripeCustomer.mockResolvedValueOnce({
+        id: "sub-del",
+        userId: "user-del",
+        cancelAtPeriodEnd: false,
+      });
+      mockStopAllForUser.mockResolvedValueOnce({ stopped: 2, failed: 0 });
+
+      const response = await postWebhook();
+      expect(response.status).toBe(200);
+      expect(mockStopAllForUser).toHaveBeenCalledWith(
+        "user-del",
+        "tier_change",
+      );
+    });
+
+    it("returns 500 when stopAllForUser throws (transient SSM/DB failure) so Stripe retries", async () => {
+      // No inner try/catch in the handler — partial per-row failures
+      // are returned via summary.failed (logged, not thrown), so they
+      // don't reach here. The only throws are whole-call failures
+      // (transient SSM throttle, DB unreachable, etc.) — exactly the
+      // cases where Stripe should retry the event rather than ack it.
+      mockConstructEvent.mockReturnValueOnce({
+        type: "customer.subscription.deleted",
+        data: { object: { customer: "cus_del" } },
+      });
+      mockFindByStripeCustomer.mockResolvedValueOnce({
+        id: "sub-del",
+        userId: "user-del",
+        cancelAtPeriodEnd: false,
+      });
+      mockStopAllForUser.mockRejectedValueOnce(new Error("SSM throttled"));
+
+      const response = await postWebhook();
+      // 500 → Stripe retries. If this were 200, the sessions would
+      // leak (rows stay active + ECS tasks running) until TTL/manual cleanup.
+      expect(response.status).toBe(500);
     });
 
     it("clears cancelAtPeriodEnd when the row had a pending cancellation", async () => {
@@ -364,6 +416,7 @@ describe("StripeHandler webhook behaviour", () => {
       });
       mockFindByStripeCustomer.mockResolvedValueOnce({
         id: "sub-del",
+        userId: "user-del",
         cancelAtPeriodEnd: true,
       });
 
@@ -384,6 +437,7 @@ describe("StripeHandler webhook behaviour", () => {
       });
       mockFindByStripeCustomer.mockResolvedValueOnce({
         id: "sub-del",
+        userId: "user-del",
         cancelAtPeriodEnd: false,
       });
 

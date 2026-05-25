@@ -292,29 +292,29 @@ export const stripeHandler = new Elysia({ name: "StripeHandler" })
           }
 
           // Tear down active OpenClaw sessions for the cancelled user
-          // per spec §10. Awaited so the webhook reflects the real
-          // outcome, but try/catch'd so a partial AWS failure doesn't
-          // make Stripe retry the whole event — the rows would
-          // already be marked stopped where it succeeded, and a
-          // human can clean up the rest manually. We DO NOT delete
-          // the EFS access points here — keeping the user's
-          // workspace intact across resubscriptions matches the
-          // "stopped → restart on same name" behaviour for the
-          // sessions themselves.
-          try {
-            const summary = await openclawSessionsService.stopAllForUser(
-              sub.userId,
-              "tier_change",
-            );
-            if (summary.stopped > 0 || summary.failed > 0) {
-              console.log(
-                `[stripe] subscription.deleted: openclaw teardown — stopped=${summary.stopped} failed=${summary.failed} (user ${sub.userId})`,
-              );
-            }
-          } catch (err: unknown) {
-            console.error(
-              "[stripe] subscription.deleted: openclaw teardown failed",
-              { userId: sub.userId, error: err },
+          // per spec §10. We DO NOT delete the EFS access points here
+          // — keeping the user's workspace intact across resubscriptions
+          // matches the "stopped → restart on same name" behaviour
+          // for the sessions themselves.
+          //
+          // No inner try/catch: partial AWS failures during teardown
+          // are returned via `summary.failed` (the service catches
+          // per-row errors), so they're already logged-not-thrown
+          // and won't trigger a Stripe retry storm. The only thing
+          // that DOES throw from stopAllForUser is "couldn't make
+          // any progress" (loadInfra hit a transient SSM error, DB
+          // unreachable, etc.) — exactly the case where we WANT
+          // Stripe to retry the whole event. An earlier inner catch
+          // here swallowed that signal too, silently leaving rows
+          // active + AWS resources running until manual cleanup
+          // (inspector PR #110 round 3).
+          const summary = await openclawSessionsService.stopAllForUser(
+            sub.userId,
+            "tier_change",
+          );
+          if (summary.stopped > 0 || summary.failed > 0) {
+            console.log(
+              `[stripe] subscription.deleted: openclaw teardown — stopped=${summary.stopped} failed=${summary.failed} (user ${sub.userId})`,
             );
           }
 
