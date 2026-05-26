@@ -75,3 +75,22 @@ jobs:
           SUPABASE_URL: ${{ vars.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ vars.SUPABASE_ANON_KEY }}
           VITE_WEB_URL: ${{ vars.VITE_WEB_URL }}
+
+      # The openclaw Fargate runtime lives in a separate SST app
+      # (apps/openclaw/) that is intentionally not linked to the root
+      # app at deploy time — the core API reads its outputs from SSM
+      # at runtime (spec §4.3). We deploy it here, after the root app
+      # succeeds, so the SSM contract is always kept current. SST/Pulumi
+      # no-ops in ~30s when openclaw infra hasn't changed, so the cost
+      # on non-openclaw commits is negligible.
+      - name: Install openclaw infra dependencies
+        working-directory: apps/openclaw
+        run: bun install
+
+      - name: Unlock openclaw SST (clear stale lock from previous runs)
+        working-directory: apps/openclaw
+        run: bunx sst unlock --stage staging || true
+
+      - name: Deploy openclaw infra
+        working-directory: apps/openclaw
+        run: bunx sst deploy --stage staging
