@@ -85,7 +85,21 @@ jobs:
       # on non-openclaw commits is negligible.
       - name: Install openclaw infra dependencies
         working-directory: apps/openclaw
-        run: bun install
+        # --frozen-lockfile matches the root setup composite action; in CI
+        # the lockfile is the source of truth and a drift should fail the
+        # build, not silently mutate to whatever resolved today.
+        run: bun install --frozen-lockfile
+
+      # `sst install` materialises `.sst/platform/config.d.ts`, which
+      # provides the ambient `aws`, `$app`, `$util`, `$config` globals
+      # the openclaw sst.config.ts references. SST v4's `deploy` does
+      # run this implicitly on a clean checkout, but doing it explicitly
+      # mirrors the documented local flow (apps/openclaw/README.md L43)
+      # and means the subsequent `unlock` step doesn't run before the
+      # platform is set up — safer ordering on a brand-new runner.
+      - name: Bootstrap openclaw SST platform
+        working-directory: apps/openclaw
+        run: bunx sst install
 
       - name: Unlock openclaw SST (clear stale lock from previous runs)
         working-directory: apps/openclaw
