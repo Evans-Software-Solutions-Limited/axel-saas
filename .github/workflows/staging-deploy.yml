@@ -75,3 +75,36 @@ jobs:
           SUPABASE_URL: ${{ vars.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ vars.SUPABASE_ANON_KEY }}
           VITE_WEB_URL: ${{ vars.VITE_WEB_URL }}
+
+      # The openclaw Fargate runtime lives in a separate SST app
+      # (apps/openclaw/) that is intentionally not linked to the root
+      # app at deploy time — the core API reads its outputs from SSM
+      # at runtime (spec §4.3). We deploy it here, after the root app
+      # succeeds, so the SSM contract is always kept current. SST/Pulumi
+      # no-ops in ~30s when openclaw infra hasn't changed, so the cost
+      # on non-openclaw commits is negligible.
+      - name: Install openclaw infra dependencies
+        working-directory: apps/openclaw
+        # --frozen-lockfile matches the root setup composite action; in CI
+        # the lockfile is the source of truth and a drift should fail the
+        # build, not silently mutate to whatever resolved today.
+        run: bun install --frozen-lockfile
+
+      # `sst install` materialises `.sst/platform/config.d.ts`, which
+      # provides the ambient `aws`, `$app`, `$util`, `$config` globals
+      # the openclaw sst.config.ts references. SST v4's `deploy` does
+      # run this implicitly on a clean checkout, but doing it explicitly
+      # mirrors the documented local flow (apps/openclaw/README.md L43)
+      # and means the subsequent `unlock` step doesn't run before the
+      # platform is set up — safer ordering on a brand-new runner.
+      - name: Bootstrap openclaw SST platform
+        working-directory: apps/openclaw
+        run: bunx sst install
+
+      - name: Unlock openclaw SST (clear stale lock from previous runs)
+        working-directory: apps/openclaw
+        run: bunx sst unlock --stage staging || true
+
+      - name: Deploy openclaw infra
+        working-directory: apps/openclaw
+        run: bunx sst deploy --stage staging

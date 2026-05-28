@@ -5,7 +5,7 @@
     "": {
       "name": "@axel-saas/openclaw-infra",
       "dependencies": {
-        "sst": "*",
+        "sst": "^4.14.1",
       },
       "devDependencies": {
         "@tsconfig/node22": "^22",
