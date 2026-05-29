@@ -1,10 +1,10 @@
-# `@axel-saas/openclaw-infra` — SST app (Phases 2 + 3)
+# `@axel-saas/openclaw-infra` — SST app (Phases 2 + 3 + 6)
 
 Provisions the long-lived AWS resources the OpenClaw Fargate runtime
 needs: ECR, ECS cluster, EFS, IAM roles, ALB with the wildcard ACM
 cert + HTTPS-443 listener, Route53 wildcard ALIAS, task definitions
-for all three tiers, and SSM parameter writes for the cross-stack
-contract.
+for all three tiers, SSM parameter writes for the cross-stack
+contract, and the Phase 6 reaper Lambda + alarms.
 
 This is a **separate, independent SST v3 app** from the root
 `axel-saas` SST config at the repo root. Same AWS accounts, same
@@ -27,11 +27,68 @@ API reads everything it needs from SSM Parameter Store (`/axel/<stage>/openclaw/
 
 Dev / preview stages (anything that isn't `staging` or `production`) have no hosted zone available. The DNS module no-ops on those: no cert, no Route53 record, no `hosted-zone-id` SSM param. **Both the ALB listener AND the ALB SG ingress** fall back to HTTP-80 in lock-step (the SG ingress rule's port branches on the same `certificateArn !== null` check as the listener, both in `alb.ts`) so smoke tests work via the raw ALB DNS name — matches spec §9.1 ("ALB DNS direct").
 
-## What's NOT in scope (deferred to later phases)
+## Phase 6 — Reaper Lambda + alarms
 
-- **Phase 4** — `.github/workflows/openclaw-deploy.yml`. Phase 2+3 is `sst deploy` from a local CLI; Phase 4 makes it `workflow_dispatch` from CI.
-- **Phase 5** — `POST /openclaw/sessions` in the core API + per-user EFS access points + ALB per-session rules. The API caller role is wired up but unassumable from outside this stack until Phase 5 grants the core API Lambda explicit `sts:AssumeRole`. The manual recipe below is what Phase 5 will automate.
-- **Phase 6** — reaper Lambda + CloudWatch alarms.
+Provisioned in `infra/reaper.ts`. EventBridge fires the reaper Lambda every 15 minutes; the handler queries Postgres for sessions whose `started_at + tier.wallClockMs` is in the past and tears each down via the same `OpenclawSessionsService.stopSession` path the core API's `DELETE /openclaw/sessions/:id` uses (the handler module lives at `microservices/core/src/application/openclaw/reaperHandler.ts` — SST/esbuild follows the import chain across the workspace boundary at bundle time; no deploy-time linking, the spec §4.3 invariant is intact).
+
+Wall-clock caps per tier (from `tierPolicy.ts` — single source of truth):
+
+| Tier       | Wall-clock cap |
+| ---------- | -------------- |
+| Free       | 1 h            |
+| Premium    | 8 h            |
+| Enterprise | 24 h           |
+
+### Per-stage secret
+
+The reaper needs DB access; set the connection string once per stage:
+
+```bash
+cd apps/openclaw
+bun x sst secret set DatabaseUrl 'postgres://…' --stage staging
+bun x sst secret set DatabaseUrl 'postgres://…' --stage production
+```
+
+The same value lives on the root axel-saas app — they're stored independently so the cross-app boundary stays clean (no `sst.Linkable` chain).
+
+### Alarms + SNS
+
+Two CloudWatch alarms wired to a per-stage SNS topic (`openclaw-<stage>-reaper-alarms`):
+
+- `openclaw-<stage>-reaper-errors` — Lambda invocation errors > 0 over 15 min (built-in `AWS/Lambda` `Errors` metric).
+- `openclaw-<stage>-reaper-failures` — per-session teardown failures > 0 over 15 min (custom `Axel/Openclaw/Reaper/ReapFailure` metric emitted by the handler).
+
+The SNS topic ARN is in the SST output as `reaperAlarmTopicArn`. Subscribe a pager / email / Slack webhook post-deploy:
+
+```bash
+TOPIC_ARN=$(bun x sst output reaperAlarmTopicArn --stage staging)
+aws sns subscribe --topic-arn "$TOPIC_ARN" --protocol email \
+  --notification-endpoint ops@meetaxel.ai
+```
+
+The subscription is intentionally out-of-band — re-point without a redeploy.
+
+### Manual reaper exit-criterion test
+
+Per spec §1.4: forcing a Free task's `started_at` back 65 minutes should result in the reaper killing it on its next 15-min run.
+
+```bash
+# 1. Create a Free session via the core API.
+# 2. Force its started_at back via direct DB update:
+psql "$DATABASE_URL" -c "
+  UPDATE openclaw_sessions
+  SET started_at = now() - interval '65 minutes'
+  WHERE id = '<session-id>';
+"
+# 3. Wait up to 15 min for the next EventBridge tick.
+# 4. Confirm the row is now stopped_at IS NOT NULL with stopped_reason='reaper'.
+```
+
+## What's NOT in scope (deferred to later work)
+
+- "Active tasks > 90" alarm (ALB rule cap precursor) — requires a custom metric the reaper would emit on every run; deferred to a follow-up alongside any other operational metrics.
+- "Tasks running > 6h" alarm (precursor to wall-clock kill) — same shape, deferred.
+- Tag-based scoping of the reaper's ELB v2 permissions (target groups currently match `targetgroup/openclaw-*/*`; tightening requires the core API to apply a resource tag at creation time).
 
 ## Deploy
 

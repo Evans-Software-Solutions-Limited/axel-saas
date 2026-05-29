@@ -914,6 +914,111 @@ export class OpenclawSessionsService {
     return { stopped, failed };
   }
 
+  /**
+   * Phase 6 reaper entrypoint. Finds every active session whose
+   * `started_at + tier.wallClockMs` is in the past, then stops each
+   * via `stopSession` with `reason: "reaper"`. Called from the
+   * EventBridge-scheduled Lambda in `apps/openclaw/infra/reaper.ts`.
+   *
+   * Idempotency: `stopSession` returns `not_found` for already-stopped
+   * rows, so a previous run that crashed partway through is safely
+   * re-runnable. Per-session errors are caught and counted — a single
+   * stuck AWS call must not strand the rest of the batch (the Stripe
+   * cancellation pattern in `stopAllForUser` proved this matters).
+   *
+   * When the openclaw SST stack is torn down (`OpenclawInfraNotDeployed
+   * Error`), the reap is a no-op: the AWS resources the rows point at
+   * are gone with the stack, and a subsequent stopSession would mark
+   * the rows stopped via its own SSM-loader-throw guard. Letting the
+   * reaper skip rather than partial-mark here keeps the "stack torn
+   * down → user can release manually" recovery story simple.
+   */
+  async reapExpiredSessions(): Promise<{
+    reaped: number;
+    failed: number;
+    scanned: number;
+  }> {
+    // Loader-throw guard — same shape as stopSession / stopAllForUser.
+    // The narrow catch matches PR #110 round 1's inspector finding:
+    // transient SSM failures (throttling / AccessDenied / parse errors)
+    // MUST surface so the EventBridge invocation retries on the next
+    // 15-min tick. Swallowing them here would make the reaper a silent
+    // no-op for the duration of the transient, which is exactly the
+    // kind of "running but doing nothing" failure mode CloudWatch
+    // alarms exist to catch.
+    try {
+      await this.loadInfra();
+    } catch (err) {
+      if (err instanceof OpenclawInfraNotDeployedError) {
+        this.logger.warn(
+          "reaper: openclaw infra not deployed; skipping this run",
+          { error: err.message },
+        );
+        return { reaped: 0, failed: 0, scanned: 0 };
+      }
+      throw err;
+    }
+
+    const now = this.clock();
+    const wallClockMsByTier = {
+      free: getTierPolicy("free").wallClockMs,
+      premium: getTierPolicy("premium").wallClockMs,
+      enterprise: getTierPolicy("enterprise").wallClockMs,
+    };
+    const expired = await this.repository.listExpired(now, wallClockMsByTier);
+
+    let reaped = 0;
+    let failed = 0;
+    for (const row of expired) {
+      try {
+        // `userId: null` flags this as a system call; stopSession's
+        // ownership check is skipped (it's keyed on userId !== null).
+        const result = await this.stopSession({
+          sessionId: row.id,
+          userId: null,
+          reason: "reaper",
+        });
+        // `not_found` after `listExpired` returned the row means
+        // another concurrent reaper or a user DELETE got there first
+        // — count it toward "reaped" so it doesn't trip the failure
+        // alarm. `stopped` is the normal happy path.
+        if (result.kind === "stopped" || result.kind === "not_found") {
+          reaped += 1;
+          this.logger.info("reaper: stopped expired session", {
+            sessionId: row.id,
+            userId: row.userId,
+            tier: row.tier,
+            startedAt: row.startedAt.toISOString(),
+            ageMs: now.getTime() - row.startedAt.getTime(),
+            resolution: result.kind,
+          });
+        } else {
+          // result.kind === "forbidden" — should not happen with
+          // userId: null, but keep the branch closed.
+          failed += 1;
+          this.logger.error("reaper: unexpected stopSession result", {
+            sessionId: row.id,
+            kind: result.kind,
+          });
+        }
+      } catch (err) {
+        failed += 1;
+        this.logger.error("reaper: stopSession threw", {
+          sessionId: row.id,
+          userId: row.userId,
+          tier: row.tier,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
+    this.logger.info("reaper: run complete", {
+      reaped,
+      failed,
+      scanned: expired.length,
+    });
+    return { reaped, failed, scanned: expired.length };
+  }
+
   private async tearDownSessionResources(args: {
     clusterArn: string;
     taskArn: string;

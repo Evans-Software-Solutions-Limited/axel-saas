@@ -71,6 +71,12 @@ export default $config({
     const alb = await import("./infra/alb");
     const taskDef = await import("./infra/taskDefinition");
     await import("./infra/ssm");
+    // Phase 6: reaper Lambda + EventBridge + alarms. Loaded after
+    // ssm.ts so the SSM contract is already written by the time the
+    // reaper's IAM grants reference its prefix (no functional
+    // ordering dependency — IAM doesn't validate existence at the
+    // grant level — but it keeps the deploy log readable).
+    const reaper = await import("./infra/reaper");
 
     return {
       ecrRepositoryUrl: ecr.repository.repositoryUrl,
@@ -89,6 +95,9 @@ export default $config({
       wildcardName: dns.wildcardName,
       efsFileSystemId: efs.fileSystem.id,
       apiCallerRoleArn: apiCaller.apiCallerRole.arn,
+      // Phase 6 outputs — useful for the operator to subscribe to
+      // alarms post-deploy without spelunking through the console.
+      reaperAlarmTopicArn: reaper.alarmTopic.arn,
     };
   },
 });

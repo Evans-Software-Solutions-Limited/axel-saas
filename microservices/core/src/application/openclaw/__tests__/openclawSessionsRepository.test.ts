@@ -252,4 +252,105 @@ describe("OpenclawSessionsRepository", () => {
       expect(updateMock).toHaveBeenCalled();
     });
   });
+
+  describe("listExpired", () => {
+    const HOUR_MS = 60 * 60 * 1000;
+    const caps = {
+      free: 1 * HOUR_MS,
+      premium: 8 * HOUR_MS,
+      enterprise: 24 * HOUR_MS,
+    };
+
+    it("returns rows whose started_at + tier cap is in the past", async () => {
+      // now = noon. Free started 90 min ago (expired by 30 min);
+      // premium started 30 min ago (not expired); enterprise started
+      // 2 h ago (not expired).
+      const now = new Date("2026-05-20T12:00:00.000Z");
+      selectMock.mockReturnValue(
+        mockChain([
+          mockRow({
+            id: "free-expired",
+            tier: "free",
+            startedAt: new Date("2026-05-20T10:30:00.000Z"),
+          }),
+          mockRow({
+            id: "premium-fresh",
+            tier: "premium",
+            startedAt: new Date("2026-05-20T11:30:00.000Z"),
+          }),
+          mockRow({
+            id: "enterprise-fresh",
+            tier: "enterprise",
+            startedAt: new Date("2026-05-20T10:00:00.000Z"),
+          }),
+        ]),
+      );
+      const rows = await repo.listExpired(now, caps);
+      expect(rows.map((r) => r.id)).toEqual(["free-expired"]);
+    });
+
+    it("returns empty when no active rows are past their cap", async () => {
+      selectMock.mockReturnValue(mockChain([]));
+      const rows = await repo.listExpired(new Date(), caps);
+      expect(rows).toEqual([]);
+    });
+
+    it("skips rows with an unknown tier rather than crashing", async () => {
+      // Defensive coverage of the "legacy row" branch. The reaper
+      // is a backstop, not a place to crash on data shape drift —
+      // an unknown tier should pass through to the operator as a
+      // visible non-reaped row (alerted out-of-band) rather than
+      // blocking the whole run.
+      const now = new Date("2026-05-20T12:00:00.000Z");
+      selectMock.mockReturnValue(
+        mockChain([
+          mockRow({
+            id: "bogus-tier",
+            tier: "starter" as unknown as "free", // type-erased to feign drift
+            startedAt: new Date("2020-01-01"),
+          }),
+        ]),
+      );
+      const rows = await repo.listExpired(now, caps);
+      expect(rows).toEqual([]);
+    });
+
+    it("treats exactly-at-cap as NOT expired (strict <)", async () => {
+      // started_at + cap === now → strict less-than is false → keep
+      // alive. Boundary documented in the spec — at-cap is "still
+      // running"; the next 15-min tick catches it.
+      const now = new Date("2026-05-20T12:00:00.000Z");
+      selectMock.mockReturnValue(
+        mockChain([
+          mockRow({
+            id: "exactly-at-cap",
+            tier: "free",
+            startedAt: new Date("2026-05-20T11:00:00.000Z"),
+          }),
+        ]),
+      );
+      const rows = await repo.listExpired(now, caps);
+      expect(rows).toEqual([]);
+    });
+
+    it("handles multiple expired rows across tiers", async () => {
+      const now = new Date("2026-05-20T12:00:00.000Z");
+      selectMock.mockReturnValue(
+        mockChain([
+          mockRow({
+            id: "free-1",
+            tier: "free",
+            startedAt: new Date("2026-05-20T10:30:00.000Z"),
+          }),
+          mockRow({
+            id: "premium-1",
+            tier: "premium",
+            startedAt: new Date("2026-05-20T03:00:00.000Z"), // 9 h ago
+          }),
+        ]),
+      );
+      const rows = await repo.listExpired(now, caps);
+      expect(rows.map((r) => r.id).sort()).toEqual(["free-1", "premium-1"]);
+    });
+  });
 });

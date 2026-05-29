@@ -26,6 +26,10 @@ export default defineConfig({
         "**/taskHandler.ts",
         "**/integrationHandler.ts",
         "**/openclawSessionsHandler.ts",
+        // Phase 6 reaper Lambda entrypoint — pure production wiring
+        // (lazy AWS SDK init + Lambda glue). The testable factory it
+        // delegates to lives in reaperRunner.ts and is covered.
+        "**/reaperHandler.ts",
         // awsClients delegates entirely to AWS SDK init (dynamic
         // imports, credential providers) — behaviour worth testing
         // lives in the service that consumes the clients.
