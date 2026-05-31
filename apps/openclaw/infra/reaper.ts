@@ -132,7 +132,17 @@ export const reaper = new sst.aws.Cron("OpenclawReaper", {
     memory: "512 MB",
     environment: {
       STAGE: $app.stage,
-      AWS_REGION: "eu-west-2",
+      // AWS_REGION is intentionally NOT set here — it's on Lambda's
+      // reserved-env-var list. The runtime auto-injects it from the
+      // function's actual deployment region, and any attempt to set
+      // it via the function configuration causes `sst deploy` to
+      // fail with "Lambda was unable to configure your environment
+      // variables because the environment variables you have
+      // provided are reserved keys: AWS_REGION." The handler reads
+      // it correctly at runtime via `process.env.AWS_REGION` (see
+      // reaperHandler.ts:37) — the same way the core API Lambda
+      // does (infra/api.ts intentionally omits it). Inspector PR
+      // #113 round-2 found this.
       DATABASE_URL: databaseUrl.value,
       OPENCLAW_GATEWAY_TOKEN: gatewayToken,
     },

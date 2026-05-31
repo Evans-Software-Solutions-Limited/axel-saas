@@ -88,7 +88,7 @@ psql "$DATABASE_URL" -c "
 
 - "Active tasks > 90" alarm (ALB rule cap precursor) — requires a custom metric the reaper would emit on every run; deferred to a follow-up alongside any other operational metrics.
 - "Tasks running > 6h" alarm (precursor to wall-clock kill) — same shape, deferred.
-- Tag-based scoping of the reaper's ELB v2 permissions (target groups currently match `targetgroup/openclaw-*/*`; tightening requires the core API to apply a resource tag at creation time).
+- Tag-based scoping of the reaper's ELB v2 permissions (target groups currently match `targetgroup/oc-*/*` — the prefix the core API uses, capped at 32 chars by AWS; tightening requires the core API to apply a resource tag at creation time).
 
 ## Deploy
 
