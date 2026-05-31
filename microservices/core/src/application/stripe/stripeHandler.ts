@@ -296,20 +296,48 @@ export const stripeHandler = new Elysia({ name: "StripeHandler" })
               // container picks up the new tier on its next reload
               // rather than waiting for the user to re-onboard.
               //
-              // Wrapped in try/catch because:
-              //   - The Stripe event must succeed (return 2xx) even if
-              //     the workspace sync fails. A Stripe retry storm on a
-              //     transient EFS / DB hiccup would re-charge the user
-              //     and re-bill via downstream events; partial workspace
-              //     regen is recoverable (the operator can re-trigger
-              //     via a no-op tier write, and the next /connect or
-              //     /revoke will overwrite TOOLS.md + openclaw.json
-              //     anyway).
-              //   - The catch is BROAD on purpose. Unlike the
-              //     stopAllForUser path (which has its own narrow
-              //     loader-throw guard), the tier sync's failure modes
-              //     are all "workspace stays stale until manual
-              //     re-trigger" — none of them justify a Stripe retry.
+              // Wrapped in try/catch because the Stripe event MUST
+              // succeed (return 2xx) even if the workspace sync fails.
+              // A retry storm on a transient EFS / DB hiccup would
+              // re-fire every downstream subscription.updated handler
+              // (period-end refresh, cancel-at-period-end flag, status
+              // map) on each retry — none of which is idempotent in
+              // any interesting way but all of which write to the DB
+              // again. Stripe never sees the workspace failure.
+              //
+              // The catch is BROAD on purpose. Unlike the
+              // stopAllForUser path (which has its own narrow
+              // loader-throw guard for the SSM-not-deployed signal),
+              // none of the workspace-sync failure modes (EFS write
+              // error, DB read failure on onboarding answers,
+              // integration list failure) justify a Stripe retry —
+              // the tier is already DB-updated; replaying the event
+              // wouldn't change the workspace outcome.
+              //
+              // ## Recovery story when this catch fires
+              //
+              // Inspector PR #115 caught that the original comment
+              // here described a recovery path that doesn't exist:
+              //
+              //   - "No-op tier write re-triggers" is FALSE. The sync
+              //     is inside the `nextTier !== previousTier` guard;
+              //     a replay of the same Stripe event (or any
+              //     subscription.updated with the same tier) skips
+              //     the sync entirely. To genuinely re-trigger from
+              //     Stripe you'd need to change price metadata to a
+              //     DIFFERENT tier and back.
+              //   - "Next /connect or /revoke overwrites" only
+              //     refreshes TOOLS.md + openclaw.json (the two files
+              //     `integrationsSync.ts` writes). It does NOT touch
+              //     AGENTS.md or SOUL.md — both are tier-only and
+              //     stay stale until a real tier transition.
+              //
+              // So on failure: AGENTS.md and SOUL.md are stale for
+              // the affected user until the next genuine tier change.
+              // For an MVP this is acceptable (we ack Stripe + log
+              // structured); a future admin re-trigger endpoint that
+              // skips the equality guard is the right follow-up if
+              // failures become frequent enough to warrant it.
               if (nextTier !== previousTier) {
                 try {
                   await syncWorkspaceAfterTierChange(
@@ -332,9 +360,24 @@ export const stripeHandler = new Elysia({ name: "StripeHandler" })
                     },
                   );
                 } catch (err) {
+                  // Structured log carrying everything an operator
+                  // needs to manually re-trigger:
+                  //   - userId   → which user is affected
+                  //   - previousTier / nextTier → which transition
+                  //   - subscriptionId → the row to inspect
+                  //   - the raw error → root cause for fix
+                  // No automatic recovery; see comment above for why
+                  // this is acceptable for MVP and what to add when
+                  // it isn't.
                   console.error(
-                    `[stripe] subscription.updated: workspace regen failed for user ${sub.userId} (tier ${previousTier} → ${nextTier}). Stripe event still ack'd; workspace will refresh on next integration mutation or manual re-trigger. error:`,
-                    err instanceof Error ? err.message : String(err),
+                    "[stripe] subscription.updated: workspace regen failed; AGENTS.md/SOUL.md stale until next REAL tier change (no-op tier writes will not re-trigger)",
+                    {
+                      userId: sub.userId,
+                      subscriptionId: sub.id,
+                      previousTier,
+                      nextTier,
+                      error: err instanceof Error ? err.message : String(err),
+                    },
                   );
                 }
               }
