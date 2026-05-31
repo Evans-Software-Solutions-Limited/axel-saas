@@ -182,4 +182,41 @@ export class OpenclawSessionsRepository {
       .set({ stoppedAt, stoppedReason: reason })
       .where(eq(openclawSessions.id, id));
   }
+
+  /**
+   * Return every active session that has exceeded its tier's wall-clock
+   * cap. Active = `stopped_at IS NULL`. Expired = `started_at +
+   * wallClockMsByTier[row.tier]` < `now`.
+   *
+   * Filter happens in TypeScript rather than SQL on purpose:
+   *
+   *  - The active set is bounded by per-user concurrency caps × user
+   *    count. Even at 1k active sessions across all users, the rows
+   *    are tiny (~200 bytes each) — pulling all of them is <250 KB
+   *    and runs in <50 ms over a warm pg connection.
+   *  - Tier wall-clock caps come from `tierPolicy.ts` (the single
+   *    source of truth). Pushing them into a SQL `CASE WHEN` would
+   *    duplicate the policy values in two places — change one, forget
+   *    the other, expired tasks never reaped. Passing the policy in
+   *    keeps the table here.
+   *  - Rows skipped for "unknown tier" (legacy / migrated data) are
+   *    explicitly returned as not-expired rather than crashing — the
+   *    reaper is a backstop, not the source of correctness; let an
+   *    unknown tier reach a deploy alarm rather than blocking the run.
+   */
+  async listExpired(
+    now: Date,
+    wallClockMsByTier: Record<"free" | "premium" | "enterprise", number>,
+  ): Promise<OpenclawSession[]> {
+    const active = await this.db
+      .select()
+      .from(openclawSessions)
+      .where(isNull(openclawSessions.stoppedAt));
+    const nowMs = now.getTime();
+    return active.filter((row) => {
+      const cap = wallClockMsByTier[row.tier];
+      if (!cap) return false;
+      return row.startedAt.getTime() + cap < nowMs;
+    });
+  }
 }

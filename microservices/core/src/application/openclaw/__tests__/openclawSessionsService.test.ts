@@ -121,6 +121,7 @@ function makeRepo(overrides: Partial<OpenclawSessionsRepository> = {}) {
     rankAmongActive: vi.fn().mockResolvedValue(0),
     findLastEfsAccessPointId: vi.fn().mockResolvedValue(null),
     markStopped: vi.fn().mockResolvedValue(undefined),
+    listExpired: vi.fn().mockResolvedValue([]),
     ...overrides,
   };
   return repo as unknown as OpenclawSessionsRepository & typeof repo;
@@ -1273,6 +1274,83 @@ describe("OpenclawSessionsService.stopSession", () => {
     expect(ecsSend).not.toHaveBeenCalled();
     expect(elbv2Send).not.toHaveBeenCalled();
   });
+
+  it("accepts a pre-loaded infra and skips its own loadInfra call", async () => {
+    // Inspector PR #113 finding: stopSession's per-call loadInfra
+    // multiplied N times during a reaper batch. The new `infra` param
+    // lets the reaper pass in already-resolved infra to skip the
+    // round-trip. Verify the loader is NOT called when infra is
+    // supplied.
+    const loadInfra = vi.fn().mockResolvedValue(goldenInfra);
+    const row = {
+      id: "session-1",
+      userId: "u1",
+      name: "n",
+      tier: "premium" as const,
+      taskArn: "arn:task/1",
+      targetGroupArn: "arn:tg/1",
+      listenerRuleArn: "arn:rule/1",
+      efsAccessPointId: "fsap-1",
+      startedAt: new Date(),
+      stoppedAt: null,
+      stoppedReason: null,
+    };
+    const repo = makeRepo({
+      findById: vi.fn().mockResolvedValue(row),
+    });
+    const svc = new OpenclawSessionsService({
+      repository: repo,
+      loadInfra,
+      awsClients: makeAwsClients(),
+    });
+    const result = await svc.stopSession({
+      sessionId: row.id,
+      userId: "u1",
+      reason: "user",
+      infra: goldenInfra, // pre-loaded
+    });
+    expect(result.kind).toBe("stopped");
+    // Critical: loader was NOT invoked because caller pre-loaded.
+    expect(loadInfra).not.toHaveBeenCalled();
+  });
+
+  it("honours an explicit infra=null as 'skip AWS teardown'", async () => {
+    // The reaper's NotDeployed path passes infra=null down to
+    // stopSession so the row gets marked stopped without trying to
+    // hit AWS. Mirrors the loader-throw branch.
+    const row = {
+      id: "session-1",
+      userId: "u1",
+      name: "n",
+      tier: "premium" as const,
+      taskArn: "arn:task/1",
+      targetGroupArn: "arn:tg/1",
+      listenerRuleArn: "arn:rule/1",
+      efsAccessPointId: "fsap-1",
+      startedAt: new Date(),
+      stoppedAt: null,
+      stoppedReason: null,
+    };
+    const repo = makeRepo({
+      findById: vi.fn().mockResolvedValue(row),
+    });
+    const svc = new OpenclawSessionsService({
+      repository: repo,
+      loadInfra: vi.fn(),
+      awsClients: makeAwsClients(),
+    });
+    const result = await svc.stopSession({
+      sessionId: row.id,
+      userId: "u1",
+      reason: "user",
+      infra: null,
+    });
+    expect(result.kind).toBe("stopped");
+    expect(repo.markStopped).toHaveBeenCalledOnce();
+    // No AWS calls.
+    expect(ecsSend).not.toHaveBeenCalled();
+    expect(elbv2Send).not.toHaveBeenCalled();
+  });
 });
 
 describe("OpenclawSessionsService.stopAllForUser", () => {
@@ -1455,5 +1533,248 @@ describe("OpenclawSessionsService.stopAllForUser", () => {
     // No AWS teardown attempts.
     expect(ecsSend).not.toHaveBeenCalled();
     expect(elbv2Send).not.toHaveBeenCalled();
+  });
+});
+
+describe("OpenclawSessionsService.reapExpiredSessions", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    primeHappyPathAws();
+  });
+
+  const HOUR_MS = 60 * 60 * 1000;
+
+  function expiredRow(overrides: Record<string, unknown> = {}) {
+    return {
+      id: "expired-1",
+      userId: "u1",
+      name: "demo",
+      tier: "free" as const,
+      taskArn: "arn:task/1",
+      targetGroupArn: "arn:tg/1",
+      listenerRuleArn: "arn:rule/1",
+      efsAccessPointId: "fsap-1",
+      startedAt: new Date("2026-05-20T10:00:00.000Z"),
+      stoppedAt: null,
+      stoppedReason: null,
+      ...overrides,
+    };
+  }
+
+  it("scans zero rows when no sessions are expired", async () => {
+    const repo = makeRepo({
+      listExpired: vi.fn().mockResolvedValue([]),
+    });
+    const svc = new OpenclawSessionsService({
+      repository: repo,
+      loadInfra: async () => goldenInfra,
+      awsClients: makeAwsClients(),
+      clock: () => new Date("2026-05-20T12:00:00.000Z"),
+    });
+    const result = await svc.reapExpiredSessions();
+    expect(result).toEqual({ reaped: 0, failed: 0, notFound: 0, scanned: 0 });
+    expect(repo.listExpired).toHaveBeenCalledOnce();
+    // Tier policy wallClockMs values flowed through correctly.
+    const [, caps] = (repo.listExpired as ReturnType<typeof vi.fn>).mock
+      .calls[0];
+    expect(caps).toEqual({
+      free: 1 * HOUR_MS,
+      premium: 8 * HOUR_MS,
+      enterprise: 24 * HOUR_MS,
+    });
+  });
+
+  it("stops each expired session via stopSession with reason 'reaper'", async () => {
+    const rows = [
+      expiredRow({ id: "r1", tier: "free" }),
+      expiredRow({
+        id: "r2",
+        tier: "premium",
+        taskArn: "arn:task/2",
+        targetGroupArn: "arn:tg/2",
+        listenerRuleArn: "arn:rule/2",
+      }),
+    ];
+    const repo = makeRepo({
+      listExpired: vi.fn().mockResolvedValue(rows),
+      // findById is called from inside stopSession — return the row
+      // matching the requested id.
+      findById: vi
+        .fn()
+        .mockImplementation(async (id: string) =>
+          rows.find((r) => r.id === id),
+        ),
+    });
+    const svc = new OpenclawSessionsService({
+      repository: repo,
+      loadInfra: async () => goldenInfra,
+      awsClients: makeAwsClients(),
+      clock: () => new Date("2026-05-20T12:00:00.000Z"),
+    });
+    const result = await svc.reapExpiredSessions();
+    expect(result).toEqual({ reaped: 2, failed: 0, notFound: 0, scanned: 2 });
+    expect(repo.markStopped).toHaveBeenCalledTimes(2);
+    expect(repo.markStopped).toHaveBeenCalledWith("r1", "reaper");
+    expect(repo.markStopped).toHaveBeenCalledWith("r2", "reaper");
+  });
+
+  it("memoises infra across the batch (single loadInfra call per run)", async () => {
+    // Inspector PR #113 finding: per-row stopSession previously called
+    // loadInfra(), which at scale (100+ expired rows, SSM 40 RPS limit)
+    // collapsed into per-row ThrottlingException. Verify the batch
+    // now resolves infra ONCE at the top.
+    const rows = [
+      expiredRow({ id: "r1" }),
+      expiredRow({ id: "r2" }),
+      expiredRow({ id: "r3" }),
+    ];
+    const loadInfra = vi.fn().mockResolvedValue(goldenInfra);
+    const repo = makeRepo({
+      listExpired: vi.fn().mockResolvedValue(rows),
+      findById: vi
+        .fn()
+        .mockImplementation(async (id: string) =>
+          rows.find((r) => r.id === id),
+        ),
+    });
+    const svc = new OpenclawSessionsService({
+      repository: repo,
+      loadInfra,
+      awsClients: makeAwsClients(),
+    });
+    await svc.reapExpiredSessions();
+    // Single loadInfra call for the whole batch, NOT 1 + N.
+    expect(loadInfra).toHaveBeenCalledOnce();
+  });
+
+  it("distinguishes 'not_found' from 'reaped' in the result counts", async () => {
+    // Inspector PR #113 finding: collapsing not_found into reaped
+    // masks a real bug class (e.g. findById/listExpired filter drift)
+    // because a 100%-not-found run would silently report success. The
+    // notFound count must be separately observable.
+    const rows = [expiredRow({ id: "raced" })];
+    const repo = makeRepo({
+      listExpired: vi.fn().mockResolvedValue(rows),
+      findById: vi.fn().mockResolvedValue(null), // disappeared
+    });
+    const svc = new OpenclawSessionsService({
+      repository: repo,
+      loadInfra: async () => goldenInfra,
+      awsClients: makeAwsClients(),
+    });
+    const result = await svc.reapExpiredSessions();
+    expect(result).toEqual({ reaped: 0, failed: 0, notFound: 1, scanned: 1 });
+  });
+
+  it("counts a single AWS-teardown failure without stranding the batch", async () => {
+    const rows = [
+      expiredRow({ id: "ok" }),
+      expiredRow({
+        id: "broken",
+        taskArn: "arn:task/broken",
+        targetGroupArn: "arn:tg/broken",
+        listenerRuleArn: "arn:rule/broken",
+      }),
+    ];
+    const repo = makeRepo({
+      listExpired: vi.fn().mockResolvedValue(rows),
+      findById: vi
+        .fn()
+        .mockImplementation(async (id: string) =>
+          rows.find((r) => r.id === id),
+        ),
+    });
+    // Fail the second row's listener-rule delete. The whole try
+    // block in stopSession should catch and bubble — reapExpired's
+    // per-row try then catches and counts as failed.
+    elbv2Send.mockImplementation(async (cmd) => {
+      if (cmd.__type === "DeleteRuleCommand") {
+        if (cmd.input.RuleArn === "arn:rule/broken") {
+          throw new Error("ELB broken");
+        }
+        return {};
+      }
+      if (cmd.__type === "DescribeTargetHealthCommand") return {};
+      return {};
+    });
+    const svc = new OpenclawSessionsService({
+      repository: repo,
+      loadInfra: async () => goldenInfra,
+      awsClients: makeAwsClients(),
+    });
+    const result = await svc.reapExpiredSessions();
+    expect(result.scanned).toBe(2);
+    expect(result.reaped).toBe(1);
+    expect(result.failed).toBe(1);
+    expect(result.notFound).toBe(0);
+  });
+
+  it("returns scanned=0 reaped=0 when openclaw infra is not deployed", async () => {
+    // Per spec: if the SST stack is torn down between Phase 5 and a
+    // reaper run, skip rather than crash. Rows can be cleaned up by a
+    // subsequent stopSession call (which has its own loader-throw
+    // guard for the rows-only mark-stopped path).
+    const repo = makeRepo({
+      listExpired: vi.fn().mockResolvedValue([]),
+    });
+    const svc = new OpenclawSessionsService({
+      repository: repo,
+      loadInfra: async () => {
+        throw new OpenclawInfraNotDeployedError(
+          "Missing SSM parameter /axel/staging/openclaw/cluster-arn",
+        );
+      },
+      awsClients: makeAwsClients(),
+    });
+    const result = await svc.reapExpiredSessions();
+    expect(result).toEqual({ reaped: 0, failed: 0, notFound: 0, scanned: 0 });
+    // CRITICAL: listExpired must NOT be called when infra is missing.
+    // Otherwise the reaper would query Postgres for rows and decide
+    // there's nothing to do — but the AWS resources are still leaking
+    // until the stack comes back. The loader-throw is the SST-aware
+    // guard; let the next run reconcile.
+    expect(repo.listExpired).not.toHaveBeenCalled();
+  });
+
+  it("propagates non-NotDeployed loadInfra errors (transient SSM)", async () => {
+    // Inspector PR #110 finding extended to the reaper: a transient
+    // SSM ThrottlingException must surface so EventBridge can retry
+    // on the next 15-min tick, NOT silently no-op the run.
+    const repo = makeRepo();
+    const svc = new OpenclawSessionsService({
+      repository: repo,
+      loadInfra: async () => {
+        throw new Error("ThrottlingException: Rate exceeded");
+      },
+      awsClients: makeAwsClients(),
+    });
+    await expect(svc.reapExpiredSessions()).rejects.toThrow(
+      /ThrottlingException/,
+    );
+  });
+
+  it("counts an unexpected stopSession result kind ('forbidden') as failed", async () => {
+    // stopSession with userId: null can never return 'forbidden' in
+    // current code — but if a future refactor adds a system-side
+    // ownership check, the reaper should fail loudly rather than
+    // silently treat it as success. Defensive coverage of the closed
+    // branch.
+    const rows = [expiredRow({ id: "ghost" })];
+    const repo = makeRepo({
+      listExpired: vi.fn().mockResolvedValue(rows),
+      // Return a row but mismatch the system userId check. Easiest
+      // way: make findById return undefined so result.kind=not_found
+      // — then mutate the test to a different shape... Actually we
+      // can override stopSession via spying on the service instance.
+    });
+    const svc = new OpenclawSessionsService({
+      repository: repo,
+      loadInfra: async () => goldenInfra,
+      awsClients: makeAwsClients(),
+    });
+    // Force the unexpected branch by spying on the service.
+    vi.spyOn(svc, "stopSession").mockResolvedValueOnce({ kind: "forbidden" });
+    const result = await svc.reapExpiredSessions();
+    expect(result).toEqual({ reaped: 0, failed: 1, notFound: 0, scanned: 1 });
   });
 });
