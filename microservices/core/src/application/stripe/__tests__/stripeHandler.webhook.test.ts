@@ -9,6 +9,12 @@ vi.mock("../../openclaw/openclawSessionsHandler", () => ({
   },
 }));
 
+const mockSyncWorkspaceAfterTierChange = vi.fn().mockResolvedValue(undefined);
+vi.mock("../../workspace/tierChangeSync", () => ({
+  syncWorkspaceAfterTierChange: (...args: unknown[]) =>
+    mockSyncWorkspaceAfterTierChange(...args),
+}));
+
 vi.mock("stripe", () => ({
   default: vi.fn().mockImplementation(() => ({
     checkout: { sessions: { create: vi.fn() } },
@@ -342,6 +348,111 @@ describe("StripeHandler webhook behaviour", () => {
 
       await postWebhook();
       expect(mockUpdateCancelAtPeriodEnd).not.toHaveBeenCalled();
+    });
+
+    it("triggers workspace regen when the tier actually changes", async () => {
+      mockSyncWorkspaceAfterTierChange.mockClear();
+      mockConstructEvent.mockReturnValueOnce({
+        type: "customer.subscription.updated",
+        data: {
+          object: {
+            customer: "cus_999",
+            status: "active",
+            items: {
+              data: [{ price: { metadata: { tier: "premium" } } }],
+            },
+          },
+        },
+      });
+      mockFindByStripeCustomer.mockResolvedValueOnce({
+        id: "sub-row-1",
+        userId: "user-uuid-1",
+        status: "active",
+        tier: "free", // previous tier — different from incoming "premium"
+      });
+
+      await postWebhook();
+
+      expect(mockUpdateTier).toHaveBeenCalledWith("sub-row-1", "premium");
+      // The sync receives (deps, userId, newTier).
+      expect(mockSyncWorkspaceAfterTierChange).toHaveBeenCalledOnce();
+      const [, syncUserId, syncTier] =
+        mockSyncWorkspaceAfterTierChange.mock.calls[0];
+      expect(syncUserId).toBe("user-uuid-1");
+      expect(syncTier).toBe("premium");
+    });
+
+    it("does NOT trigger workspace regen when the tier is the same (noop write)", async () => {
+      // Stripe occasionally re-fires customer.subscription.updated
+      // with the same tier (e.g. plan-modification events that don't
+      // touch the price). Re-running the full workspace regen on
+      // every such event would burn EFS writes + reload signals for
+      // no behavioural difference.
+      mockSyncWorkspaceAfterTierChange.mockClear();
+      mockConstructEvent.mockReturnValueOnce({
+        type: "customer.subscription.updated",
+        data: {
+          object: {
+            customer: "cus_999",
+            status: "active",
+            items: {
+              data: [{ price: { metadata: { tier: "premium" } } }],
+            },
+          },
+        },
+      });
+      mockFindByStripeCustomer.mockResolvedValueOnce({
+        id: "sub-row-1",
+        userId: "user-uuid-1",
+        status: "active",
+        tier: "premium", // same as incoming
+      });
+
+      await postWebhook();
+
+      // Tier still gets DB-updated (idempotent), but sync is skipped.
+      expect(mockUpdateTier).toHaveBeenCalledWith("sub-row-1", "premium");
+      expect(mockSyncWorkspaceAfterTierChange).not.toHaveBeenCalled();
+    });
+
+    it("returns 200 to Stripe even when workspace regen throws", async () => {
+      // Critical: a workspace-sync failure (EFS hiccup, DB blip) MUST
+      // NOT trip a Stripe retry storm. The tier is already updated in
+      // the DB; the workspace just stays stale until the next sync.
+      // Retrying via Stripe would re-bill / re-charge on downstream
+      // events.
+      mockSyncWorkspaceAfterTierChange.mockClear();
+      mockSyncWorkspaceAfterTierChange.mockRejectedValueOnce(
+        new Error("EFS unavailable"),
+      );
+      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+      mockConstructEvent.mockReturnValueOnce({
+        type: "customer.subscription.updated",
+        data: {
+          object: {
+            customer: "cus_999",
+            status: "active",
+            items: {
+              data: [{ price: { metadata: { tier: "enterprise" } } }],
+            },
+          },
+        },
+      });
+      mockFindByStripeCustomer.mockResolvedValueOnce({
+        id: "sub-row-1",
+        userId: "user-uuid-1",
+        status: "active",
+        tier: "premium",
+      });
+
+      const response = await postWebhook();
+
+      expect(response.status).toBe(200);
+      expect(mockSyncWorkspaceAfterTierChange).toHaveBeenCalledOnce();
+      // The error is logged (not swallowed silently).
+      expect(errorSpy).toHaveBeenCalled();
+      errorSpy.mockRestore();
     });
   });
 

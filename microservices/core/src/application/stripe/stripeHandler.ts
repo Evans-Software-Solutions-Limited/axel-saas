@@ -16,6 +16,63 @@ import {
 import { normaliseTier } from "./tierNormaliser";
 import { sendEmail } from "../email/emailService";
 import { openclawSessionsService } from "../openclaw/openclawSessionsHandler";
+import { IntegrationRepository } from "../integrations/integrationRepository";
+import { IntegrationService } from "../integrations/integrationService";
+import { AwsSecretsClient } from "../integrations/secretsClient";
+import { WorkspaceConfigService } from "../workspace/workspaceConfigService";
+import { syncWorkspaceAfterTierChange } from "../workspace/tierChangeSync";
+import type { SubscriptionTier } from "../integrations/tierGate";
+
+// Workspace-sync dependencies for the customer.subscription.updated
+// tier-change path. Lazy-initialised (not constructed at module load)
+// because:
+//
+//   - Hoisting interaction with vi.mock in tests: module-level
+//     `new ProvisioningRepository()` runs before the test file's
+//     captured-vars-in-mock-factories are initialised, throwing
+//     `Cannot access 'mockX' before initialization`.
+//   - Not every webhook event needs the workspace sync (checkout
+//     creation, invoice failure, cancellation, etc.). Lazy
+//     instantiation defers the cost to the one path that uses it.
+//
+// The shared `[workspace-sync]` log prefix keeps CloudWatch readable
+// across this and the integration-handler call site (which has its
+// own WorkspaceConfigService instance — separate pendingReloads
+// sets, harmless).
+const tierSyncLogger = {
+  info: (msg: string, ctx?: Record<string, unknown>) =>
+    console.log(`[workspace-sync] ${msg}`, ctx ?? {}),
+  warn: (msg: string, ctx?: Record<string, unknown>) =>
+    console.warn(`[workspace-sync] ${msg}`, ctx ?? {}),
+};
+
+let cachedTierSyncIntegrationService: IntegrationService | undefined;
+let cachedTierSyncWorkspaceConfigService: WorkspaceConfigService | undefined;
+
+function getTierSyncIntegrationService(): IntegrationService {
+  if (!cachedTierSyncIntegrationService) {
+    cachedTierSyncIntegrationService = new IntegrationService(
+      new IntegrationRepository(),
+      new AwsSecretsClient(),
+    );
+  }
+  return cachedTierSyncIntegrationService;
+}
+
+function getTierSyncWorkspaceConfigService(): WorkspaceConfigService {
+  if (!cachedTierSyncWorkspaceConfigService) {
+    cachedTierSyncWorkspaceConfigService = new WorkspaceConfigService({
+      provisioningRepo: new ProvisioningRepository(),
+      logger: {
+        info: tierSyncLogger.info,
+        warn: tierSyncLogger.warn,
+        error: (msg, ctx) =>
+          console.error(`[workspace-sync] ${msg}`, ctx ?? {}),
+      },
+    });
+  }
+  return cachedTierSyncWorkspaceConfigService;
+}
 
 function getStripeInstance() {
   const secretKey = process.env.STRIPE_SECRET_KEY;
@@ -230,7 +287,57 @@ export const stripeHandler = new Elysia({ name: "StripeHandler" })
           if (rawTier) {
             const nextTier = normaliseTier(rawTier);
             if (nextTier) {
+              const previousTier = sub.tier as SubscriptionTier | null;
               await subRepo.updateTier(sub.id, nextTier);
+
+              // Tier-change workspace regen: when the tier actually
+              // changes (not a noop write of the same value), refresh
+              // every tier-sensitive workspace file so the running
+              // container picks up the new tier on its next reload
+              // rather than waiting for the user to re-onboard.
+              //
+              // Wrapped in try/catch because:
+              //   - The Stripe event must succeed (return 2xx) even if
+              //     the workspace sync fails. A Stripe retry storm on a
+              //     transient EFS / DB hiccup would re-charge the user
+              //     and re-bill via downstream events; partial workspace
+              //     regen is recoverable (the operator can re-trigger
+              //     via a no-op tier write, and the next /connect or
+              //     /revoke will overwrite TOOLS.md + openclaw.json
+              //     anyway).
+              //   - The catch is BROAD on purpose. Unlike the
+              //     stopAllForUser path (which has its own narrow
+              //     loader-throw guard), the tier sync's failure modes
+              //     are all "workspace stays stale until manual
+              //     re-trigger" — none of them justify a Stripe retry.
+              if (nextTier !== previousTier) {
+                try {
+                  await syncWorkspaceAfterTierChange(
+                    {
+                      userRepository,
+                      integrationService: getTierSyncIntegrationService(),
+                      workspaceConfigService:
+                        getTierSyncWorkspaceConfigService(),
+                      logger: tierSyncLogger,
+                    },
+                    sub.userId,
+                    nextTier,
+                  );
+                  tierSyncLogger.info(
+                    "subscription.updated: workspace regen complete",
+                    {
+                      userId: sub.userId,
+                      previousTier,
+                      nextTier,
+                    },
+                  );
+                } catch (err) {
+                  console.error(
+                    `[stripe] subscription.updated: workspace regen failed for user ${sub.userId} (tier ${previousTier} → ${nextTier}). Stripe event still ack'd; workspace will refresh on next integration mutation or manual re-trigger. error:`,
+                    err instanceof Error ? err.message : String(err),
+                  );
+                }
+              }
             } else {
               console.warn(
                 `[stripe] subscription.updated: ignoring unrecognised tier '${rawTier}' on price ${itemPrice?.id ?? "unknown"} for subscription ${sub.id}`,

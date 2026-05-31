@@ -36,14 +36,7 @@
 
 import type { IntegrationService } from "../integrations/integrationService";
 import type { SubscriptionTier } from "../integrations/tierGate";
-import {
-  generateOpenClawConfig,
-  serializeOpenClawConfig,
-} from "./openclawConfigGenerator";
-import {
-  mergeOpenClawConfig,
-  parseExistingOpenClawConfig,
-} from "./openclawConfigMerger";
+import { regenerateOpenClawJsonUpdate } from "./openclawJsonRegen";
 import { generateToolsMarkdown } from "./toolsGenerator";
 import type {
   FileUpdate,
@@ -95,7 +88,6 @@ export async function syncWorkspaceAfterIntegrationChange(
   tier: SubscriptionTier | null,
   options: SyncOptions = {},
 ): Promise<void> {
-  const { logger } = deps;
   const effectiveTier = tier ?? "free";
 
   // 1. TOOLS.md — purely a function of integrations + tier.
@@ -112,11 +104,14 @@ export async function syncWorkspaceAfterIntegrationChange(
   //    a tier-appropriate fresh template, write the result. Adding
   //    the openclaw.json update to the SAME `updateFiles` call as
   //    TOOLS.md means one EFS round-trip and one reload signal.
+  //
+  // The actual regen lives in `openclawJsonRegen.ts` (shared with
+  // `tierChangeSync.ts`) so the malformed-file + read-error
+  // behaviour stays in lock-step across both call sites.
   const openClawUpdate = await regenerateOpenClawJsonUpdate(
     deps,
     userId,
     effectiveTier,
-    logger,
   );
   if (openClawUpdate) {
     updates.push(openClawUpdate);
@@ -127,65 +122,4 @@ export async function syncWorkspaceAfterIntegrationChange(
     updates,
     options.reason ?? "integration_changed",
   );
-}
-
-/**
- * Produce the openclaw.json `FileUpdate`, or `null` when the
- * existing file is malformed and we'd rather skip the regen than
- * clobber the evidence of corruption. The TOOLS.md update still
- * goes through in that case — partial progress is better than no
- * progress, and TOOLS.md is the more behaviourally-impactful of
- * the two files.
- */
-async function regenerateOpenClawJsonUpdate(
-  deps: IntegrationsSyncDeps,
-  userId: string,
-  tier: SubscriptionTier,
-  logger: { warn: (message: string, ctx?: Record<string, unknown>) => void },
-): Promise<FileUpdate | null> {
-  // Read failures (non-ENOENT — EACCES, EIO, EBUSY, anything the
-  // default fs.readFile re-throws) used to propagate straight through
-  // and short-circuit the TOOLS.md write below. That was a behavioural
-  // regression vs the pre-PR orchestrator: TOOLS.md is purely a
-  // function of integrations + tier and has no dependency on
-  // openclaw.json being readable, so an EFS hiccup turning every
-  // subsequent /connect / /revoke into a silent TOOLS.md no-op (with
-  // a 200 to the user) was the wrong failure mode. Mirror the
-  // malformed-JSON branch: log, return null, let TOOLS.md through.
-  let existingRaw: string | null;
-  try {
-    existingRaw = await deps.workspaceConfigService.readWorkspaceFile(
-      userId,
-      "openclaw.json",
-    );
-  } catch (err: unknown) {
-    logger.warn("openclaw.json read failed; skipping regen", {
-      userId,
-      error: err instanceof Error ? err.message : String(err),
-    });
-    return null;
-  }
-
-  const parsed = parseExistingOpenClawConfig(existingRaw);
-  if (parsed.kind === "malformed") {
-    // Malformed on-disk file. Don't clobber — operator may want to
-    // inspect. Logging at warn level (not error) because the most
-    // common cause is a transient partial write from a crashed
-    // container; the next container boot will rewrite via the
-    // template-copy fallback in the entrypoint.
-    logger.warn("openclaw.json malformed; skipping regen", {
-      userId,
-      error: parsed.error,
-    });
-    return null;
-  }
-
-  const generated = generateOpenClawConfig(tier);
-  const existing = parsed.kind === "ok" ? parsed.value : null;
-  const merged = mergeOpenClawConfig(existing, generated);
-
-  return {
-    filename: "openclaw.json",
-    content: serializeOpenClawConfig(merged),
-  };
 }
