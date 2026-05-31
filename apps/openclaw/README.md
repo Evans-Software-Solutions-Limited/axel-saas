@@ -84,6 +84,18 @@ psql "$DATABASE_URL" -c "
 # 4. Confirm the row is now stopped_at IS NOT NULL with stopped_reason='reaper'.
 ```
 
+## Operator scripts (`scripts/`)
+
+Three runbooks live under `apps/openclaw/scripts/`. Run from anywhere — they resolve paths relative to their own location.
+
+| Script                    | When                                                                                 | What                                                                                                                                                                                                                                                                                                        |
+| ------------------------- | ------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `push-bootstrap-image.sh` | Once per stage, before first POST /openclaw/sessions                                 | Builds + pushes the `:bootstrap` image referenced by the task definitions. Until this runs, RunTask can't pull an image and session creation hangs/500s. Production-gated behind a `read -p` confirm.                                                                                                       |
+| `smoke-test-sessions.sh`  | After every deploy that touches Phase 4/5                                            | Verifies the session lifecycle: POST `/openclaw/sessions` → poll `/healthz` until 200 → GET listed → DELETE 204. Trap auto-cleans on early failure.                                                                                                                                                         |
+| `verify-chat-loop.sh`     | Once per stage post-merge, then after any bridge-plugin or workspace-template change | Closes the end-to-end loop: POST session → poll → POST `/api/chat` to the bridge plugin → assert non-empty `response` → DELETE. Proves the bridge plugin's `/api/chat` translates to OpenClaw's `/v1/chat/completions` against a real Fargate task (the pre-Phase-5 smoke tests only covered local docker). |
+
+Each script's header comment documents required + optional env vars and distinct exit codes per failure mode (so a CI wrapper can branch on outcome). Always require `STAGE` and a `JWT`; `verify-chat-loop.sh` also requires `OPENCLAW_GATEWAY_TOKEN` + `USER_ID`.
+
 ## What's NOT in scope (deferred to later work)
 
 - "Active tasks > 90" alarm (ALB rule cap precursor) — requires a custom metric the reaper would emit on every run; deferred to a follow-up alongside any other operational metrics.
