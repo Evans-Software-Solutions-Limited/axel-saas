@@ -25,13 +25,23 @@ import type { OpenclawSessionsService } from "./openclawSessionsService";
 export interface ReaperRunResult {
   reaped: number;
   failed: number;
+  /**
+   * Count of expired rows that were already stopped between
+   * `listExpired` and `stopSession` (race against a parallel reaper
+   * run or a user DELETE). Separate from `reaped` so a sudden
+   * pattern shift toward all-notFound is visible — e.g. a future bug
+   * where `findById` and `listExpired` use different filter shapes
+   * would silently look like a clean reap if these were collapsed.
+   * Inspector PR #113 found this distinction matters.
+   */
+  notFound: number;
   scanned: number;
   durationMs: number;
 }
 
 /**
- * Emit two custom metrics so the alarms in `apps/openclaw/infra/reaper.ts`
- * have something to watch:
+ * Emit three custom metrics so the alarms in `apps/openclaw/infra/
+ * reaper.ts` have something to watch:
  *
  *   - `ReapSuccess` — count of sessions stopped this run. Useful as a
  *     "reaper is alive and doing work" signal even when no rows are
@@ -40,9 +50,15 @@ export interface ReaperRunResult {
  *     alarm fires on `>= 1` over any 15-min window: an aggregate
  *     teardown failure shows up immediately rather than waiting for
  *     a tasks-running-> 6h secondary alarm.
+ *   - `ReapNotFound` — count of expired rows that disappeared mid-
+ *     reap. Distinct from `ReapSuccess` so a pattern shift away from
+ *     "all stopped" is visible to the operator without alarming on
+ *     it (no alarm by default — `ReapNotFound` should be 0 in steady
+ *     state but transient race-positives are normal during a manual
+ *     teardown sweep).
  */
 export type EmitMetricsFn = (
-  result: { reaped: number; failed: number },
+  result: { reaped: number; failed: number; notFound: number },
   stage: string,
 ) => Promise<void>;
 
@@ -87,13 +103,22 @@ export function buildHandler(deps: {
       stage,
       reaped: result.reaped,
       failed: result.failed,
+      notFound: result.notFound,
       scanned: result.scanned,
       durationMs,
     });
-    await emit({ reaped: result.reaped, failed: result.failed }, stage);
+    await emit(
+      {
+        reaped: result.reaped,
+        failed: result.failed,
+        notFound: result.notFound,
+      },
+      stage,
+    );
     return {
       reaped: result.reaped,
       failed: result.failed,
+      notFound: result.notFound,
       scanned: result.scanned,
       durationMs,
     };

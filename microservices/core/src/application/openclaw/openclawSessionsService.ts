@@ -791,6 +791,21 @@ export class OpenclawSessionsService {
     /** Whose request is this? `null` for system callers (reaper, stripe). */
     userId: string | null;
     reason: OpenclawStoppedReason;
+    /**
+     * Optional pre-loaded infra. When the caller has already resolved
+     * the SSM contract for the current invocation (the reaper batch
+     * does this once at the top of `reapExpiredSessions`), pass it in
+     * to skip the redundant per-row `loadInfra()`. Saves N-1 SSM calls
+     * across a batch — at 100 expired rows and SSM's 40 RPS account
+     * limit per region, the unmemoised path collapsed to per-row
+     * ThrottlingException after the first ~40 rows.
+     *
+     * `null` means "infra is known to be torn down — mark the row
+     * stopped without AWS teardown" (matches the loader-throw branch).
+     * `undefined` (the default) means "loadInfra yourself" — preserves
+     * the existing single-call contract.
+     */
+    infra?: OpenclawInfra | null;
   }): Promise<StopSessionResult> {
     const row = await this.repository.findById(input.sessionId);
     if (!row || row.stoppedAt) {
@@ -815,18 +830,24 @@ export class OpenclawSessionsService {
     // are still running, silently leaking against the ALB rule and
     // target-group quotas.
     let infra: OpenclawInfra | null;
-    try {
-      infra = await this.loadInfra();
-    } catch (err) {
-      if (err instanceof OpenclawInfraNotDeployedError) {
-        this.logger.warn(
-          "openclaw infra not deployed; skipping AWS teardown, " +
-            "marking row stopped so the user can release it",
-          { sessionId: row.id, error: err.message },
-        );
-        infra = null;
-      } else {
-        throw err;
+    if (input.infra !== undefined) {
+      // Caller pre-loaded the contract (reaper batch). Skip the
+      // round-trip; honour explicit `null` as "infra missing".
+      infra = input.infra;
+    } else {
+      try {
+        infra = await this.loadInfra();
+      } catch (err) {
+        if (err instanceof OpenclawInfraNotDeployedError) {
+          this.logger.warn(
+            "openclaw infra not deployed; skipping AWS teardown, " +
+              "marking row stopped so the user can release it",
+            { sessionId: row.id, error: err.message },
+          );
+          infra = null;
+        } else {
+          throw err;
+        }
       }
     }
 
@@ -936,6 +957,7 @@ export class OpenclawSessionsService {
   async reapExpiredSessions(): Promise<{
     reaped: number;
     failed: number;
+    notFound: number;
     scanned: number;
   }> {
     // Loader-throw guard — same shape as stopSession / stopAllForUser.
@@ -946,15 +968,27 @@ export class OpenclawSessionsService {
     // no-op for the duration of the transient, which is exactly the
     // kind of "running but doing nothing" failure mode CloudWatch
     // alarms exist to catch.
+    //
+    // CRITICAL: we resolve infra ONCE here and pass it through to each
+    // per-row stopSession via the `infra` parameter. Without this
+    // memoisation, stopSession's per-call loadInfra() fires N more
+    // times during the batch — at 100 expired rows and SSM's 40 RPS
+    // account limit, every run past ~40 rows hits ThrottlingException
+    // and silently turns 60% of stopSession calls into per-row
+    // failures. Inspector PR #113 found this. The memoised `infra`
+    // also gets passed as `null` (not undefined) on the
+    // NotDeployedError branch so stopSession knows the caller already
+    // confirmed teardown should be skipped.
+    let infra: OpenclawInfra;
     try {
-      await this.loadInfra();
+      infra = await this.loadInfra();
     } catch (err) {
       if (err instanceof OpenclawInfraNotDeployedError) {
         this.logger.warn(
           "reaper: openclaw infra not deployed; skipping this run",
           { error: err.message },
         );
-        return { reaped: 0, failed: 0, scanned: 0 };
+        return { reaped: 0, failed: 0, notFound: 0, scanned: 0 };
       }
       throw err;
     }
@@ -969,20 +1003,20 @@ export class OpenclawSessionsService {
 
     let reaped = 0;
     let failed = 0;
+    let notFound = 0;
     for (const row of expired) {
       try {
         // `userId: null` flags this as a system call; stopSession's
         // ownership check is skipped (it's keyed on userId !== null).
+        // `infra` is the pre-loaded contract — saves the redundant
+        // SSM round-trip per row.
         const result = await this.stopSession({
           sessionId: row.id,
           userId: null,
           reason: "reaper",
+          infra,
         });
-        // `not_found` after `listExpired` returned the row means
-        // another concurrent reaper or a user DELETE got there first
-        // — count it toward "reaped" so it doesn't trip the failure
-        // alarm. `stopped` is the normal happy path.
-        if (result.kind === "stopped" || result.kind === "not_found") {
+        if (result.kind === "stopped") {
           reaped += 1;
           this.logger.info("reaper: stopped expired session", {
             sessionId: row.id,
@@ -990,8 +1024,23 @@ export class OpenclawSessionsService {
             tier: row.tier,
             startedAt: row.startedAt.toISOString(),
             ageMs: now.getTime() - row.startedAt.getTime(),
-            resolution: result.kind,
           });
+        } else if (result.kind === "not_found") {
+          // Race: a parallel reaper run / user DELETE got there first
+          // between listExpired and stopSession. Distinct from
+          // `stopped` so a pattern of all-not-found (e.g. a bug in
+          // findById vs listExpired alignment) is visible in the
+          // metrics — Inspector PR #113 flagged the prior collapsed
+          // "treat as reaped" path as masking a real bug class.
+          notFound += 1;
+          this.logger.info(
+            "reaper: row already stopped before reaper got there",
+            {
+              sessionId: row.id,
+              userId: row.userId,
+              tier: row.tier,
+            },
+          );
         } else {
           // result.kind === "forbidden" — should not happen with
           // userId: null, but keep the branch closed.
@@ -1014,9 +1063,10 @@ export class OpenclawSessionsService {
     this.logger.info("reaper: run complete", {
       reaped,
       failed,
+      notFound,
       scanned: expired.length,
     });
-    return { reaped, failed, scanned: expired.length };
+    return { reaped, failed, notFound, scanned: expired.length };
   }
 
   private async tearDownSessionResources(args: {

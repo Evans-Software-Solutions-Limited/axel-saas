@@ -111,7 +111,7 @@ async function getCloudWatchClient(): Promise<CloudWatchClient> {
  * would then flag a fake outage). Log + swallow.
  */
 async function emitMetrics(
-  result: { reaped: number; failed: number },
+  result: { reaped: number; failed: number; notFound: number },
   stage: string,
 ): Promise<void> {
   try {
@@ -130,6 +130,12 @@ async function emitMetrics(
           {
             MetricName: "ReapFailure",
             Value: result.failed,
+            Unit: "Count",
+            Dimensions: [{ Name: "Stage", Value: stage }],
+          },
+          {
+            MetricName: "ReapNotFound",
+            Value: result.notFound,
             Unit: "Count",
             Dimensions: [{ Name: "Stage", Value: stage }],
           },

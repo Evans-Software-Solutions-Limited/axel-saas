@@ -13,9 +13,15 @@ import { buildHandler } from "../reaperRunner";
 import type { OpenclawSessionsService } from "../openclawSessionsService";
 
 function makeService(
-  result: { reaped: number; failed: number; scanned: number } = {
+  result: {
+    reaped: number;
+    failed: number;
+    notFound: number;
+    scanned: number;
+  } = {
     reaped: 0,
     failed: 0,
+    notFound: 0,
     scanned: 0,
   },
   overrides: { throwInstead?: Error } = {},
@@ -30,7 +36,12 @@ function makeService(
 
 describe("reaperHandler.buildHandler", () => {
   it("returns the service result enriched with durationMs", async () => {
-    const service = makeService({ reaped: 3, failed: 1, scanned: 4 });
+    const service = makeService({
+      reaped: 3,
+      failed: 1,
+      notFound: 0,
+      scanned: 4,
+    });
     let ticks = 0;
     const clock = () => {
       // First call (start) = t0; second call (end) = t0 + 250ms.
@@ -44,13 +55,19 @@ describe("reaperHandler.buildHandler", () => {
     expect(result).toEqual({
       reaped: 3,
       failed: 1,
+      notFound: 0,
       scanned: 4,
       durationMs: 250,
     });
   });
 
   it("emits metrics with the supplied stage label", async () => {
-    const service = makeService({ reaped: 2, failed: 0, scanned: 2 });
+    const service = makeService({
+      reaped: 2,
+      failed: 0,
+      notFound: 0,
+      scanned: 2,
+    });
     const emit = vi.fn().mockResolvedValue(undefined);
     const fn = buildHandler({
       service,
@@ -58,7 +75,29 @@ describe("reaperHandler.buildHandler", () => {
       stage: "staging",
     });
     await fn();
-    expect(emit).toHaveBeenCalledWith({ reaped: 2, failed: 0 }, "staging");
+    expect(emit).toHaveBeenCalledWith(
+      { reaped: 2, failed: 0, notFound: 0 },
+      "staging",
+    );
+  });
+
+  it("forwards notFound count through to metrics", async () => {
+    // Inspector PR #113 finding: notFound must be a distinct metric
+    // so a pattern shift toward all-notFound (which would mask a
+    // findById/listExpired filter drift bug) becomes visible.
+    const service = makeService({
+      reaped: 1,
+      failed: 0,
+      notFound: 3,
+      scanned: 4,
+    });
+    const emit = vi.fn().mockResolvedValue(undefined);
+    const fn = buildHandler({ service, emitMetrics: emit, stage: "staging" });
+    await fn();
+    expect(emit).toHaveBeenCalledWith(
+      { reaped: 1, failed: 0, notFound: 3 },
+      "staging",
+    );
   });
 
   it("falls back to STAGE env var when stage is not passed", async () => {
@@ -120,7 +159,12 @@ describe("reaperHandler.buildHandler", () => {
     // even when a *test* emit rejects, buildHandler still surfaces
     // it (so the production impl's swallow is the only resilience
     // boundary, kept honest).
-    const service = makeService({ reaped: 1, failed: 0, scanned: 1 });
+    const service = makeService({
+      reaped: 1,
+      failed: 0,
+      notFound: 0,
+      scanned: 1,
+    });
     const emit = vi.fn().mockRejectedValue(new Error("CW down"));
     const fn = buildHandler({ service, emitMetrics: emit });
     // Per design: a custom emit that throws WILL propagate. The

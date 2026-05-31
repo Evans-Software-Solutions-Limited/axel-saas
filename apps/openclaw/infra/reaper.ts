@@ -119,7 +119,16 @@ export const reaper = new sst.aws.Cron("OpenclawReaper", {
     handler:
       "../../microservices/core/src/application/openclaw/reaperHandler.handler",
     runtime: "nodejs22.x",
-    timeout: "5 minutes",
+    // 15 minutes — the reaper loops sequentially over expired rows,
+    // each stopSession does DescribeTargetHealth + DeregisterTargets +
+    // DeleteRule + DeleteTargetGroup + StopTask + DB update (~3-5s per
+    // row in steady state, slower when the ELB target-deregistration
+    // delay applies). At 5 min the first-run-after-cap-added scenario
+    // (potentially hundreds of pre-existing sessions waiting to be
+    // reaped) could time out and leak the tail. 15 min matches the
+    // EventBridge cadence — the worst-case overshoot is unchanged
+    // even if a single invocation runs long.
+    timeout: "15 minutes",
     memory: "512 MB",
     environment: {
       STAGE: $app.stage,
@@ -144,11 +153,22 @@ export const reaper = new sst.aws.Cron("OpenclawReaper", {
         ],
       },
       // ELB v2 teardown — scoped to this stage's listener for rule
-      // operations, and wildcard on target groups (TG ARNs are not
-      // known at deploy time — they're created per-session at runtime
-      // by the core API). The natural scope tightening here would be
-      // a resource tag policy on TGs, which the core API doesn't apply
-      // today; tracked for a follow-up tightening pass.
+      // operations, and to the actual TG naming convention the core
+      // API uses for target groups (TG ARNs are not known at deploy
+      // time — they're created per-session at runtime). The natural
+      // scope tightening here would be a resource tag policy on TGs,
+      // which the core API doesn't apply today; tracked for a
+      // follow-up tightening pass.
+      //
+      // The TG prefix is `oc-` (NOT `openclaw-`) because TG names are
+      // capped at 32 chars by AWS; the service uses `oc-${sessionId
+      // .replace(/-/g, "").slice(0, 28)}` — see
+      // openclawSessionsService.ts:583. An IAM grant with the wrong
+      // prefix is the blast-radius bug: every reaper invocation
+      // would get AccessDenied on DeleteTargetGroup, the
+      // `ReapFailure` alarm would fire on the first session expiry
+      // after deploy, and rows would stay stuck active forever.
+      // Inspector PR #113 found this pre-merge.
       {
         actions: [
           "elasticloadbalancing:DeleteRule",
@@ -156,7 +176,12 @@ export const reaper = new sst.aws.Cron("OpenclawReaper", {
         ],
         resources: [
           listener.arn,
-          "arn:aws:elasticloadbalancing:*:*:listener-rule/*",
+          // Listener-rule ARNs are `:listener-rule/app/<lb-name>/
+          // <lb-id>/<listener-id>/<rule-id>`. IAM wildcards do match
+          // `/` mid-ARN, so this is genuinely scoped per stage via
+          // the `openclaw-${stage}` LB name segment rather than a
+          // global wildcard.
+          $interpolate`arn:aws:elasticloadbalancing:eu-west-2:*:listener-rule/app/openclaw-${$app.stage}/*/*/*`,
         ],
       },
       {
@@ -166,7 +191,7 @@ export const reaper = new sst.aws.Cron("OpenclawReaper", {
           "elasticloadbalancing:DescribeTargetHealth",
         ],
         resources: [
-          $interpolate`arn:aws:elasticloadbalancing:eu-west-2:*:targetgroup/openclaw-*/*`,
+          "arn:aws:elasticloadbalancing:eu-west-2:*:targetgroup/oc-*/*",
         ],
       },
       // SSM contract — the reaper reads the same cross-stack params
