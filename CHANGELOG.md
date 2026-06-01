@@ -1,5 +1,41 @@
 # Changelog
 
+## [1.3.0](https://github.com/Evans-Software-Solutions-Limited/axel-saas/compare/axel-saas-v1.2.0...axel-saas-v1.3.0) (2026-06-01)
+
+
+### Features
+
+* align subscription tiers with free/premium/enterprise model ([#85](https://github.com/Evans-Software-Solutions-Limited/axel-saas/issues/85)) ([b972415](https://github.com/Evans-Software-Solutions-Limited/axel-saas/commit/b972415563c7a6bb2335188d40954d3f2531e62d))
+* **auth,subscriptions:** re-enable signup/login and add /subscriptions/free ([#89](https://github.com/Evans-Software-Solutions-Limited/axel-saas/issues/89)) ([b2d4265](https://github.com/Evans-Software-Solutions-Limited/axel-saas/commit/b2d42657f9d3770fcea85d4072c93685298618ce))
+* **email:** transactional email service with Resend ([#86](https://github.com/Evans-Software-Solutions-Limited/axel-saas/issues/86)) ([e193fae](https://github.com/Evans-Software-Solutions-Limited/axel-saas/commit/e193fae86d98c972efdeb5ad1a86992ad41f16e4))
+* **gateway:** typed client foundations (timeout + tracing + structured errors) ([#98](https://github.com/Evans-Software-Solutions-Limited/axel-saas/issues/98)) ([76c7750](https://github.com/Evans-Software-Solutions-Limited/axel-saas/commit/76c7750b9731abc5a6ac079a299bf980e680ca39))
+* **integrations:** wire frontend + OAuth start/callback flow ([#94](https://github.com/Evans-Software-Solutions-Limited/axel-saas/issues/94)) ([71bad2b](https://github.com/Evans-Software-Solutions-Limited/axel-saas/commit/71bad2bcd14ef2174a251dfe52e6bbf378da27b9))
+* **office,tasks:** wire to real task API with shared hook ([#87](https://github.com/Evans-Software-Solutions-Limited/axel-saas/issues/87)) ([60460d3](https://github.com/Evans-Software-Solutions-Limited/axel-saas/commit/60460d3bec77cf70930ff689fe4da0384eb0006f))
+* **openclaw:** chat-loop verification operator script ([#114](https://github.com/Evans-Software-Solutions-Limited/axel-saas/issues/114)) ([c33274c](https://github.com/Evans-Software-Solutions-Limited/axel-saas/commit/c33274cc4034c78fdfdd58fe61aad3173a5c6961))
+* **openclaw:** in-process bridge plugin exposing the gateway-contract REST surface ([#99](https://github.com/Evans-Software-Solutions-Limited/axel-saas/issues/99)) ([4699b59](https://github.com/Evans-Software-Solutions-Limited/axel-saas/commit/4699b5950eab4757a03616638e1a9224957d2eaa))
+* **openclaw:** Phase 2 SST app skeleton (ECR, EFS, ECS, ALB, IAM, SSM) ([#105](https://github.com/Evans-Software-Solutions-Limited/axel-saas/issues/105)) ([23a89cf](https://github.com/Evans-Software-Solutions-Limited/axel-saas/commit/23a89cf181b11e954a5791821a457ec52d3d1350))
+* **openclaw:** Phase 3 — wildcard DNS, ACM cert, HTTPS-443 listener ([#106](https://github.com/Evans-Software-Solutions-Limited/axel-saas/issues/106)) ([f65cea8](https://github.com/Evans-Software-Solutions-Limited/axel-saas/commit/f65cea8e916b4958a4e07eada9667e524048f4fb))
+* **openclaw:** Phase 5 — per-user OpenClaw session API ([#107](https://github.com/Evans-Software-Solutions-Limited/axel-saas/issues/107)) ([b699948](https://github.com/Evans-Software-Solutions-Limited/axel-saas/commit/b69994847c51689a2bc7311ddf24f6bc5882f798))
+* **openclaw:** Phase 6 reaper Lambda + alarms ([#113](https://github.com/Evans-Software-Solutions-Limited/axel-saas/issues/113)) ([a06c29f](https://github.com/Evans-Software-Solutions-Limited/axel-saas/commit/a06c29fe5d87953a2bc08b3ec41d97826670a061))
+* **openclaw:** pinned-version Docker runtime for local testing (Phase 1) ([437fd04](https://github.com/Evans-Software-Solutions-Limited/axel-saas/commit/437fd0477272db3902b723bc23d2083ffe613021))
+* **rate-limit:** per-user authed rate limiter (DynamoDB-backed) ([#97](https://github.com/Evans-Software-Solutions-Limited/axel-saas/issues/97)) ([5088df5](https://github.com/Evans-Software-Solutions-Limited/axel-saas/commit/5088df59379f4c878d73fcd3dd767c8f62ac4b03))
+* secure integrations/secrets foundation ([#82](https://github.com/Evans-Software-Solutions-Limited/axel-saas/issues/82)) ([41eb331](https://github.com/Evans-Software-Solutions-Limited/axel-saas/commit/41eb3315b2b28b30fbd9c37df1a61dfbd3726c92))
+* **settings:** profile save, notification prefs, account deletion (US-S1/S7/S8) ([#101](https://github.com/Evans-Software-Solutions-Limited/axel-saas/issues/101)) ([51d28b3](https://github.com/Evans-Software-Solutions-Limited/axel-saas/commit/51d28b34bbef0ed3b5665c352db8cb95c07c3db8))
+* **settings:** wire billing to real subscription + Stripe portal ([#91](https://github.com/Evans-Software-Solutions-Limited/axel-saas/issues/91)) ([4ec9d6f](https://github.com/Evans-Software-Solutions-Limited/axel-saas/commit/4ec9d6fa77b5a67629810b50558980df397539d3))
+* **stripe:** tier-change → workspace regen ([#115](https://github.com/Evans-Software-Solutions-Limited/axel-saas/issues/115)) ([29dcc0c](https://github.com/Evans-Software-Solutions-Limited/axel-saas/commit/29dcc0cf692da70bed69002a7dba605a44ec8268))
+* **subscribe:** close free-tier gaps deferred from [#89](https://github.com/Evans-Software-Solutions-Limited/axel-saas/issues/89) ([#90](https://github.com/Evans-Software-Solutions-Limited/axel-saas/issues/90)) ([eeacc46](https://github.com/Evans-Software-Solutions-Limited/axel-saas/commit/eeacc4641281b0255d8302426f336e9b3e70b487))
+* **usage:** per-user token caps + chat enforcement + Settings panel ([#96](https://github.com/Evans-Software-Solutions-Limited/axel-saas/issues/96)) ([8430f83](https://github.com/Evans-Software-Solutions-Limited/axel-saas/commit/8430f83e51fcb8180c6450bfab4f6fd0350c0a0b))
+* **workspace:** regenerate openclaw.json with bridge-plugin preservation ([#104](https://github.com/Evans-Software-Solutions-Limited/axel-saas/issues/104)) ([b710b4b](https://github.com/Evans-Software-Solutions-Limited/axel-saas/commit/b710b4b23514fa9bb5a747abceca2e1311b85036))
+* **workspace:** regenerate TOOLS.md + reload on integration/BYOM change ([#100](https://github.com/Evans-Software-Solutions-Limited/axel-saas/issues/100)) ([83739b7](https://github.com/Evans-Software-Solutions-Limited/axel-saas/commit/83739b7f5469a2405dece37df13f8f582e9d9937))
+
+
+### Bug Fixes
+
+* format claude-review.yml to pass prettier --check ([4edf6d4](https://github.com/Evans-Software-Solutions-Limited/axel-saas/commit/4edf6d4cf43432752cf4ea3fa1f612452979a56a))
+* **infra:** name-pattern IAM grant, remove deploy-time SSM read ([#109](https://github.com/Evans-Software-Solutions-Limited/axel-saas/issues/109)) ([483a4b4](https://github.com/Evans-Software-Solutions-Limited/axel-saas/commit/483a4b465f168b7a4d8108596037cae4056a0728))
+* **openclaw:** loader-throw collapses to dns_unavailable, not 500 ([#110](https://github.com/Evans-Software-Solutions-Limited/axel-saas/issues/110)) ([000e805](https://github.com/Evans-Software-Solutions-Limited/axel-saas/commit/000e8056fdbe34e1265e779935d7ec7a34751c86))
+* **signup:** render "check your email" state instead of routing home ([#95](https://github.com/Evans-Software-Solutions-Limited/axel-saas/issues/95)) ([bcc7148](https://github.com/Evans-Software-Solutions-Limited/axel-saas/commit/bcc714820c155b9801b7576473add7723cbad7f7))
+
 ## [1.2.0](https://github.com/Evans-Software-Solutions-Limited/axel-saas/compare/axel-saas-v1.1.0...axel-saas-v1.2.0) (2026-04-02)
 
 
