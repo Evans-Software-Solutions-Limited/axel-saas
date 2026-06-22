@@ -1,4 +1,4 @@
 {
-  "openclaw": "v2026.5.28",
+  "openclaw": "v2026.6.9",
   "_": "Single source of truth for the pinned OpenClaw release. Bump only via an explicit PR. Tag must exist on github.com/openclaw/openclaw."
 }
