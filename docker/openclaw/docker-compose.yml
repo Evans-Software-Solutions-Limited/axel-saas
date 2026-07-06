@@ -12,8 +12,8 @@ services:
         # Read from versions.json so the pinned version lives in exactly one place.
         # Override on the CLI for one-off local testing of a different tag, e.g.:
         #   docker compose build --build-arg OPENCLAW_VERSION=v2026.4.25
-        OPENCLAW_VERSION: ${OPENCLAW_VERSION:-v2026.5.28}
-    image: openclaw:${OPENCLAW_VERSION:-v2026.5.28}-local
+        OPENCLAW_VERSION: ${OPENCLAW_VERSION:-v2026.6.11}
+    image: openclaw:${OPENCLAW_VERSION:-v2026.6.11}-local
     ports:
       - "18789:18789"
     environment:
