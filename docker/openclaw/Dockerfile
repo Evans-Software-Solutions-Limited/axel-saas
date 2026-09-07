@@ -6,7 +6,7 @@
 
 FROM node:22-slim
 
-# OPENCLAW_VERSION is the GitHub release tag (e.g. v2026.5.28). Source of truth: versions.json.
+# OPENCLAW_VERSION is the GitHub release tag (e.g. v2026.9.2). Source of truth: versions.json.
 # We install from the npm registry — npm publishes pre-built tarballs (with `dist/`) for each
 # GitHub release; `npm install -g github:...` does not work because OpenClaw's `dist/` is built
 # at publish time and is not committed to the source tree. From 2026.5.2 onward the npm-first
@@ -23,7 +23,7 @@ RUN apt-get update \
  && rm -rf /var/lib/apt/lists/*
 
 # Strip the leading 'v' from the GitHub tag to get the npm semver (POSIX shell parameter expansion).
-# v2026.5.28 -> 2026.5.28
+# v2026.9.2 -> 2026.9.2
 RUN NPM_VERSION="${OPENCLAW_VERSION#v}" \
  && echo "Installing openclaw@${NPM_VERSION} (built from github.com/${OPENCLAW_REPO} tag ${OPENCLAW_VERSION})" \
  && npm install -g "openclaw@${NPM_VERSION}"
